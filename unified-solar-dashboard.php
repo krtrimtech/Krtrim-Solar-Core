@@ -4,7 +4,7 @@
  * Plugin URI:        https://krtrim.tech/tool
  * Description:       A comprehensive project management and bidding platform for solar companies, developed by Krtrim.
  * Version:           2.0.1
- * Author:            Shyanukant Rathi
+ * Author:            Krtrim
  * Author URI:        https://krtrim.tech
  * License:           GPL-2.0+
  * License URI:       http://www.gnu.org/licenses/gpl-2.0.txt
@@ -57,8 +57,7 @@ final class Krtrim_Solar_Core {
 		require_once $this->dir_path . 'includes/class-notifications-manager.php';
 		require_once $this->dir_path . 'admin/views/view-vendor-approval.php';
 		require_once $this->dir_path . 'admin/views/view-project-reviews.php';
-		require_once $this->dir_path . 'admin/views/view-notification-settings.php';
-		require_once $this->dir_path . 'admin/views/view-vendor-settings.php';
+		require_once $this->dir_path . 'admin/views/view-general-settings.php';
 		require_once $this->dir_path . 'admin/views/view-team-analysis.php';
 		require_once $this->dir_path . 'public/views/view-client-dashboard.php';
 		require_once $this->dir_path . 'public/views/view-vendor-dashboard.php';
@@ -85,7 +84,16 @@ final class Krtrim_Solar_Core {
 		add_shortcode( 'vendor_registration_form', 'sp_vendor_registration_form_shortcode' );
 		add_shortcode( 'solar_project_marketplace', 'sp_project_marketplace_shortcode' );
 		
+		add_shortcode( 'solar_project_marketplace', 'sp_project_marketplace_shortcode' );
+		
 		add_filter( 'template_include', [ $this, 'template_include_single_project' ] );
+		add_filter( 'plugin_action_links_' . plugin_basename( $this->file ), [ $this, 'add_plugin_action_links' ] );
+	}
+
+	public function add_plugin_action_links( $links ) {
+		$settings_link = '<a href="options-general.php?page=ksc-settings">Settings</a>';
+		$links[] = $settings_link;
+		return $links;
 	}
 
 	public function activate() {
@@ -95,16 +103,20 @@ final class Krtrim_Solar_Core {
 
 	public function enqueue_public_scripts() {
 		wp_enqueue_style( 'ksc-public-styles', $this->dir_url . 'assets/css/dashboard.css', [], $this->version );
-		wp_enqueue_script( 'ksc-public-scripts', $this->dir_url . 'assets/js/dashboard.js', [ 'jquery' ], $this->version, true );
-		wp_localize_script( 'ksc-public-scripts', 'ksc_dashboard_vars', [
-			'rest_api_nonce' => wp_create_nonce( 'wp_rest' ),
-			'client_api_url' => rest_url( 'solar/v1/client-notifications' ),
-			'vendor_api_url' => rest_url( 'solar/v1/vendor-notifications' ),
-			'admin_ajax_url' => admin_url( 'admin-ajax.php' ),
-			'get_earnings_chart_data_nonce' => wp_create_nonce( 'get_earnings_chart_data_nonce' ),
-			'client_comments_url' => rest_url( 'solar/v1/client-comments' ),
-			'vendor_notifications_url' => rest_url( 'solar/v1/vendor-notifications/' ),
-		]);
+		wp_enqueue_style( 'ksc-public-styles', $this->dir_url . 'assets/css/dashboard.css', [], $this->version );
+		
+        if ( is_page( 'solar-dashboard' ) ) {
+            wp_enqueue_script( 'ksc-public-scripts', $this->dir_url . 'assets/js/dashboard.js', [ 'jquery' ], $this->version, true );
+            wp_localize_script( 'ksc-public-scripts', 'ksc_dashboard_vars', [
+                'rest_api_nonce' => wp_create_nonce( 'wp_rest' ),
+                'client_api_url' => rest_url( 'solar/v1/client-notifications' ),
+                'vendor_api_url' => rest_url( 'solar/v1/vendor-notifications' ),
+                'admin_ajax_url' => admin_url( 'admin-ajax.php' ),
+                'get_earnings_chart_data_nonce' => wp_create_nonce( 'get_earnings_chart_data_nonce' ),
+                'client_comments_url' => rest_url( 'solar/v1/client-comments' ),
+                'vendor_notifications_url' => rest_url( 'solar/v1/vendor-notifications/' ),
+            ]);
+        }
 
 		if ( is_page( 'solar-dashboard' ) && in_array( 'solar_client', (array) wp_get_current_user()->roles ) ) {
 			$client_id = get_current_user_id();
@@ -136,7 +148,8 @@ final class Krtrim_Solar_Core {
 		}
 
 		if ( is_page( 'area-manager-dashboard' ) ) {
-			wp_enqueue_script('area-manager-dashboard', $this->dir_url . 'assets/js/area-manager-dashboard.js', ['jquery'], null, true);
+            wp_enqueue_script( 'chart-js', 'https://cdn.jsdelivr.net/npm/chart.js', [], '3.7.0', true );
+			wp_enqueue_script('area-manager-dashboard', $this->dir_url . 'assets/js/area-manager-dashboard.js', ['jquery', 'chart-js'], null, true);
 			wp_localize_script('area-manager-dashboard', 'sp_area_dashboard_vars', [
 				'ajax_url' => admin_url('admin-ajax.php'),
 				'create_project_nonce' => wp_create_nonce('sp_create_project_nonce_field'),
@@ -152,6 +165,8 @@ final class Krtrim_Solar_Core {
                 'create_lead_nonce' => wp_create_nonce('create_lead_nonce'),
                 'delete_lead_nonce' => wp_create_nonce('delete_lead_nonce'),
                 'send_message_nonce' => wp_create_nonce('send_message_nonce'),
+                'get_clients_nonce' => wp_create_nonce('get_clients_nonce'),
+                'reset_password_nonce' => wp_create_nonce('reset_password_nonce'),
 				'states_cities_json_url' => $this->dir_url . 'assets/data/indian-states-cities.json',
 			]);
 		}

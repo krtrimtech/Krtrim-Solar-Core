@@ -42,6 +42,10 @@ class SP_API_Handlers {
         add_action('wp_ajax_create_solar_lead', [ $this, 'create_solar_lead' ]);
         add_action('wp_ajax_delete_solar_lead', [ $this, 'delete_solar_lead' ]);
         add_action('wp_ajax_send_lead_message', [ $this, 'send_lead_message' ]);
+
+        // Client Management
+        add_action('wp_ajax_get_area_manager_clients', [ $this, 'get_area_manager_clients' ]);
+        add_action('wp_ajax_reset_client_password', [ $this, 'reset_client_password' ]);
     }
 
     public function get_area_manager_dashboard_stats() {
@@ -279,6 +283,11 @@ class SP_API_Handlers {
         $username = sanitize_user($_POST['username']);
         $email = sanitize_email($_POST['email']);
         $password = $_POST['password'];
+        $name = sanitize_text_field($_POST['name']);
+
+        if (empty($username) || empty($email) || empty($password) || empty($name)) {
+            wp_send_json_error(['message' => 'All fields are required.']);
+        }
 
         if (username_exists($username)) {
             wp_send_json_error(['message' => 'Username already exists.']);
@@ -296,10 +305,23 @@ class SP_API_Handlers {
 
         $user = new WP_User($user_id);
         $user->set_role('solar_client');
+        
+        // Split name into first and last
+        $name_parts = explode(' ', $name, 2);
+        $first_name = $name_parts[0];
+        $last_name = isset($name_parts[1]) ? $name_parts[1] : '';
 
-        update_user_meta($user_id, '_created_by_area_manager', $manager_id);
+        wp_update_user([
+            'ID' => $user_id,
+            'display_name' => $name,
+            'first_name' => $first_name,
+            'last_name' => $last_name
+        ]);
 
-        wp_send_json_success(['message' => 'Client created successfully.']);
+        // Link to Area Manager
+        update_user_meta($user_id, '_created_by_area_manager', get_current_user_id());
+
+        wp_send_json_success(['message' => 'Client account created successfully.']);
     }
 
     public function create_vendor_from_dashboard() {
@@ -783,19 +805,78 @@ class SP_API_Handlers {
 
         $wpdb->update(
             $table,
-            ['image_url' => $image_url, 'vendor_comment' => $vendor_comment, 'admin_status' => 'pending', 'updated_at' => current_time('mysql')],
+            [
+                'image_url' => $image_url,
+                'vendor_comment' => $vendor_comment,
+                'admin_status' => 'pending',
+                'updated_at' => current_time('mysql')
+            ],
             ['id' => $step_id],
             ['%s', '%s', '%s', '%s'],
             ['%d']
         );
 
-        $project_status = get_post_meta($project_id, 'project_status', true);
-        if (in_array($project_status, ['pending', 'assigned'])) {
-            update_post_meta($project_id, 'project_status', 'in_progress');
+        do_action('sp_vendor_step_submitted', $step_id, $project_id);
+
+        wp_send_json_success(['message' => 'Step submitted successfully! The page will now reload.']);
+    }
+
+    public function get_area_manager_clients() {
+        check_ajax_referer('get_clients_nonce', 'nonce');
+
+        if (!is_user_logged_in() || !in_array('area_manager', (array)wp_get_current_user()->roles)) {
+            wp_send_json_error(['message' => 'Permission denied.']);
         }
 
-        wp_send_json_success(['message' => 'Uploaded successfully!']);
+        $manager_id = get_current_user_id();
+        $args = [
+            'role' => 'solar_client',
+            'meta_key' => '_created_by_area_manager',
+            'meta_value' => $manager_id,
+            'fields' => ['ID', 'display_name', 'user_email', 'user_login'],
+        ];
+
+        $clients = get_users($args);
+        $data = [];
+
+        foreach ($clients as $client) {
+            $data[] = [
+                'id' => $client->ID,
+                'name' => $client->display_name,
+                'email' => $client->user_email,
+                'username' => $client->user_login,
+            ];
+        }
+
+        wp_send_json_success(['clients' => $data]);
     }
+
+    public function reset_client_password() {
+        check_ajax_referer('reset_password_nonce', 'nonce');
+
+        if (!is_user_logged_in() || !in_array('area_manager', (array)wp_get_current_user()->roles)) {
+            wp_send_json_error(['message' => 'Permission denied.']);
+        }
+
+        $client_id = intval($_POST['client_id']);
+        $new_password = $_POST['new_password'];
+
+        if (empty($client_id) || empty($new_password)) {
+            wp_send_json_error(['message' => 'Invalid data.']);
+        }
+
+        // Verify client belongs to this area manager
+        $created_by = get_user_meta($client_id, '_created_by_area_manager', true);
+        if ($created_by != get_current_user_id()) {
+            wp_send_json_error(['message' => 'You do not have permission to manage this client.']);
+        }
+
+        wp_set_password($new_password, $client_id);
+
+        wp_send_json_success(['message' => 'Password reset successfully.']);
+    }
+
+
 
     public function submit_project_bid() {
         $project_id = isset($_POST['project_id']) ? intval($_POST['project_id']) : 0;
@@ -1030,6 +1111,26 @@ class SP_API_Handlers {
             wp_send_json_error(['message' => 'Could not create project: ' . $project_id->get_error_message()]);
         }
 
+        if (isset($data['vendor_assignment_method'])) {
+            $method = sanitize_text_field($data['vendor_assignment_method']);
+            update_post_meta($project_id, '_vendor_assignment_method', $method);
+
+            if ($method === 'manual') {
+                if (isset($data['assigned_vendor_id'])) {
+                    update_post_meta($project_id, '_assigned_vendor_id', sanitize_text_field($data['assigned_vendor_id']));
+                }
+                if (isset($data['paid_to_vendor'])) {
+                    update_post_meta($project_id, '_paid_to_vendor', sanitize_text_field($data['paid_to_vendor']));
+                }
+                update_post_meta($project_id, '_project_status', 'assigned');
+                wp_update_post(['ID' => $project_id, 'post_status' => 'assigned']);
+            } else {
+                // Bidding mode
+                delete_post_meta($project_id, '_assigned_vendor_id');
+                delete_post_meta($project_id, '_paid_to_vendor');
+            }
+        }
+
         $fields = [
             'project_state',
             'project_city',
@@ -1039,9 +1140,6 @@ class SP_API_Handlers {
             'client_address',
             'client_phone_number',
             'project_start_date',
-            'vendor_assignment_method',
-            'assigned_vendor_id',
-            'paid_to_vendor',
         ];
 
         foreach ($fields as $field) {

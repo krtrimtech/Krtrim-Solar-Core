@@ -1,3 +1,74 @@
+// Password Toggle
+$(document).on('click', '.toggle-password', function () {
+    const targetId = $(this).data('target');
+    const field = $('#' + targetId);
+    if (field.attr('type') === 'password') {
+        field.attr('type', 'text');
+    } else {
+        field.attr('type', 'password');
+    }
+});
+
+// Generate Password
+$(document).on('click', '.generate-password-btn', function () {
+    const targetId = $(this).data('target');
+    const chars = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789!@#$%^&*()";
+    let password = "";
+    for (let i = 0; i < 12; i++) {
+        password += chars.charAt(Math.floor(Math.random() * chars.length));
+    }
+    $('#' + targetId).val(password).trigger('input');
+});
+
+// Password Strength
+$('#client_password').on('input', function () {
+    const password = $(this).val();
+    const meter = $('#password-strength-bar');
+    const text = $('#password-strength-text');
+    let strength = 0;
+
+    if (password.length >= 8) strength++;
+    if (password.match(/[a-z]/) && password.match(/[A-Z]/)) strength++;
+    if (password.match(/\d/)) strength++;
+    if (password.match(/[^a-zA-Z\d]/)) strength++;
+
+    let color = 'red';
+    let width = '0%';
+    let label = '';
+
+    switch (strength) {
+        case 0:
+        case 1:
+            width = '25%';
+            color = 'red';
+            label = 'Weak';
+            break;
+        case 2:
+            width = '50%';
+            color = 'orange';
+            label = 'Medium';
+            break;
+        case 3:
+            width = '75%';
+            color = 'blue';
+            label = 'Strong';
+            break;
+        case 4:
+            width = '100%';
+            color = 'green';
+            label = 'Very Strong';
+            break;
+    }
+
+    if (password.length === 0) {
+        width = '0%';
+        label = '';
+    }
+
+    meter.css({ 'width': width, 'background-color': color });
+    text.text(label).css('color', color);
+});
+
 jQuery(document).ready(function ($) {
     const ajaxUrl = sp_area_dashboard_vars.ajax_url;
     const createProjectNonce = sp_area_dashboard_vars.create_project_nonce;
@@ -65,6 +136,8 @@ jQuery(document).ready(function ($) {
             loadVendorApprovals();
         } else if (section === 'leads') {
             loadLeads();
+        } else if (section === 'my-clients') {
+            loadMyClients();
         }
     });
 
@@ -183,36 +256,40 @@ jQuery(document).ready(function ($) {
 
     // --- Create Project ---
     let statesAndCities = [];
-    $.getJSON(sp_area_dashboard_vars.states_cities_json_url, function (data) {
-        statesAndCities = data.states;
-        const stateSelect = $('#project_state');
-        statesAndCities.forEach(state => {
-            stateSelect.append(`<option value="${state.state}">${state.state}</option>`);
+    if ($('#project_state').is('select')) {
+        $.getJSON(sp_area_dashboard_vars.states_cities_json_url, function (data) {
+            statesAndCities = data.states;
+            const stateSelect = $('#project_state');
+            statesAndCities.forEach(state => {
+                stateSelect.append(`<option value="${state.state}">${state.state}</option>`);
+            });
         });
-    });
 
-    $('#project_state').on('change', function () {
-        const selectedState = $(this).val();
-        const citySelect = $('#project_city');
-        citySelect.empty().append('<option value="">Select City</option>');
+        $('#project_state').on('change', function () {
+            const selectedState = $(this).val();
+            const citySelect = $('#project_city');
+            citySelect.empty().append('<option value="">Select City</option>');
 
-        if (selectedState) {
-            const stateData = statesAndCities.find(state => state.state === selectedState);
-            if (stateData) {
-                stateData.districts.forEach(city => {
-                    citySelect.append(`<option value="${city}">${city}</option>`);
-                });
+            if (selectedState) {
+                const stateData = statesAndCities.find(state => state.state === selectedState);
+                if (stateData) {
+                    stateData.districts.forEach(city => {
+                        citySelect.append(`<option value="${city}">${city}</option>`);
+                    });
+                }
             }
-        }
-    });
+        });
+    }
 
     $('input[name="vendor_assignment_method"]').on('change', function () {
-        if ($(this).val() === 'manual') {
-            $('.vendor-manual-fields').show();
-            $('#assigned_vendor_id, #paid_to_vendor').prop('disabled', false);
-        } else {
+        if ($(this).val() === 'bidding') {
+            // Bidding
             $('.vendor-manual-fields').hide();
             $('#assigned_vendor_id, #paid_to_vendor').prop('disabled', true);
+        } else {
+            // Manual
+            $('.vendor-manual-fields').show();
+            $('#assigned_vendor_id, #paid_to_vendor').prop('disabled', false);
         }
     });
 
@@ -235,6 +312,8 @@ jQuery(document).ready(function ($) {
                 solar_system_size_kw: $('#solar_system_size_kw').val(),
                 client_address: $('#client_address').val(),
                 client_phone_number: $('#client_phone_number').val(),
+                project_start_date: $('#project_start_date').val(),
+                project_start_date: $('#project_start_date').val(),
                 project_start_date: $('#project_start_date').val(),
                 vendor_assignment_method: $('input[name="vendor_assignment_method"]:checked').val(),
                 assigned_vendor_id: $('#assigned_vendor_id').val(),
@@ -286,6 +365,7 @@ jQuery(document).ready(function ($) {
                                     <td>
                                         <button class="button button-small open-msg-modal" data-type="email" data-lead-id="${lead.id}" data-recipient="${lead.email}" ${!lead.email ? 'disabled' : ''}>Email</button>
                                         <button class="button button-small open-msg-modal" data-type="whatsapp" data-lead-id="${lead.id}" data-recipient="${lead.phone}" ${!lead.phone ? 'disabled' : ''}>WhatsApp</button>
+                                        <button class="button button-small convert-lead-btn" data-lead-name="${lead.name}" data-lead-email="${lead.email}" data-lead-phone="${lead.phone}">Create Client</button>
                                         <button class="button button-small button-link-delete delete-lead-btn" data-lead-id="${lead.id}" style="color:red;">Delete</button>
                                     </td>
                                 </tr>
@@ -418,24 +498,49 @@ jQuery(document).ready(function ($) {
     });
 
     // --- Create Client ---
+    // --- Create Client ---
+    // Convert Lead to Client
+    $(document).on('click', '.convert-lead-btn', function () {
+        const name = $(this).data('lead-name');
+        const email = $(this).data('lead-email');
+
+        // Switch to Create Client section
+        $('.nav-item[data-section="create-client"]').click();
+
+        // Pre-fill form
+        $('#client_name').val(name);
+        $('#client_email').val(email);
+
+        // Generate a username suggestion
+        const username = email.split('@')[0];
+        $('#client_username').val(username);
+
+        $('#create-client-feedback').text('Pre-filled from lead data. Please set a password.').addClass('text-info');
+    });
+
     $('#create-client-form').on('submit', function (e) {
         e.preventDefault();
         const form = $(this);
         const feedback = $('#create-client-feedback');
+
+        const password = $('#client_password').val();
+
+        // No confirm check needed anymore
 
         $.ajax({
             url: ajaxUrl,
             type: 'POST',
             data: {
                 action: 'create_client_from_dashboard',
+                name: $('#client_name').val(),
                 username: $('#client_username').val(),
                 email: $('#client_email').val(),
-                password: $('#client_password').val(),
+                password: password,
                 nonce: sp_area_dashboard_vars.create_client_nonce,
             },
             beforeSend: function () {
                 form.find('button').prop('disabled', true).text('Creating...');
-                feedback.text('').removeClass('text-success text-danger');
+                feedback.text('').removeClass('text-success text-danger text-info');
             },
             success: function (response) {
                 if (response.success) {
@@ -608,4 +713,85 @@ jQuery(document).ready(function ($) {
             }
         });
     });
+    // --- My Clients ---
+    function loadMyClients() {
+        $('#my-clients-list-container').html('<p>Loading clients...</p>');
+        $.ajax({
+            url: ajaxUrl,
+            type: 'POST',
+            data: {
+                action: 'get_area_manager_clients',
+                nonce: sp_area_dashboard_vars.get_clients_nonce,
+            },
+            success: function (response) {
+                if (response.success) {
+                    let html = '';
+                    if (response.data.clients.length > 0) {
+                        html += '<table class="wp-list-table widefat fixed striped"><thead><tr><th>Name</th><th>Username</th><th>Email</th><th>Actions</th></tr></thead><tbody>';
+                        response.data.clients.forEach(client => {
+                            html += `
+                                <tr>
+                                    <td>${client.name}</td>
+                                    <td>${client.username}</td>
+                                    <td>${client.email}</td>
+                                    <td>
+                                        <button class="button button-small open-reset-password-modal" data-client-id="${client.id}" data-client-name="${client.name}">Reset Password</button>
+                                    </td>
+                                </tr>
+                            `;
+                        });
+                        html += '</tbody></table>';
+                    } else {
+                        html = '<p>No clients found.</p>';
+                    }
+                    $('#my-clients-list-container').html(html);
+                } else {
+                    $('#my-clients-list-container').html('<p class="text-danger">Error loading clients.</p>');
+                }
+            }
+        });
+    }
+
+    $(document).on('click', '.open-reset-password-modal', function (e) {
+        e.preventDefault();
+        const clientId = $(this).data('client-id');
+        const clientName = $(this).data('client-name');
+
+        $('#reset_password_client_id').val(clientId);
+        $('#reset-password-client-name').text(clientName);
+        $('#reset-password-modal').show();
+    });
+
+    $('#reset-password-form').on('submit', function (e) {
+        e.preventDefault();
+        const form = $(this);
+        const feedback = $('#reset-password-feedback');
+
+        $.ajax({
+            url: ajaxUrl,
+            type: 'POST',
+            data: {
+                action: 'reset_client_password',
+                nonce: sp_area_dashboard_vars.reset_password_nonce,
+                client_id: $('#reset_password_client_id').val(),
+                new_password: $('#new_password').val(),
+            },
+            beforeSend: function () {
+                form.find('button').prop('disabled', true).text('Resetting...');
+                feedback.text('');
+            },
+            success: function (response) {
+                if (response.success) {
+                    feedback.text(response.data.message).addClass('text-success');
+                    setTimeout(() => { $('#reset-password-modal').hide(); form[0].reset(); feedback.text(''); }, 2000);
+                } else {
+                    feedback.text(response.data.message).addClass('text-danger');
+                }
+            },
+            complete: function () {
+                form.find('button').prop('disabled', false).text('Reset Password');
+            }
+        });
+    });
+
 });

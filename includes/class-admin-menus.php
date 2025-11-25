@@ -57,22 +57,13 @@ class SP_Admin_Menus {
             27
         );
 
-        // Vendor Registration Settings Page (under Settings)
+        // Consolidated Settings Page
         add_options_page(
-            'Vendor Registration Settings',
-            'Vendor Registration',
+            'Kritim Solar Core Settings',
+            'Kritim Solar Core',
             'manage_options',
-            'vendor-registration-settings',
-            'sp_render_vendor_settings_page'
-        );
-
-        // Notification Settings Page (under Settings)
-        add_options_page(
-            'Notification Settings',
-            'Notifications',
-            'manage_options',
-            'notification-settings',
-            'sp_render_notification_settings_page'
+            'ksc-settings',
+            'sp_render_general_settings_page'
         );
     }
 }
