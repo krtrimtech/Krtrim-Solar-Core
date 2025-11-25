@@ -1,4 +1,4 @@
-jQuery(document).ready(function($) {
+jQuery(document).ready(function ($) {
     const ajaxUrl = sp_area_dashboard_vars.ajax_url;
     const createProjectNonce = sp_area_dashboard_vars.create_project_nonce;
     const projectDetailsNonce = sp_area_dashboard_vars.project_details_nonce;
@@ -12,9 +12,9 @@ jQuery(document).ready(function($) {
             type: 'POST',
             data: {
                 action: 'get_area_manager_dashboard_stats',
-                nonce: '<?php echo wp_create_nonce("get_dashboard_stats_nonce"); ?>',
+                nonce: sp_area_dashboard_vars.get_dashboard_stats_nonce,
             },
-            success: function(response) {
+            success: function (response) {
                 if (response.success) {
                     const stats = response.data;
                     $('#total-projects-stat').text(stats.total_projects);
@@ -46,10 +46,10 @@ jQuery(document).ready(function($) {
     loadDashboardStats();
 
     // --- Navigation ---
-    $('.nav-item').on('click', function(e) {
+    $('.nav-item').on('click', function (e) {
         e.preventDefault();
         const section = $(this).data('section');
-        
+
         $('.nav-item').removeClass('active');
         $(this).addClass('active');
 
@@ -74,9 +74,9 @@ jQuery(document).ready(function($) {
             type: 'POST',
             data: {
                 action: 'get_area_manager_projects',
-                security: ajaxUrl,
+                nonce: sp_area_dashboard_vars.get_projects_nonce,
             },
-            success: function(response) {
+            success: function (response) {
                 if (response.success) {
                     let html = '';
                     if (response.data.projects.length > 0) {
@@ -108,9 +108,9 @@ jQuery(document).ready(function($) {
             type: 'POST',
             data: {
                 action: 'get_area_manager_reviews',
-                nonce: '<?php echo wp_create_nonce("get_reviews_nonce"); ?>',
+                nonce: sp_area_dashboard_vars.get_reviews_nonce,
             },
-            success: function(response) {
+            success: function (response) {
                 if (response.success) {
                     let html = '';
                     if (response.data.reviews.length > 0) {
@@ -148,9 +148,9 @@ jQuery(document).ready(function($) {
             type: 'POST',
             data: {
                 action: 'get_area_manager_vendor_approvals',
-                nonce: '<?php echo wp_create_nonce("get_vendor_approvals_nonce"); ?>',
+                nonce: sp_area_dashboard_vars.get_vendor_approvals_nonce,
             },
-            success: function(response) {
+            success: function (response) {
                 if (response.success) {
                     let html = '';
                     if (response.data.vendors.length > 0) {
@@ -181,7 +181,7 @@ jQuery(document).ready(function($) {
 
     // --- Create Project ---
     let statesAndCities = [];
-    $.getJSON('<?php echo plugin_dir_url( __FILE__ ) . '../../assets/data/indian-states-cities.json'; ?>', function(data) {
+    $.getJSON(sp_area_dashboard_vars.states_cities_json_url, function (data) {
         statesAndCities = data.states;
         const stateSelect = $('#project_state');
         statesAndCities.forEach(state => {
@@ -189,7 +189,7 @@ jQuery(document).ready(function($) {
         });
     });
 
-    $('#project_state').on('change', function() {
+    $('#project_state').on('change', function () {
         const selectedState = $(this).val();
         const citySelect = $('#project_city');
         citySelect.empty().append('<option value="">Select City</option>');
@@ -204,7 +204,7 @@ jQuery(document).ready(function($) {
         }
     });
 
-    $('input[name="vendor_assignment_method"]').on('change', function() {
+    $('input[name="vendor_assignment_method"]').on('change', function () {
         if ($(this).val() === 'manual') {
             $('.vendor-manual-fields').show();
             $('#assigned_vendor_id, #paid_to_vendor').prop('disabled', false);
@@ -214,11 +214,11 @@ jQuery(document).ready(function($) {
         }
     });
 
-    $('#create-project-form').on('submit', function(e) {
+    $('#create-project-form').on('submit', function (e) {
         e.preventDefault();
         const form = $(this);
         const feedback = $('#create-project-feedback');
-        
+
         $.ajax({
             url: ajaxUrl,
             type: 'POST',
@@ -238,11 +238,11 @@ jQuery(document).ready(function($) {
                 assigned_vendor_id: $('#assigned_vendor_id').val(),
                 paid_to_vendor: $('#paid_to_vendor').val(),
             },
-            beforeSend: function() {
+            beforeSend: function () {
                 form.find('button').prop('disabled', true).text('Creating...');
                 feedback.text('').removeClass('text-success text-danger');
             },
-            success: function(response) {
+            success: function (response) {
                 if (response.success) {
                     feedback.text(response.data.message).addClass('text-success');
                     form[0].reset();
@@ -253,18 +253,18 @@ jQuery(document).ready(function($) {
                     feedback.text(response.data.message).addClass('text-danger');
                 }
             },
-            complete: function() {
+            complete: function () {
                 form.find('button').prop('disabled', false).text('Create Project');
             }
         });
     });
 
     // --- Create Vendor ---
-    $('#create-vendor-form').on('submit', function(e) {
+    $('#create-vendor-form').on('submit', function (e) {
         e.preventDefault();
         const form = $(this);
         const feedback = $('#create-vendor-feedback');
-        
+
         $.ajax({
             url: ajaxUrl,
             type: 'POST',
@@ -273,13 +273,13 @@ jQuery(document).ready(function($) {
                 username: $('#vendor_username').val(),
                 email: $('#vendor_email').val(),
                 password: $('#vendor_password').val(),
-                nonce: '<?php echo wp_create_nonce("create_vendor_nonce"); ?>',
+                nonce: sp_area_dashboard_vars.create_vendor_nonce,
             },
-            beforeSend: function() {
+            beforeSend: function () {
                 form.find('button').prop('disabled', true).text('Creating...');
                 feedback.text('').removeClass('text-success text-danger');
             },
-            success: function(response) {
+            success: function (response) {
                 if (response.success) {
                     feedback.text(response.data.message).addClass('text-success');
                     form[0].reset();
@@ -287,18 +287,18 @@ jQuery(document).ready(function($) {
                     feedback.text(response.data.message).addClass('text-danger');
                 }
             },
-            complete: function() {
+            complete: function () {
                 form.find('button').prop('disabled', false).text('Create Vendor');
             }
         });
     });
 
     // --- Create Client ---
-    $('#create-client-form').on('submit', function(e) {
+    $('#create-client-form').on('submit', function (e) {
         e.preventDefault();
         const form = $(this);
         const feedback = $('#create-client-feedback');
-        
+
         $.ajax({
             url: ajaxUrl,
             type: 'POST',
@@ -307,13 +307,13 @@ jQuery(document).ready(function($) {
                 username: $('#client_username').val(),
                 email: $('#client_email').val(),
                 password: $('#client_password').val(),
-                nonce: '<?php echo wp_create_nonce("create_client_nonce"); ?>',
+                nonce: sp_area_dashboard_vars.create_client_nonce,
             },
-            beforeSend: function() {
+            beforeSend: function () {
                 form.find('button').prop('disabled', true).text('Creating...');
                 feedback.text('').removeClass('text-success text-danger');
             },
-            success: function(response) {
+            success: function (response) {
                 if (response.success) {
                     feedback.text(response.data.message).addClass('text-success');
                     form[0].reset();
@@ -321,19 +321,19 @@ jQuery(document).ready(function($) {
                     feedback.text(response.data.message).addClass('text-danger');
                 }
             },
-            complete: function() {
+            complete: function () {
                 form.find('button').prop('disabled', false).text('Create Client');
             }
         });
     });
 
     // --- Project Details ---
-    $('#area-project-list-container').on('click', '.project-card', function() {
+    $('#area-project-list-container').on('click', '.project-card', function () {
         const projectId = $(this).data('project-id');
         loadProjectDetails(projectId);
     });
 
-    $('#back-to-projects-list').on('click', function() {
+    $('#back-to-projects-list').on('click', function () {
         $('#project-detail-section').hide();
         $('#projects-section').show();
     });
@@ -341,7 +341,7 @@ jQuery(document).ready(function($) {
     function loadProjectDetails(projectId) {
         $('#projects-section').hide();
         $('#project-detail-section').show();
-        
+
         // Clear previous details
         $('#project-detail-title').text('Loading...');
         $('#project-detail-meta').html('');
@@ -356,7 +356,7 @@ jQuery(document).ready(function($) {
                 nonce: projectDetailsNonce,
                 project_id: projectId,
             },
-            success: function(response) {
+            success: function (response) {
                 if (response.success) {
                     const project = response.data;
                     $('#project-detail-title').text(project.title);
@@ -414,7 +414,7 @@ jQuery(document).ready(function($) {
     }
 
     // --- Review Submission ---
-    $('#vendor-submissions-list').on('click', '.review-btn', function() {
+    $('#vendor-submissions-list').on('click', '.review-btn', function () {
         const button = $(this);
         const stepId = button.data('step-id');
         const decision = button.data('decision');
@@ -430,10 +430,10 @@ jQuery(document).ready(function($) {
                 decision: decision,
                 comment: comment,
             },
-            beforeSend: function() {
+            beforeSend: function () {
                 button.prop('disabled', true).text('Processing...');
             },
-            success: function(response) {
+            success: function (response) {
                 if (response.success) {
                     alert(response.data.message);
                     loadProjectDetails(button.closest('.project-detail-card').find('.award-bid-btn').data('project-id'));
@@ -441,14 +441,14 @@ jQuery(document).ready(function($) {
                     alert('Error: ' + response.data.message);
                 }
             },
-            complete: function() {
+            complete: function () {
                 button.prop('disabled', false).text(decision.charAt(0).toUpperCase() + decision.slice(1));
             }
         });
     });
 
     // --- Award Bid ---
-    $('#project-bids-list').on('click', '.award-bid-btn', function() {
+    $('#project-bids-list').on('click', '.award-bid-btn', function () {
         const button = $(this);
         const projectId = button.data('project-id');
         const vendorId = button.data('vendor-id');
@@ -468,10 +468,10 @@ jQuery(document).ready(function($) {
                 vendor_id: vendorId,
                 bid_amount: bidAmount,
             },
-            beforeSend: function() {
+            beforeSend: function () {
                 button.prop('disabled', true).text('Awarding...');
             },
-            success: function(response) {
+            success: function (response) {
                 if (response.success) {
                     alert(response.data.message);
                     loadProjectDetails(projectId);
@@ -479,7 +479,7 @@ jQuery(document).ready(function($) {
                     alert('Error: ' + response.data.message);
                 }
             },
-            complete: function() {
+            complete: function () {
                 button.prop('disabled', false).text('Award Project');
             }
         });

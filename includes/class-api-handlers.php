@@ -41,6 +41,8 @@ class SP_API_Handlers {
     }
 
     public function get_area_manager_dashboard_stats() {
+        check_ajax_referer('get_dashboard_stats_nonce', 'nonce');
+
         if (!is_user_logged_in() || !in_array('area_manager', (array)wp_get_current_user()->roles)) {
             wp_send_json_error(['message' => 'Permission denied.']);
         }
@@ -85,6 +87,8 @@ class SP_API_Handlers {
     }
 
     public function get_vendor_earnings_chart_data() {
+        check_ajax_referer('get_earnings_chart_data_nonce', 'nonce');
+
         if (!is_user_logged_in() || !in_array('solar_vendor', (array)wp_get_current_user()->roles)) {
             wp_send_json_error(['message' => 'Permission denied.']);
         }
@@ -125,6 +129,8 @@ class SP_API_Handlers {
     }
 
     public function create_client_from_dashboard() {
+        check_ajax_referer('create_client_nonce', 'nonce');
+
         if (!is_user_logged_in() || !in_array('area_manager', (array)wp_get_current_user()->roles)) {
             wp_send_json_error(['message' => 'Permission denied.']);
         }
@@ -157,6 +163,8 @@ class SP_API_Handlers {
     }
 
     public function create_vendor_from_dashboard() {
+        check_ajax_referer('create_vendor_nonce', 'nonce');
+
         if (!is_user_logged_in() || !in_array('area_manager', (array)wp_get_current_user()->roles)) {
             wp_send_json_error(['message' => 'Permission denied.']);
         }
@@ -189,6 +197,8 @@ class SP_API_Handlers {
     }
 
     public function get_area_manager_vendor_approvals() {
+        check_ajax_referer('get_vendor_approvals_nonce', 'nonce');
+
         if (!is_user_logged_in() || !in_array('area_manager', (array)wp_get_current_user()->roles)) {
             wp_send_json_error(['message' => 'Permission denied.']);
         }
@@ -217,6 +227,8 @@ class SP_API_Handlers {
     }
 
     public function get_area_manager_reviews() {
+        check_ajax_referer('get_reviews_nonce', 'nonce');
+
         if (!is_user_logged_in() || !in_array('area_manager', (array)wp_get_current_user()->roles)) {
             wp_send_json_error(['message' => 'Permission denied.']);
         }
@@ -957,7 +969,7 @@ class SP_API_Handlers {
     }
 
     public function get_area_manager_projects() {
-        check_ajax_referer('sp_area_dashboard_vars', 'security');
+        check_ajax_referer('get_projects_nonce', 'nonce');
 
         if (!is_user_logged_in() || !in_array('area_manager', (array)wp_get_current_user()->roles)) {
             wp_send_json_error(['message' => 'Permission denied.']);

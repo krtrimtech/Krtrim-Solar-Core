@@ -172,7 +172,7 @@ function sp_render_leaderboard_view() {
                 const stateSelect = $('#state-select');
                 stateSelect.empty().append('<option value="">Select State</option>');
                 statesAndCities.forEach(state => {
-                    stateSelect.append(`<option value="${state.name}">${state.name}</option>`);
+                    stateSelect.append(`<option value="${state.state}">${state.state}</option>`);
                 });
 
                 $('#location-modal').show();
@@ -184,9 +184,9 @@ function sp_render_leaderboard_view() {
                 citySelect.empty().append('<option value="">Select City</option>');
 
                 if (selectedState) {
-                    const stateData = statesAndCities.find(state => state.name === selectedState);
+                    const stateData = statesAndCities.find(state => state.state === selectedState);
                     if (stateData) {
-                        stateData.cities.forEach(city => {
+                        stateData.districts.forEach(city => {
                             citySelect.append(`<option value="${city}">${city}</option>`);
                         });
                     }

@@ -39,7 +39,7 @@ function render_solar_client_dashboard() {
                 echo get_custom_logo();
             } else {
                 echo '<div class="logo">☀️</div>';
-                echo '<span>' . get_bloginfo('name') . '</span>';
+                echo '<span>' . esc_html(get_bloginfo('name')) . '</span>';
             }
             ?>
             <button class="sidebar-toggle-mobile" onclick="toggleSidebar()" title="Toggle Menu">☰</button>

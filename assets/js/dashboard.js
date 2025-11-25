@@ -7,7 +7,7 @@ function handleWhatsAppRedirect(whatsapp_data) {
 }
 
 // Global dashboard settings
-const REST_API_NONCE = '<?php echo wp_create_nonce("wp_rest"); ?>';
+const REST_API_NONCE = ksc_dashboard_vars.rest_api_nonce;
 
 // --- Generic UI Functions ---
 
@@ -17,7 +17,7 @@ function switchSection(event, section) {
     document.getElementById(section + '-section').style.display = 'block';
     document.querySelectorAll('.nav-item').forEach(el => el.classList.remove('active'));
     document.querySelector(`[data-section="${section}"]`).classList.add('active');
-    
+
     const titles = {
         'dashboard': 'Dashboard',
         'projects': 'Projects',
@@ -104,7 +104,7 @@ function submitComment(stepId, projectId) {
         return;
     }
 
-    fetch('<?php echo esc_url(rest_url("solar/v1/client-comments")); ?>', {
+    fetch(ksc_dashboard_vars.client_comments_url, {
         method: 'POST',
         headers: {
             'Content-Type': 'application/json',
@@ -116,19 +116,19 @@ function submitComment(stepId, projectId) {
             comment_text: commentText
         })
     })
-    .then(response => response.json())
-    .then(data => {
-        if (data.message) {
-            alert('✅ Comment submitted successfully!');
-            document.getElementById(`comment-text-${stepId}`).value = '';
-            toggleCommentForm(stepId);
-        } else {
-            throw new Error(data.message || 'Unknown error');
-        }
-    })
-    .catch(error => {
-        alert(`Error: ${error.message}`);
-    });
+        .then(response => response.json())
+        .then(data => {
+            if (data.message) {
+                alert('✅ Comment submitted successfully!');
+                document.getElementById(`comment-text-${stepId}`).value = '';
+                toggleCommentForm(stepId);
+            } else {
+                throw new Error(data.message || 'Unknown error');
+            }
+        })
+        .catch(error => {
+            alert(`Error: ${error.message}`);
+        });
 }
 
 // --- Unified Notification Loader ---
@@ -139,44 +139,44 @@ function loadNotifications(restUrl) {
         credentials: 'same-origin',
         headers: { 'X-WP-Nonce': REST_API_NONCE }
     })
-    .then(response => {
-        if (!response.ok) throw new Error('Network response was not ok');
-        return response.json();
-    })
-    .then(data => {
-        const notifList = document.getElementById('notif-list');
-        const notifCount = document.getElementById('notif-count');
-        const notifications = data.notifications || data; // Handle both possible response structures
+        .then(response => {
+            if (!response.ok) throw new Error('Network response was not ok');
+            return response.json();
+        })
+        .then(data => {
+            const notifList = document.getElementById('notif-list');
+            const notifCount = document.getElementById('notif-count');
+            const notifications = data.notifications || data; // Handle both possible response structures
 
-        if (notifications && notifications.length > 0) {
-            let html = '';
-            notifications.forEach(n => {
-                const isVendor = restUrl.includes('vendor');
-                const borderColor = n.type === 'approved' ? '#28a745' : n.type === 'rejected' ? '#dc3545' : '#007bff';
-                const bgColor = n.type === 'approved' ? '#f8fff9' : n.type === 'rejected' ? '#fff5f5' : '#f0f7ff';
-                
-                html += `<div class="notification-item" style="padding:12px;position:relative; border-radius:8px; border-left:4px solid ${borderColor}; background:${bgColor}; margin-bottom:10px;" data-notification-id="${n.id}">`;
-                if (isVendor) {
-                    html += `<button class="btn-dismiss-notification" style="position:absolute; top:8px; right:8px; background:none; border:none; font-size:16px; cursor:pointer;">&times;</button>`;
-                }
-                html += `<div style="font-weight:600; color:#333;">${n.icon} ${n.title}</div>`;
-                html += `<div style="font-size:12px; color:#666; margin-top:4px;">${n.message}</div>`;
-                if (n.time_ago) {
-                    html += `<div style="font-size:10px; color:#999; margin-top:4px;">${n.time_ago}</div>`;
-                }
-                html += `</div>`;
-            });
-            notifList.innerHTML = html;
-            notifCount.textContent = notifications.length;
-        } else {
-            notifList.innerHTML = '<p style="text-align:center; color:#999; padding: 20px; margin: 0;">No new notifications</p>';
-            notifCount.textContent = '0';
-        }
-    })
-    .catch(error => {
-        console.error('Notification Error:', error);
-        document.getElementById('notif-list').innerHTML = '<p style="color:#dc3545; text-align:center; padding: 20px; margin:0;">Error loading notifications</p>';
-    });
+            if (notifications && notifications.length > 0) {
+                let html = '';
+                notifications.forEach(n => {
+                    const isVendor = restUrl.includes('vendor');
+                    const borderColor = n.type === 'approved' ? '#28a745' : n.type === 'rejected' ? '#dc3545' : '#007bff';
+                    const bgColor = n.type === 'approved' ? '#f8fff9' : n.type === 'rejected' ? '#fff5f5' : '#f0f7ff';
+
+                    html += `<div class="notification-item" style="padding:12px;position:relative; border-radius:8px; border-left:4px solid ${borderColor}; background:${bgColor}; margin-bottom:10px;" data-notification-id="${n.id}">`;
+                    if (isVendor) {
+                        html += `<button class="btn-dismiss-notification" style="position:absolute; top:8px; right:8px; background:none; border:none; font-size:16px; cursor:pointer;">&times;</button>`;
+                    }
+                    html += `<div style="font-weight:600; color:#333;">${n.icon} ${n.title}</div>`;
+                    html += `<div style="font-size:12px; color:#666; margin-top:4px;">${n.message}</div>`;
+                    if (n.time_ago) {
+                        html += `<div style="font-size:10px; color:#999; margin-top:4px;">${n.time_ago}</div>`;
+                    }
+                    html += `</div>`;
+                });
+                notifList.innerHTML = html;
+                notifCount.textContent = notifications.length;
+            } else {
+                notifList.innerHTML = '<p style="text-align:center; color:#999; padding: 20px; margin: 0;">No new notifications</p>';
+                notifCount.textContent = '0';
+            }
+        })
+        .catch(error => {
+            console.error('Notification Error:', error);
+            document.getElementById('notif-list').innerHTML = '<p style="color:#dc3545; text-align:center; padding: 20px; margin:0;">Error loading notifications</p>';
+        });
 }
 
 // --- Vendor-Specific Functions ---
@@ -195,12 +195,12 @@ function goToProject(projectId) {
 
 // --- Document Ready ---
 
-document.addEventListener('DOMContentLoaded', function() {
+document.addEventListener('DOMContentLoaded', function () {
     const clientDashboard = document.getElementById('modernDashboard');
     const vendorDashboard = document.getElementById('vendorDashboard');
 
     if (clientDashboard) {
-        const clientApiUrl = '<?php echo esc_url(rest_url("solar/v1/client-notifications")); ?>';
+        const clientApiUrl = ksc_dashboard_vars.client_api_url;
         loadNotifications(clientApiUrl);
         setInterval(() => loadNotifications(clientApiUrl), 10000);
 
@@ -224,19 +224,19 @@ document.addEventListener('DOMContentLoaded', function() {
     }
 
     if (vendorDashboard) {
-        const vendorApiUrl = '<?php echo esc_url(rest_url("solar/v1/vendor-notifications")); ?>';
+        const vendorApiUrl = ksc_dashboard_vars.vendor_api_url;
         loadNotifications(vendorApiUrl);
         setInterval(() => loadNotifications(vendorApiUrl), 10000);
 
         function loadEarningsChart() {
             $.ajax({
-                url: '<?php echo admin_url("admin-ajax.php"); ?>',
+                url: ksc_dashboard_vars.admin_ajax_url,
                 type: 'POST',
                 data: {
                     action: 'get_vendor_earnings_chart_data',
-                    nonce: '<?php echo wp_create_nonce("get_earnings_chart_data_nonce"); ?>',
+                    nonce: ksc_dashboard_vars.get_earnings_chart_data_nonce,
                 },
-                success: function(response) {
+                success: function (response) {
                     if (response.success) {
                         const ctx = document.getElementById('earnings-chart').getContext('2d');
                         new Chart(ctx, {
@@ -267,7 +267,7 @@ document.addEventListener('DOMContentLoaded', function() {
     }
 
     // Dismiss vendor notification
-    document.addEventListener('click', function(e) {
+    document.addEventListener('click', function (e) {
         if (e.target && e.target.classList.contains('btn-dismiss-notification')) {
             e.stopPropagation();
             const notifDiv = e.target.closest('[data-notification-id]');
@@ -275,38 +275,38 @@ document.addEventListener('DOMContentLoaded', function() {
 
             if (!notifId) return;
 
-            fetch(`<?php echo esc_url(rest_url("solar/v1/vendor-notifications/")); ?>${notifId}`, {
+            fetch(`${ksc_dashboard_vars.vendor_notifications_url}${notifId}`, {
                 method: 'DELETE',
                 credentials: 'same-origin',
                 headers: { 'X-WP-Nonce': REST_API_NONCE }
             })
-            .then(response => {
-                if (!response.ok) throw new Error('Failed to delete');
-                return response.json();
-            })
-            .then(() => {
-                notifDiv.style.transition = 'opacity 0.3s';
-                notifDiv.style.opacity = '0';
-                setTimeout(() => {
-                    notifDiv.remove();
-                    const notifCount = document.getElementById('notif-count');
-                    const currentCount = parseInt(notifCount.textContent);
-                    if (currentCount > 0) {
-                        notifCount.textContent = currentCount - 1;
-                    }
-                }, 300);
-            })
-            .catch(error => {
-                alert('Error deleting notification');
-                console.error('Delete notification error:', error);
-            });
+                .then(response => {
+                    if (!response.ok) throw new Error('Failed to delete');
+                    return response.json();
+                })
+                .then(() => {
+                    notifDiv.style.transition = 'opacity 0.3s';
+                    notifDiv.style.opacity = '0';
+                    setTimeout(() => {
+                        notifDiv.remove();
+                        const notifCount = document.getElementById('notif-count');
+                        const currentCount = parseInt(notifCount.textContent);
+                        if (currentCount > 0) {
+                            notifCount.textContent = currentCount - 1;
+                        }
+                    }, 300);
+                })
+                .catch(error => {
+                    alert('Error deleting notification');
+                    console.error('Delete notification error:', error);
+                });
         }
     });
 
     // Vendor step upload form
     const uploadForm = document.querySelector('.ajax-upload-form');
     if (uploadForm) {
-        uploadForm.addEventListener('submit', function(e) {
+        uploadForm.addEventListener('submit', function (e) {
             e.preventDefault();
             const form = e.target;
             const formData = new FormData(form);
@@ -314,33 +314,33 @@ document.addEventListener('DOMContentLoaded', function() {
             const statusDiv = form.querySelector('.upload-status');
 
             formData.append('action', 'vendor_upload_step');
-            
+
             submitBtn.disabled = true;
             submitBtn.textContent = '⏳...';
             statusDiv.className = 'upload-status loading';
             statusDiv.textContent = 'Uploading...';
             statusDiv.style.display = 'block';
 
-            fetch('<?php echo admin_url("admin-ajax.php"); ?>', {
+            fetch(ksc_dashboard_vars.admin_ajax_url, {
                 method: 'POST',
                 body: formData,
             })
-            .then(response => response.json())
-            .then(data => {
-                if (data.success) {
-                    statusDiv.className = 'upload-status success';
-                    statusDiv.textContent = `✅ ${data.data.message}`;
-                    setTimeout(() => location.reload(), 1500);
-                } else {
-                    throw new Error(data.data.message);
-                }
-            })
-            .catch(error => {
-                statusDiv.className = 'upload-status error';
-                statusDiv.textContent = `❌ ${error.message || 'Upload failed'}`;
-                submitBtn.disabled = false;
-                submitBtn.textContent = '📂 Submit';
-            });
+                .then(response => response.json())
+                .then(data => {
+                    if (data.success) {
+                        statusDiv.className = 'upload-status success';
+                        statusDiv.textContent = `✅ ${data.data.message}`;
+                        setTimeout(() => location.reload(), 1500);
+                    } else {
+                        throw new Error(data.data.message);
+                    }
+                })
+                .catch(error => {
+                    statusDiv.className = 'upload-status error';
+                    statusDiv.textContent = `❌ ${error.message || 'Upload failed'}`;
+                    submitBtn.disabled = false;
+                    submitBtn.textContent = '📂 Submit';
+                });
         });
     }
 });

@@ -7,7 +7,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 class SP_Razorpay_Light_Client {
     private $key_id;
     private $key_secret;
-    private $api_url = 'https://api.razorpay.com/v1/';
+    const API_URL = 'https://api.razorpay.com/v1/';
 
     public function __construct() {
         $options = get_option('sp_vendor_options');
@@ -31,7 +31,7 @@ class SP_Razorpay_Light_Client {
      * @return array The API response from Razorpay.
      */
     public function create_order($amount, $currency, $receipt_id) {
-        $url = $this->api_url . 'orders';
+        $url = self::API_URL . 'orders';
         
         $body = [
             'amount' => $amount,

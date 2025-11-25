@@ -62,36 +62,7 @@ class SP_User_Profile_Fields {
                 </td>
             </tr>
         </table>
-        <script>
-            jQuery(document).ready(function($) {
-                var locations = <?php echo json_encode($locations); ?>;
-                var selectedCity = '<?php echo esc_js($selected_city); ?>';
 
-                function updateCities() {
-                    var state = $('#sp-state-select').val();
-                    var cityDropdown = $('#sp-city-select');
-                    cityDropdown.empty().append('<option value="">Select City</option>');
-
-                    if (locations[state]) {
-                        $.each(locations[state], function(index, city) {
-                            var option = $('<option></option>').attr('value', city).text(city);
-                            if (city === selectedCity) {
-                                option.attr('selected', 'selected');
-                            }
-                            cityDropdown.append(option);
-                        });
-                    }
-                }
-
-                if ($('#sp-state-select').length) {
-                    updateCities();
-                    $('#sp-state-select').on('change', function() {
-                        selectedCity = ''; // Reset city on state change
-                        updateCities();
-                    });
-                }
-            });
-        </script>
         <?php
     }
 

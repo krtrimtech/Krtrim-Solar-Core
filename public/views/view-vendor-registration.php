@@ -83,4 +83,3 @@ function sp_vendor_registration_form_shortcode() {
     return ob_get_clean();
 }
 add_shortcode('vendor_registration_form', 'sp_vendor_registration_form_shortcode');
-
