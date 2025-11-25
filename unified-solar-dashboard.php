@@ -96,11 +96,79 @@ final class Krtrim_Solar_Core {
 	public function enqueue_public_scripts() {
 		wp_enqueue_style( 'ksc-public-styles', $this->dir_url . 'assets/css/dashboard.css', [], $this->version );
 		wp_enqueue_script( 'ksc-public-scripts', $this->dir_url . 'assets/js/dashboard.js', [ 'jquery' ], $this->version, true );
+
+		if ( is_page( 'solar-dashboard' ) && in_array( 'solar_client', (array) wp_get_current_user()->roles ) ) {
+			$client_id = get_current_user_id();
+			$args = array(
+				'post_type' => 'solar-project',
+				'posts_per_page' => 1,
+				'post_status' => 'publish',
+				'meta_query' => array(
+					array(
+						'key' => 'client_user_id',
+						'value' => $client_id,
+					)
+				)
+			);
+			$project_query = new WP_Query($args);
+			if ($project_query->have_posts()) {
+				$project_query->the_post();
+				$project_id = get_the_ID();
+				$total_project_cost = get_post_meta($project_id, '_total_project_cost', true);
+				$paid_amount = get_post_meta($project_id, '_paid_amount', true);
+				$balance = $total_project_cost - $paid_amount;
+				wp_localize_script( 'ksc-public-scripts', 'payment_data', [
+					'total' => $total_project_cost,
+					'paid' => $paid_amount,
+					'balance' => $balance,
+				]);
+			}
+			wp_reset_postdata();
+		}
+
+		if ( is_page( 'area-manager-dashboard' ) ) {
+			wp_enqueue_script('area-manager-dashboard', $this->dir_url . 'assets/js/area-manager-dashboard.js', ['jquery'], null, true);
+			wp_localize_script('area-manager-dashboard', 'sp_area_dashboard_vars', [
+				'ajax_url' => admin_url('admin-ajax.php'),
+				'create_project_nonce' => wp_create_nonce('sp_create_project_nonce_field'),
+				'project_details_nonce' => wp_create_nonce('sp_project_details_nonce'),
+				'review_submission_nonce' => wp_create_nonce('sp_review_nonce'),
+				'award_bid_nonce' => wp_create_nonce('award_bid_nonce'),
+			]);
+		}
+
+		if ( is_page( 'project-marketplace' ) ) {
+			wp_enqueue_script( 'marketplace-js', $this->dir_url . 'assets/js/marketplace.js', ['jquery'], null, true );
+
+			$json_file = $this->dir_path . 'assets/data/indian-states-cities.json';
+			$states_cities = json_decode( file_get_contents( $json_file ), true );
+
+			wp_localize_script( 'marketplace-js', 'marketplace_vars', [
+				'ajax_url' => admin_url( 'admin-ajax.php' ),
+				'nonce' => wp_create_nonce( 'filter_projects_nonce' ),
+				'states_cities' => $states_cities['states'],
+			]);
+		}
 	}
 
 	public function enqueue_admin_scripts( $hook ) {
 		wp_enqueue_style( 'ksc-admin-styles', $this->dir_url . 'assets/css/admin.css', [], $this->version );
 		wp_enqueue_script( 'ksc-admin-scripts', $this->dir_url . 'assets/js/admin.js', [ 'jquery' ], $this->version, true );
+
+		if ( 'user-edit.php' === $hook || 'profile.php' === $hook ) {
+			wp_enqueue_script( 'user-profile-js', $this->dir_url . 'assets/js/user-profile.js', ['jquery'], null, true );
+
+			$json_file = $this->dir_path . 'assets/data/indian-states-cities.json';
+			$states_cities = json_decode( file_get_contents( $json_file ), true );
+			
+			$user_id = isset( $_GET['user_id'] ) ? intval( $_GET['user_id'] ) : get_current_user_id();
+
+			wp_localize_script( 'user-profile-js', 'user_profile_vars', [
+				'states_cities' => $states_cities['states'],
+				'selected_state' => get_user_meta( $user_id, 'state', true ),
+				'selected_city' => get_user_meta( $user_id, 'city', true ),
+			]);
+		}
 	}
 	
 	public function shortcode_unified_dashboard() {

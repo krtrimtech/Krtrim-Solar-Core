@@ -235,6 +235,9 @@ function render_solar_client_dashboard() {
                                     <div class="card-header">
                                         <h3>Payment Summary</h3>
                                     </div>
+                                    <div class="payment-summary-chart">
+                                        <canvas id="payment-summary-chart"></canvas>
+                                    </div>
                                     <div class="payment-grid">
                                         <div class="payment-item">
                                             <div class="payment-icon" style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);">💸</div>

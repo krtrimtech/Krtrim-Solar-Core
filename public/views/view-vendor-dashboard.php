@@ -170,6 +170,15 @@ function render_solar_vendor_dashboard() {
                     <div class="content-grid">
                         <!-- Left Column -->
                         <div class="content-left">
+                            <!-- Earnings Chart -->
+                            <div class="card">
+                                <div class="card-header">
+                                    <h3>💰 Earnings Overview</h3>
+                                </div>
+                                <div class="earnings-chart">
+                                    <canvas id="earnings-chart"></canvas>
+                                </div>
+                            </div>
                             <!-- Summary Card -->
                             <div class="card">
                                 <div class="card-header">

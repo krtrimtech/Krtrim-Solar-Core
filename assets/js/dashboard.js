@@ -203,12 +203,67 @@ document.addEventListener('DOMContentLoaded', function() {
         const clientApiUrl = '<?php echo esc_url(rest_url("solar/v1/client-notifications")); ?>';
         loadNotifications(clientApiUrl);
         setInterval(() => loadNotifications(clientApiUrl), 10000);
+
+        if (typeof payment_data !== 'undefined') {
+            const ctx = document.getElementById('payment-summary-chart').getContext('2d');
+            new Chart(ctx, {
+                type: 'pie',
+                data: {
+                    labels: ['Paid', 'Balance'],
+                    datasets: [{
+                        label: 'Payment Summary',
+                        data: [payment_data.paid, payment_data.balance],
+                        backgroundColor: [
+                            'rgba(40, 167, 69, 0.5)',
+                            'rgba(255, 193, 7, 0.5)',
+                        ],
+                    }]
+                },
+            });
+        }
     }
 
     if (vendorDashboard) {
         const vendorApiUrl = '<?php echo esc_url(rest_url("solar/v1/vendor-notifications")); ?>';
         loadNotifications(vendorApiUrl);
         setInterval(() => loadNotifications(vendorApiUrl), 10000);
+
+        function loadEarningsChart() {
+            $.ajax({
+                url: '<?php echo admin_url("admin-ajax.php"); ?>',
+                type: 'POST',
+                data: {
+                    action: 'get_vendor_earnings_chart_data',
+                    nonce: '<?php echo wp_create_nonce("get_earnings_chart_data_nonce"); ?>',
+                },
+                success: function(response) {
+                    if (response.success) {
+                        const ctx = document.getElementById('earnings-chart').getContext('2d');
+                        new Chart(ctx, {
+                            type: 'line',
+                            data: {
+                                labels: response.data.labels,
+                                datasets: [{
+                                    label: 'Earnings',
+                                    data: response.data.data,
+                                    backgroundColor: 'rgba(40, 167, 69, 0.2)',
+                                    borderColor: 'rgba(40, 167, 69, 1)',
+                                    borderWidth: 1
+                                }]
+                            },
+                            options: {
+                                scales: {
+                                    y: {
+                                        beginAtZero: true
+                                    }
+                                }
+                            }
+                        });
+                    }
+                }
+            });
+        }
+        loadEarningsChart();
     }
 
     // Dismiss vendor notification

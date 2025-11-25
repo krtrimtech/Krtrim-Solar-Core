@@ -33,6 +33,215 @@ class SP_API_Handlers {
         add_action('wp_ajax_assign_area_manager_location', [ $this, 'assign_area_manager_location' ]);
         add_action('wp_ajax_filter_marketplace_projects', [ $this, 'filter_marketplace_projects' ]);
         add_action('wp_ajax_nopriv_filter_marketplace_projects', [ $this, 'filter_marketplace_projects' ]);
+        add_action('wp_ajax_get_area_manager_reviews', [ $this, 'get_area_manager_reviews' ]);
+        add_action('wp_ajax_get_area_manager_vendor_approvals', [ $this, 'get_area_manager_vendor_approvals' ]);
+        add_action('wp_ajax_create_vendor_from_dashboard', [ $this, 'create_vendor_from_dashboard' ]);
+        add_action('wp_ajax_create_client_from_dashboard', [ $this, 'create_client_from_dashboard' ]);
+        add_action('wp_ajax_get_area_manager_dashboard_stats', [ $this, 'get_area_manager_dashboard_stats' ]);
+    }
+
+    public function get_area_manager_dashboard_stats() {
+        if (!is_user_logged_in() || !in_array('area_manager', (array)wp_get_current_user()->roles)) {
+            wp_send_json_error(['message' => 'Permission denied.']);
+        }
+
+        $manager = wp_get_current_user();
+        $args = [
+            'post_type' => 'solar_project',
+            'posts_per_page' => -1,
+            'author' => $manager->ID,
+        ];
+        $projects = get_posts($args);
+
+        $total_projects = count($projects);
+        $completed_projects = 0;
+        $in_progress_projects = 0;
+        $total_paid_to_vendors = 0;
+        $total_company_profit = 0;
+
+        foreach ($projects as $project) {
+            $status = get_post_meta($project->ID, '_project_status', true);
+            if ($status === 'completed') {
+                $completed_projects++;
+            } elseif ($status === 'in_progress') {
+                $in_progress_projects++;
+            }
+
+            $paid = get_post_meta($project->ID, '_paid_to_vendor', true) ?: 0;
+            $winning_bid = get_post_meta($project->ID, '_winning_bid_amount', true) ?: 0;
+            $profit = $winning_bid - $paid;
+            $total_paid_to_vendors += $paid;
+            $total_company_profit += $profit;
+        }
+
+        wp_send_json_success([
+            'total_projects' => $total_projects,
+            'completed_projects' => $completed_projects,
+            'in_progress_projects' => $in_progress_projects,
+            'total_paid_to_vendors' => $total_paid_to_vendors,
+            'total_company_profit' => $total_company_profit,
+        ]);
+        add_action('wp_ajax_get_vendor_earnings_chart_data', [ $this, 'get_vendor_earnings_chart_data' ]);
+    }
+
+    public function get_vendor_earnings_chart_data() {
+        if (!is_user_logged_in() || !in_array('solar_vendor', (array)wp_get_current_user()->roles)) {
+            wp_send_json_error(['message' => 'Permission denied.']);
+        }
+
+        $vendor_id = get_current_user_id();
+        $earnings = [];
+        for ($i = 11; $i >= 0; $i--) {
+            $month = date('Y-m', strtotime("-$i months"));
+            $earnings[$month] = 0;
+        }
+
+        global $wpdb;
+        $posts_table = $wpdb->prefix . 'posts';
+        $postmeta_table = $wpdb->prefix . 'postmeta';
+
+        $results = $wpdb->get_results($wpdb->prepare(
+            "SELECT p.post_date, pm.meta_value as paid_amount
+            FROM {$posts_table} p
+            JOIN {$postmeta_table} pm ON p.ID = pm.post_id
+            JOIN {$postmeta_table} pm2 ON p.ID = pm2.post_id
+            WHERE p.post_type = 'solar_project'
+            AND pm.meta_key = '_paid_to_vendor'
+            AND pm2.meta_key = '_assigned_vendor_id'
+            AND pm2.meta_value = %d
+            AND p.post_date >= %s",
+            $vendor_id,
+            date('Y-m-01', strtotime('-11 months'))
+        ));
+
+        foreach ($results as $result) {
+            $month = date('Y-m', strtotime($result->post_date));
+            if (isset($earnings[$month])) {
+                $earnings[$month] += (float)$result->paid_amount;
+            }
+        }
+
+        wp_send_json_success(['labels' => array_keys($earnings), 'data' => array_values($earnings)]);
+    }
+
+    public function create_client_from_dashboard() {
+        if (!is_user_logged_in() || !in_array('area_manager', (array)wp_get_current_user()->roles)) {
+            wp_send_json_error(['message' => 'Permission denied.']);
+        }
+
+        $manager_id = get_current_user_id();
+        $username = sanitize_user($_POST['username']);
+        $email = sanitize_email($_POST['email']);
+        $password = $_POST['password'];
+
+        if (username_exists($username)) {
+            wp_send_json_error(['message' => 'Username already exists.']);
+        }
+
+        if (email_exists($email)) {
+            wp_send_json_error(['message' => 'Email already exists.']);
+        }
+
+        $user_id = wp_create_user($username, $password, $email);
+
+        if (is_wp_error($user_id)) {
+            wp_send_json_error(['message' => $user_id->get_error_message()]);
+        }
+
+        $user = new WP_User($user_id);
+        $user->set_role('solar_client');
+
+        update_user_meta($user_id, '_created_by_area_manager', $manager_id);
+
+        wp_send_json_success(['message' => 'Client created successfully.']);
+    }
+
+    public function create_vendor_from_dashboard() {
+        if (!is_user_logged_in() || !in_array('area_manager', (array)wp_get_current_user()->roles)) {
+            wp_send_json_error(['message' => 'Permission denied.']);
+        }
+
+        $manager_id = get_current_user_id();
+        $username = sanitize_user($_POST['username']);
+        $email = sanitize_email($_POST['email']);
+        $password = $_POST['password'];
+
+        if (username_exists($username)) {
+            wp_send_json_error(['message' => 'Username already exists.']);
+        }
+
+        if (email_exists($email)) {
+            wp_send_json_error(['message' => 'Email already exists.']);
+        }
+
+        $user_id = wp_create_user($username, $password, $email);
+
+        if (is_wp_error($user_id)) {
+            wp_send_json_error(['message' => $user_id->get_error_message()]);
+        }
+
+        $user = new WP_User($user_id);
+        $user->set_role('solar_vendor');
+
+        update_user_meta($user_id, '_created_by_area_manager', $manager_id);
+
+        wp_send_json_success(['message' => 'Vendor created successfully.']);
+    }
+
+    public function get_area_manager_vendor_approvals() {
+        if (!is_user_logged_in() || !in_array('area_manager', (array)wp_get_current_user()->roles)) {
+            wp_send_json_error(['message' => 'Permission denied.']);
+        }
+
+        $manager = wp_get_current_user();
+        $args = [
+            'post_type' => 'solar_project',
+            'posts_per_page' => -1,
+            'author' => $manager->ID,
+            'fields' => 'ids',
+        ];
+        $project_ids = get_posts($args);
+
+        if (empty($project_ids)) {
+            wp_send_json_success(['vendors' => []]);
+        }
+
+        global $wpdb;
+        $bids_table = $wpdb->prefix . 'project_bids';
+        $vendors = $wpdb->get_results($wpdb->prepare(
+            "SELECT DISTINCT u.* FROM {$wpdb->users} u JOIN {$bids_table} b ON u.ID = b.vendor_id WHERE b.project_id IN (" . implode(',', $project_ids) . ")",
+            'pending'
+        ));
+
+        wp_send_json_success(['vendors' => $vendors]);
+    }
+
+    public function get_area_manager_reviews() {
+        if (!is_user_logged_in() || !in_array('area_manager', (array)wp_get_current_user()->roles)) {
+            wp_send_json_error(['message' => 'Permission denied.']);
+        }
+
+        $manager = wp_get_current_user();
+        $args = [
+            'post_type' => 'solar_project',
+            'posts_per_page' => -1,
+            'author' => $manager->ID,
+            'fields' => 'ids',
+        ];
+        $project_ids = get_posts($args);
+
+        if (empty($project_ids)) {
+            wp_send_json_success(['reviews' => []]);
+        }
+
+        global $wpdb;
+        $steps_table = $wpdb->prefix . 'solar_process_steps';
+        $reviews = $wpdb->get_results($wpdb->prepare(
+            "SELECT * FROM {$steps_table} WHERE project_id IN (" . implode(',', $project_ids) . ") AND admin_status = %s ORDER BY created_at DESC",
+            'pending'
+        ));
+
+        wp_send_json_success(['reviews' => $reviews]);
     }
 
     public function filter_marketplace_projects() {
@@ -703,7 +912,7 @@ class SP_API_Handlers {
     }
 
     public function create_solar_project() {
-        check_ajax_referer('sp_create_project_nonce', 'sp_create_project_nonce_field');
+        check_ajax_referer('sp_create_project_nonce_field', 'sp_create_project_nonce');
 
         if (!is_user_logged_in() || !in_array('area_manager', (array)wp_get_current_user()->roles)) {
             wp_send_json_error(['message' => 'Permission denied.']);
@@ -711,20 +920,6 @@ class SP_API_Handlers {
 
         $manager = wp_get_current_user();
         $data = $_POST;
-
-        $client_email = sanitize_email($data['client_email']);
-        $client_id = email_exists($client_email);
-
-        if (!$client_id) {
-            $random_password = wp_generate_password();
-            $client_id = wp_create_user($client_email, $random_password, $client_email);
-            if (is_wp_error($client_id)) {
-                wp_send_json_error(['message' => 'Could not create client user: ' . $client_id->get_error_message()]);
-            }
-            $client_user = new WP_User($client_id);
-            $client_user->set_role('solar_client');
-            update_user_meta($client_id, 'first_name', sanitize_text_field($data['client_name']));
-        }
 
         $project_data = [
             'post_title'   => sanitize_text_field($data['project_title']),
@@ -738,14 +933,24 @@ class SP_API_Handlers {
             wp_send_json_error(['message' => 'Could not create project: ' . $project_id->get_error_message()]);
         }
 
-        update_post_meta($project_id, '_client_user_id', $client_id);
-        update_post_meta($project_id, '_solar_system_size_kw', floatval($data['system_size']));
-        update_post_meta($project_id, '_client_address', sanitize_textarea_field($data['client_address']));
-        update_post_meta($project_id, '_project_status', 'pending');
+        $fields = [
+            'project_state',
+            'project_city',
+            'project_status',
+            'client_user_id',
+            'solar_system_size_kw',
+            'client_address',
+            'client_phone_number',
+            'project_start_date',
+            'vendor_assignment_method',
+            'assigned_vendor_id',
+            'paid_to_vendor',
+        ];
 
-        $city_id = get_user_meta($manager->ID, 'assigned_city', true);
-        if ($city_id) {
-            wp_set_post_terms($project_id, [$city_id], 'project_city');
+        foreach ($fields as $field) {
+            if (isset($data[$field])) {
+                update_post_meta($project_id, '_' . $field, sanitize_text_field($data[$field]));
+            }
         }
 
         wp_send_json_success(['message' => 'Project created successfully!', 'project_id' => $project_id]);
