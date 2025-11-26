@@ -33,7 +33,7 @@ function sp_area_manager_dashboard_shortcode() {
 
     ob_start();
     ?>
-    <div id="modernDashboard" class="modern-solar-dashboard area-manager-dashboard">
+    <div id="areaManagerDashboard" class="modern-solar-dashboard area-manager-dashboard">
         <!-- Sidebar -->
         <div class="dashboard-sidebar">
             <div class="sidebar-brand">
@@ -47,15 +47,15 @@ function sp_area_manager_dashboard_shortcode() {
                 <span><?php echo get_bloginfo('name'); ?></span>
             </div>
             <nav class="sidebar-nav">
-                <a href="#" class="nav-item active" data-section="dashboard"><span>🏠</span> Dashboard</a>
-                <a href="#" class="nav-item" data-section="projects"><span>🏗️</span> Projects</a>
-                <a href="#" class="nav-item" data-section="create-project"><span>➕</span> Create Project</a>
-                <a href="#" class="nav-item" data-section="project-reviews"><span>📝</span> Project Reviews</a>
-                <a href="#" class="nav-item" data-section="vendor-approvals"><span>👍</span> Vendor Approvals</a>
+                <a href="javascript:void(0)" class="nav-item active" data-section="dashboard"><span>🏠</span> Dashboard</a>
+                <a href="javascript:void(0)" class="nav-item" data-section="projects"><span>🏗️</span> Projects</a>
+                <a href="javascript:void(0)" class="nav-item" data-section="create-project"><span>➕</span> Create Project</a>
+                <a href="javascript:void(0)" class="nav-item" data-section="project-reviews"><span>📝</span> Project Reviews</a>
+                <a href="javascript:void(0)" class="nav-item" data-section="vendor-approvals"><span>👍</span> Vendor Approvals</a>
 
-                <a href="#" class="nav-item" data-section="leads"><span>👥</span> Leads</a>
-                <a href="#" class="nav-item" data-section="my-clients"><span>users</span> My Clients</a>
-                <a href="#" class="nav-item" data-section="create-client"><span>👨‍👩‍👧‍👦</span> Create Paid Client</a>
+                <a href="javascript:void(0)" class="nav-item" data-section="leads"><span>👥</span> Leads</a>
+                <a href="javascript:void(0)" class="nav-item" data-section="my-clients"><span>users</span> My Clients</a>
+                <a href="javascript:void(0)" class="nav-item" data-section="create-client"><span>👨‍👩‍👧‍👦</span> Create Paid Client</a>
             </nav>
             <div class="sidebar-profile">
                 <div class="profile-info">

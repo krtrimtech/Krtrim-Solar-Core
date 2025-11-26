@@ -88,7 +88,32 @@ final class Krtrim_Solar_Core {
 		
 		add_filter( 'template_include', [ $this, 'template_include_single_project' ] );
 		add_filter( 'plugin_action_links_' . plugin_basename( $this->file ), [ $this, 'add_plugin_action_links' ] );
+
+        // Area Manager Redirection & Restriction
+        add_filter( 'login_redirect', [ $this, 'area_manager_login_redirect' ], 10, 3 );
+        add_action( 'admin_init', [ $this, 'restrict_area_manager_admin_access' ] );
 	}
+
+    public function area_manager_login_redirect( $redirect_to, $request, $user ) {
+        if ( isset( $user->roles ) && is_array( $user->roles ) ) {
+            if ( in_array( 'area_manager', $user->roles ) ) {
+                return home_url( '/area-manager-dashboard/' );
+            }
+        }
+        return $redirect_to;
+    }
+
+    public function restrict_area_manager_admin_access() {
+        if ( defined( 'DOING_AJAX' ) && DOING_AJAX ) {
+            return;
+        }
+
+        $user = wp_get_current_user();
+        if ( in_array( 'area_manager', (array) $user->roles ) ) {
+            wp_redirect( home_url( '/area-manager-dashboard/' ) );
+            exit;
+        }
+    }
 
 	public function add_plugin_action_links( $links ) {
 		$settings_link = '<a href="options-general.php?page=ksc-settings">Settings</a>';
@@ -147,9 +172,10 @@ final class Krtrim_Solar_Core {
 			wp_reset_postdata();
 		}
 
-		if ( is_page( 'area-manager-dashboard' ) ) {
+		global $post;
+		if ( is_a( $post, 'WP_Post' ) && ( has_shortcode( $post->post_content, 'area_manager_dashboard' ) || is_page( 'area-manager-dashboard' ) ) ) {
             wp_enqueue_script( 'chart-js', 'https://cdn.jsdelivr.net/npm/chart.js', [], '3.7.0', true );
-			wp_enqueue_script('area-manager-dashboard', $this->dir_url . 'assets/js/area-manager-dashboard.js', ['jquery', 'chart-js'], null, true);
+			wp_enqueue_script('area-manager-dashboard', $this->dir_url . 'assets/js/area-manager-dashboard.js', ['jquery', 'chart-js'], '1.0.1', true);
 			wp_localize_script('area-manager-dashboard', 'sp_area_dashboard_vars', [
 				'ajax_url' => admin_url('admin-ajax.php'),
 				'create_project_nonce' => wp_create_nonce('sp_create_project_nonce_field'),
