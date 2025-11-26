@@ -1,0 +1,101 @@
+/* Custom Date Picker Styling for Area Manager */
+
+/* Date Input Enhancement */
+input[type="date"]#filter-custom-date {
+    padding: 10px 12px;
+    border: 2px solid #e5e7eb;
+    border-radius: 8px;
+    font-size: 14px;
+    font-family: inherit;
+    transition: all 0.3s ease;
+    background: white;
+    cursor: pointer;
+}
+
+input[type="date"]#filter-custom-date:hover {
+    border-color: #6366f1;
+}
+
+input[type="date"]#filter-custom-date:focus {
+    outline: none;
+    border-color: #6366f1;
+    box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.1);
+}
+
+/* Calendar Icon Styling */
+input[type="date"]#filter-custom-date::-webkit-calendar-picker-indicator {
+    cursor: pointer;
+    opacity: 0.7;
+    transition: opacity 0.2s ease;
+}
+
+input[type="date"]#filter-custom-date::-webkit-calendar-picker-indicator:hover {
+    opacity: 1;
+}
+
+/* Smooth transition for custom date wrapper */
+#custom-date-wrapper {
+    transition: all 0.3s ease;
+    overflow: hidden;
+}
+
+/* Form group consistency */
+.filter-row .form-group {
+    position: relative;
+}
+
+.filter-row .form-group label {
+    display: block;
+    margin-bottom: 6px;
+    font-weight: 600;
+    font-size: 13px;
+    color: #374151;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+.filter-row select.project-filter,
+.filter-row input[type="date"].project-filter {
+    width: 100%;
+    padding: 10px 12px;
+    border: 2px solid #e5e7eb;
+    border-radius: 8px;
+    font-size: 14px;
+    transition: all 0.3s ease;
+    background: white;
+}
+
+.filter-row select.project-filter:hover,
+.filter-row input[type="date"].project-filter:hover {
+    border-color: #6366f1;
+}
+
+.filter-row select.project-filter:focus,
+.filter-row input[type="date"].project-filter:focus {
+    outline: none;
+    border-color: #6366f1;
+    box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.1);
+}
+
+/* Clear button enhancement */
+.filter-row .btn-secondary {
+    padding: 10px 20px;
+    background: linear-gradient(135deg, #f3f4f6 0%, #e5e7eb 100%);
+    border: 2px solid #d1d5db;
+    border-radius: 8px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.3s ease;
+}
+
+.filter-row .btn-secondary:hover {
+    background: linear-gradient(135deg, #e5e7eb 0%, #d1d5db 100%);
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+}
+
+/* Loading state for filters */
+.filter-row.loading {
+    opacity: 0.6;
+    pointer-events: none;
+}

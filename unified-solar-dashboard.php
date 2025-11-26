@@ -50,6 +50,8 @@ final class Krtrim_Solar_Core {
 		require_once $this->dir_path . 'includes/class-post-types-taxonomies.php';
 		require_once $this->dir_path . 'includes/class-admin-menus.php';
 		require_once $this->dir_path . 'includes/class-api-handlers.php';
+		require_once $this->dir_path . 'includes/ajax-get-project-details.php';
+		require_once $this->dir_path . 'includes/class-admin-widgets.php';
 		require_once $this->dir_path . 'includes/class-razorpay-light-client.php';
 		require_once $this->dir_path . 'includes/class-custom-metaboxes.php';
 		require_once $this->dir_path . 'includes/class-user-profile-fields.php';
@@ -70,6 +72,7 @@ final class Krtrim_Solar_Core {
 		new SP_Post_Types_Taxonomies();
 		new SP_Admin_Menus();
 		new SP_API_Handlers();
+		new SP_Admin_Widgets();
 		new SP_User_Profile_Fields();
 		new SP_Process_Steps_Manager();
 		new SP_Notifications_Manager();
@@ -174,11 +177,16 @@ final class Krtrim_Solar_Core {
 
 		global $post;
 		if ( is_a( $post, 'WP_Post' ) && ( has_shortcode( $post->post_content, 'area_manager_dashboard' ) || is_page( 'area-manager-dashboard' ) ) ) {
+            wp_enqueue_style('area-manager-modern', $this->dir_url . 'assets/css/area-manager-modern.css', [], '1.0.0');
+            wp_enqueue_style('leads-clients-enhanced', $this->dir_url . 'assets/css/leads-clients-enhanced.css', [], '1.0.0');
+            wp_enqueue_style('project-modal', $this->dir_url . 'assets/css/project-modal.css', [], '1.0.0');
+            wp_enqueue_style('date-picker-enhanced', $this->dir_url . 'assets/css/date-picker-enhanced.css', [], '1.0.0');
             wp_enqueue_style('toast-css', $this->dir_url . 'assets/css/toast.css', [], '1.0.0');
             wp_enqueue_style('password-field-css', $this->dir_url . 'assets/css/password-field.css', [], '1.0.0');
             wp_enqueue_script( 'chart-js', 'https://cdn.jsdelivr.net/npm/chart.js', [], '3.7.0', true );
-			wp_enqueue_script('area-manager-dashboard', $this->dir_url . 'assets/js/area-manager-dashboard.js', ['jquery', 'chart-js'], '1.0.1', true);
-			wp_localize_script('area-manager-dashboard', 'sp_area_dashboard_vars', [
+            wp_enqueue_script('project-modal-js', $this->dir_url . 'assets/js/project-modal.js', ['jquery'], '1.0.0', true);
+			wp_enqueue_script( 'area-manager-dashboard-js', $this->dir_url . 'assets/js/area-manager-dashboard.js', [ 'jquery', 'chart-js' ], '1.0.3', true );
+			wp_localize_script('area-manager-dashboard-js', 'sp_area_dashboard_vars', [
 				'ajax_url' => admin_url('admin-ajax.php'),
 				'create_project_nonce' => wp_create_nonce('sp_create_project_nonce_field'),
 				'project_details_nonce' => wp_create_nonce('sp_project_details_nonce'),

@@ -78,53 +78,128 @@ function sp_area_manager_dashboard_shortcode() {
                 </div>
             </header>
             <main class="dashboard-content">
-                <!-- Dashboard Section -->
+                <!--Dashboard Section -->
                 <section id="dashboard-section" class="section-content">
+                    <!-- Stats Cards -->
                     <div class="stats-grid">
                         <div class="stat-card">
-                            <div class="stat-header">
-                                <span class="stat-label">Total Projects</span>
-                                <span class="stat-icon">🏗️</span>
+                            <div class="stat-icon">📊</div>
+                            <div class="stat-details">
+                                <h3 id="total-projects-stat">0</h3>
+                                <span>Total Projects</span>
                             </div>
-                            <div class="stat-value" id="total-projects-stat">0</div>
                         </div>
                         <div class="stat-card">
-                            <div class="stat-header">
-                                <span class="stat-label">Completed Projects</span>
-                                <span class="stat-icon">✅</span>
+                            <div class="stat-icon">💰</div>
+                            <div class="stat-details">
+                                <h3 id="total-revenue-stat">₹0</h3>
+                                <span>Total Revenue</span>
                             </div>
-                            <div class="stat-value" id="completed-projects-stat">0</div>
                         </div>
                         <div class="stat-card">
-                            <div class="stat-header">
-                                <span class="stat-label">In-Progress Projects</span>
-                                <span class="stat-icon">🔄</span>
+                            <div class="stat-icon">💸</div>
+                            <div class="stat-details">
+                                <h3 id="total-costs-stat">₹0</h3>
+                                <span>Vendor Costs</span>
                             </div>
-                            <div class="stat-value" id="in-progress-projects-stat">0</div>
+                        </div>
+                        <div class="stat-card stat-highlight">
+                            <div class="stat-icon">💵</div>
+                            <div class="stat-details">
+                                <h3 id="total-profit-stat">₹0</h3>
+                                <span>Company Profit</span>
+                            </div>
                         </div>
                         <div class="stat-card">
-                            <div class="stat-header">
-                                <span class="stat-label">Total Paid to Vendors</span>
-                                <span class="stat-icon">💰</span>
+                            <div class="stat-icon">📈</div>
+                            <div class="stat-details">
+                                <h3 id="profit-margin-stat">0%</h3>
+                                <span>Profit Margin</span>
                             </div>
-                            <div class="stat-value" id="total-paid-stat">₹0</div>
                         </div>
                         <div class="stat-card">
-                            <div class="stat-header">
-                                <span class="stat-label">Total Company Profit</span>
-                                <span class="stat-icon">💼</span>
+                            <div class="stat-icon">👥</div>
+                            <div class="stat-details">
+                                <h3 id="total-leads-stat">0</h3>
+                                <span>Total Leads</span>
                             </div>
-                            <div class="stat-value" id="total-profit-stat">₹0</div>
                         </div>
                     </div>
-                    <div class="charts-container">
-                        <canvas id="project-status-chart"></canvas>
+
+                    <!-- Charts Section -->
+                    <div class="charts-grid">
+                        <div class="chart-card">
+                            <h3>📊 Project Status Distribution</h3>
+                            <div class="chart-container">
+                                <canvas id="project-status-chart"></canvas>
+                            </div>
+                        </div>
+                        <div class="chart-card">
+                            <h3>📈 Monthly Project Trends</h3>
+                            <div class="chart-container">
+                                <canvas id="monthly-trend-chart"></canvas>
+                            </div>
+                        </div>
+                        <div class="chart-card">
+                            <h3>💰 Financial Overview</h3>
+                            <div class="chart-container">
+                                <canvas id="financial-chart"></canvas>
+                            </div>
+                        </div>
+                        <div class="chart-card">
+                            <h3>🎯 Lead Conversion</h3>
+                            <div class="chart-container">
+                                <canvas id="lead-chart"></canvas>
+                            </div>
+                        </div>
                     </div>
                 </section>
 
                 <!-- Projects List Section -->
                 <section id="projects-section" class="section-content" style="display:none;">
-                    <h2>Your Projects</h2>
+                    <div class="section-header">
+                        <h2 class="section-title">Your Projects</h2>
+                        <div class="section-actions">
+                            <button class="btn btn-primary" onclick="jQuery('.nav-item[data-section=create-project]').click()">
+                                ➕ New Project
+                            </button>
+                        </div>
+                    </div>
+                    
+                    <!-- Project Filters - Simplified -->
+                    <div class="content-card" style="margin-bottom: 20px;">
+                        <div class="filter-row" style="display: flex; gap: 12px; flex-wrap: wrap; align-items: end;">
+                            <div class="form-group" style="margin: 0; flex: 1; min-width: 200px;">
+                                <label for="filter-status">Status</label>
+                                <select id="filter-status" class="project-filter">
+                                    <option value="">All Statuses</option>
+                                    <option value="pending">Pending</option>
+                                    <option value="assigned">Assigned</option>
+                                    <option value="in_progress">In Progress</option>
+                                    <option value="completed">Completed</option>
+                                    <option value="cancelled">Cancelled</option>
+                                </select>
+                            </div>
+                            <div class="form-group" style="margin: 0; flex: 1; min-width: 200px;">
+                                <label for="filter-date-preset">Date</label>
+                                <select id="filter-date-preset" class="project-filter">
+                                    <option value="">Show All</option>
+                                    <option value="today">Today</option>
+                                    <option value="yesterday">Yesterday</option>
+                                    <option value="week">This Week</option>
+                                    <option value="custom">Custom Date</option>
+                                </select>
+                            </div>
+                            <div class="form-group" id="custom-date-wrapper" style="margin: 0; flex: 1; min-width: 200px; display: none;">
+                                <label for="filter-custom-date">Select Date</label>
+                                <input type="date" id="filter-custom-date" class="project-filter">
+                            </div>
+                            <button class="btn btn-secondary clear-project-filters-btn" style="margin: 0;">
+                                🔄 Clear
+                            </button>
+                        </div>
+                    </div>
+                    
                     <div id="area-project-list-container">
                         <p>Loading projects...</p>
                     </div>
@@ -214,12 +289,20 @@ function sp_area_manager_dashboard_shortcode() {
                                 wp_dropdown_users( array(
                                     'role' => 'solar_client',
                                     'name' => 'client_user_id',
+                                    'id' => 'client_user_id',
                                     'show_option_none' => 'Select Client',
-                                    'meta_key' => '_created_by_area_manager',
-                                    'meta_value' => get_current_user_id(),
+                                    'selected' => 0,
                                 ) );
                                 ?>
                             </div>
+                            
+                            <!-- Financial Field -->
+                            <div class="form-group">
+                                <label for="total_project_cost">Total Project Cost (₹) *</label>
+                                <input type="number" id="total_project_cost" name="total_project_cost" step="0.01" min="0" required style="width: 100%;" placeholder="Amount client will pay">
+                                <small style="color: #666;">Total amount the client will pay for this project. Profit will be calculated based on vendor bid/assignment.</small>
+                            </div>
+                            
                             <div class="form-group">
                                 <label for="solar_system_size_kw">Solar System Size (kW)</label>
                                 <input type="number" id="solar_system_size_kw" name="solar_system_size_kw" step="0.1" required>
@@ -289,11 +372,28 @@ function sp_area_manager_dashboard_shortcode() {
 
                 <!-- Leads Section -->
                 <section id="leads-section" class="section-content" style="display:none;">
-                    <h2>Lead Management</h2>
-                    <div class="card">
+                    <div class="section-header">
+                        <h2 class="section-title">Lead Management</h2>
+                        <div class="section-actions">
+                            <div class="search-box">
+                                <input type="text" id="lead-search" placeholder="Search leads..." />
+                                <span class="search-icon">🔍</span>
+                            </div>
+                            <select id="filter-lead-status" style="padding: 10px; border: 2px solid var(--border-color); border-radius: 8px;">
+                                <option value="">All Status</option>
+                                <option value="new">New</option>
+                                <option value="contacted">Contacted</option>
+                                <option value="interested">Interested</option>
+                                <option value="converted">Converted</option>
+                                <option value="lost">Lost</option>
+                            </select>
+                        </div>
+                    </div>
+                    
+                    <div class="card modern-form">
                         <h3>Add New Lead</h3>
                         <form id="create-lead-form">
-                            <div class="form-group">
+                            <div class="form-row">
                                 <label for="lead_name">Name</label>
                                 <input type="text" id="lead_name" name="lead_name" required>
                             </div>
@@ -326,7 +426,7 @@ function sp_area_manager_dashboard_shortcode() {
 
                     <div class="card" style="margin-top: 20px;">
                         <h3>Your Leads</h3>
-                        <div id="leads-list-container">
+                        <div id="area-leads-container">
                             <p>Loading leads...</p>
                         </div>
                     </div>
@@ -336,7 +436,7 @@ function sp_area_manager_dashboard_shortcode() {
                 <section id="my-clients-section" class="section-content" style="display:none;">
                     <h2>My Clients</h2>
                     <div class="card">
-                        <div id="my-clients-list-container">
+                        <div id="my-clients-container">
                             <p>Loading clients...</p>
                         </div>
                     </div>
@@ -433,6 +533,41 @@ function sp_area_manager_dashboard_shortcode() {
         </div>
         <div class="notification-list" id="notification-list">
             <p style="text-align: center; color: #999; padding: 20px;">Loading notifications...</p>
+        </div>
+    </div>
+
+    <!-- Project Detail Modal -->
+    <div class="project-detail-modal" id="projectDetailModal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2 id="modalProjectTitle">Project Details</h2>
+                <button class="modal-close">×</button>
+            </div>
+            <div class="modal-body">
+                <div class="detail-section">
+                    <h3>📋 Project Information</h3>
+                    <div class="detail-grid" id="modalProjectInfo"></div>
+                </div>
+                <div class="detail-section">
+                    <h3>👤 Client Details</h3>
+                    <div class="detail-grid" id="modalClientInfo"></div>
+                </div>
+                <div class="detail-section">
+                    <h3>🔧 Vendor Details</h3>
+                    <div class="detail-grid" id="modalVendorInfo"></div>
+                </div>
+                <div class="detail-section">
+                    <h3>📊 Project Progress</h3>
+                    <div class="progress-overview">
+                        <p class="progress-percentage" id="modalProgressPercentage">0%</p>
+                        <p class="progress-label">Complete</p>
+                        <div class="progress-bar-container">
+                            <div class="progress-bar-fill" id="modalProgressBar" style="width: 0%"></div>
+                        </div>
+                    </div>
+                    <div class="step-list" id="modalProgressSteps"></div>
+                </div>
+            </div>
         </div>
     </div>
 

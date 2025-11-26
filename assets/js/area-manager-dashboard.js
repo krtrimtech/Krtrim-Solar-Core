@@ -157,6 +157,7 @@ if (typeof jQuery === 'undefined') {
         // Make showToast globally available
         window.showToast = showToast;
 
+        // --- Initialize AJAX URL and nonces FIRST (before any functions use them) ---
         const ajaxUrl = (typeof sp_area_dashboard_vars !== 'undefined') ? sp_area_dashboard_vars.ajax_url : '';
 
         if (!ajaxUrl) {
@@ -169,8 +170,11 @@ if (typeof jQuery === 'undefined') {
         const reviewSubmissionNonce = sp_area_dashboard_vars.review_submission_nonce;
         const awardBidNonce = sp_area_dashboard_vars.award_bid_nonce;
 
-        // --- Load Dashboard Stats ---
+        // --- Dashboard Charts & Stats ---
+        let projectStatusChart, monthlyTrendChart, financialChart, leadChart;
+
         function loadDashboardStats() {
+            console.log('Loading dashboard stats...');
             $.ajax({
                 url: ajaxUrl,
                 type: 'POST',
@@ -179,68 +183,239 @@ if (typeof jQuery === 'undefined') {
                     nonce: sp_area_dashboard_vars.get_dashboard_stats_nonce,
                 },
                 success: function (response) {
+                    console.log('Stats response:', response);
                     if (response.success) {
-                        const stats = response.data;
-                        $('#total-projects-stat').text(stats.total_projects);
-                        $('#completed-projects-stat').text(stats.completed_projects);
-                        $('#in-progress-projects-stat').text(stats.in_progress_projects);
-                        $('#total-paid-stat').text('₹' + stats.total_paid_to_vendors.toLocaleString());
-                        $('#total-profit-stat').text('₹' + stats.total_company_profit.toLocaleString());
-
-                        const ctx = document.getElementById('project-status-chart');
-                        if (ctx) {
-                            try {
-                                new Chart(ctx.getContext('2d'), {
-                                    type: 'pie',
-                                    data: {
-                                        labels: ['Completed', 'In Progress', 'Pending'],
-                                        datasets: [{
-                                            label: 'Project Statuses',
-                                            data: [stats.completed_projects, stats.in_progress_projects, stats.total_projects - stats.completed_projects - stats.in_progress_projects],
-                                            backgroundColor: [
-                                                'rgba(40, 167, 69, 0.5)',
-                                                'rgba(255, 193, 7, 0.5)',
-                                                'rgba(220, 53, 69, 0.5)',
-                                            ],
-                                        }]
-                                    },
-                                });
-                            } catch (err) {
-                                console.error("Chart init failed:", err);
-                            }
-                        }
+                        updateDashboardStats(response.data);
+                        initializeCharts(response.data);
+                    } else {
+                        console.error('Stats error:', response);
                     }
+                },
+                error: function (xhr, status, error) {
+                    console.error('AJAX error loading stats:', error);
                 }
             });
         }
 
-        // --- Data Loading Dispatcher ---
+        function updateDashboardStats(stats) {
+            console.log('Updating stats:', stats);
+            $('#total-projects-stat').text(stats.total_projects || 0);
+            $('#total-revenue-stat').text('₹' + (stats.total_revenue || 0).toLocaleString('en-IN'));
+            $('#total-costs-stat').text('₹' + (stats.total_costs || 0).toLocaleString('en-IN'));
+            $('#total-profit-stat').text('₹' + (stats.total_profit || 0).toLocaleString('en-IN'));
+            $('#profit-margin-stat').text((stats.profit_margin || 0).toFixed(1) + '%');
+            $('#total-leads-stat').text(stats.total_leads || 0);
+        }
+
+        function initializeCharts(stats) {
+            if (typeof Chart === 'undefined') {
+                console.log('Chart.js not loaded');
+                return;
+            }
+            console.log('Charts would be initialized here with:', stats);
+            // Destroy existing charts if they exist
+            if (projectStatusChart) projectStatusChart.destroy();
+            if (monthlyTrendChart) monthlyTrendChart.destroy();
+            if (financialChart) financialChart.destroy();
+            if (leadChart) leadChart.destroy();
+
+            // 1. Project Status Pie Chart
+            const statusCtx = document.getElementById('project-status-chart');
+            if (statusCtx) {
+                projectStatusChart = new Chart(statusCtx, {
+                    type: 'doughnut',
+                    data: {
+                        labels: ['Pending', 'In Progress', 'Completed'],
+                        datasets: [{
+                            data: [
+                                stats.project_status?.pending || 0,
+                                stats.project_status?.in_progress || 0,
+                                stats.project_status?.completed || 0
+                            ],
+                            backgroundColor: ['#f59e0b', '#3b82f6', '#10b981'],
+                            borderWidth: 0
+                        }]
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        plugins: {
+                            legend: { position: 'bottom' }
+                        }
+                    }
+                });
+            }
+
+            // 2. Monthly Trend Bar Chart
+            const trendCtx = document.getElementById('monthly-trend-chart');
+            if (trendCtx) {
+                monthlyTrendChart = new Chart(trendCtx, {
+                    type: 'bar',
+                    data: {
+                        labels: stats.monthly_data?.labels || ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun'],
+                        datasets: [{
+                            label: 'Projects',
+                            data: stats.monthly_data?.values || [0, 0, 0, 0, 0, 0],
+                            backgroundColor: '#4f46e5',
+                            borderRadius: 8
+                        }]
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        plugins: {
+                            legend: { display: false }
+                        },
+                        scales: {
+                            y: { beginAtZero: true }
+                        }
+                    }
+                });
+            }
+
+            // 3. Financial Overview Chart
+            const finCtx = document.getElementById('financial-chart');
+            if (finCtx) {
+                financialChart = new Chart(finCtx, {
+                    type: 'line',
+                    data: {
+                        labels: stats.monthly_data?.labels || ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun'],
+                        datasets: [
+                            {
+                                label: 'Revenue',
+                                data: stats.financial_data?.revenue || [0, 0, 0, 0, 0, 0],
+                                borderColor: '#10b981',
+                                backgroundColor: 'rgba(16, 185, 129, 0.1)',
+                                tension: 0.4,
+                                fill: true
+                            },
+                            {
+                                label: 'Costs',
+                                data: stats.financial_data?.costs || [0, 0, 0, 0, 0, 0],
+                                borderColor: '#ef4444',
+                                backgroundColor: 'rgba(239, 68, 68, 0.1)',
+                                tension: 0.4,
+                                fill: true
+                            }
+                        ]
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        plugins: {
+                            legend: { position: 'bottom' }
+                        },
+                        scales: {
+                            y: { beginAtZero: true }
+                        }
+                    }
+                });
+            }
+
+            // 4. Lead Conversion Chart
+            const leadCtx = document.getElementById('lead-chart');
+            if (leadCtx) {
+                leadChart = new Chart(leadCtx, {
+                    type: 'pie',
+                    data: {
+                        labels: ['Converted', 'Pending', 'Lost'],
+                        datasets: [{
+                            data: [
+                                stats.lead_data?.converted || 0,
+                                stats.lead_data?.pending || 0,
+                                stats.lead_data?.lost || 0
+                            ],
+                            backgroundColor: ['#10b981', '#f59e0b', '#ef4444'],
+                            borderWidth: 0
+                        }]
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        plugins: {
+                            legend: { position: 'bottom' }
+                        }
+                    }
+                });
+            }
+        }
+
+        // Load stats when dashboard section is shown
+        $(document).on('area-manager-nav-click', function (e, section) {
+            if (section === 'dashboard') {
+                loadDashboardStats();
+            }
+        });
+
+        // Initial load
+        if ($('#dashboard-section').is(':visible')) {
+            loadDashboardStats();
+        }
+
+        // Global section data loader
         window.loadSectionData = function (section) {
-            if (section === 'projects') {
+            console.log('Loading section data for:', section);
+            if (section === 'dashboard') {
+                loadDashboardStats();
+            } else if (section === 'projects') {
                 loadProjects();
             } else if (section === 'project-reviews') {
                 loadReviews();
             } else if (section === 'vendor-approvals') {
                 loadVendorApprovals();
             } else if (section === 'leads') {
+                console.log('Triggering loadLeads...');
                 loadLeads();
             } else if (section === 'my-clients') {
                 loadMyClients();
             }
         };
 
-        // Handle event from global handler if needed
+        // Load data when section becomes visible
+        $(document).on('click', '.nav-item', function () {
+            const section = $(this).data('section');
+            console.log('Nav clicked, section:', section);
+            setTimeout(function () {
+                loadSectionData(section);
+            }, 100);
+        });
+
+        // Initial load - check if dashboard is visible and load it
+        $(document).ready(function () {
+            console.log('Document ready, checking initial section');
+            setTimeout(function () {
+                if ($('#dashboard-section').is(':visible')) {
+                    console.log('Dashboard visible on load, loading stats');
+                    loadDashboardStats();
+                }
+                if ($('#leads-section').is(':visible')) {
+                    console.log('Leads visible on load, loading leads');
+                    loadLeads();
+                }
+            }, 500);
+        });
+
+        // Handle event from global handler
         $(document).on('area-manager-nav-click', function (e, section) {
             window.loadSectionData(section);
         });
 
-        loadDashboardStats();
+        // Initial load if dashboard is visible
+        setTimeout(function () {
+            if ($('#dashboard-section').is(':visible')) {
+                console.log('Initial dashboard stats load');
+                loadDashboardStats();
+            }
+        }, 500);
+
 
         // Navigation handler moved to global scope for reliability
 
-        // --- Load Projects ---
+        // --- Load Projects with Filters ---
+        let allProjects = [];
+
         function loadProjects() {
-            $('#area-project-list-container').html('<p>Loading projects...</p>');
+            $('#area-project-list-container').html('<div class="loading-spinner"><div class="spinner"></div><p>Loading projects...</p></div>');
             $.ajax({
                 url: ajaxUrl,
                 type: 'POST',
@@ -250,27 +425,140 @@ if (typeof jQuery === 'undefined') {
                 },
                 success: function (response) {
                     if (response.success) {
-                        let html = '';
-                        if (response.data.projects.length > 0) {
-                            response.data.projects.forEach(project => {
-                                html += `
-                                <div class="project-card" data-project-id="${project.id}">
-                                    <h4>${project.title}</h4>
-                                    <p>Status: <span class="badge status-${project.status}">${project.status}</span></p>
-                                    <p>${project.pending_submissions} pending submissions</p>
-                                </div>
-                            `;
-                            });
-                        } else {
-                            html = '<p>No projects found.</p>';
-                        }
-                        $('#area-project-list-container').html(html);
-                    } else {
-                        $('#area-project-list-container').html('<p class="text-danger">Error loading projects.</p>');
+                        allProjects = response.data.projects;
+                        renderProjects(allProjects);
                     }
                 }
             });
         }
+
+        function renderProjects(projects) {
+            if (!projects || projects.length === 0) {
+                $('#area-project-list-container').html('<div class="empty-state"><div class="empty-state-icon">📋</div><h3>No Projects</h3></div>');
+                return;
+            }
+            let html = '<div class="leads-grid">';
+            projects.forEach(project => {
+                const statusClass = 'status-' + (project.status || 'pending');
+                html += `
+                    <div class="lead-card">
+                        <div class="lead-card-header">
+                            <h3 class="lead-card-title">${project.title}</h3>
+                            <span class="lead-card-status ${statusClass}">${project.status}</span>
+                        </div>
+                        <div class="lead-card-body">
+                            <div class="lead-info">📍 ${project.project_state || ''}, ${project.project_city || ''}</div>
+                            <div class="lead-info">⚡ ${project.solar_system_size_kw || 0} kW</div>
+                            <div class="lead-info">💰 ₹${Number(project.total_cost || 0).toLocaleString()}</div>
+                        </div>
+                        <div class="lead-card-actions">
+                            <button class="action-btn action-btn-primary view-project-details" data-id="${project.id}">👁️ View</button>
+                            <button class="action-btn action-btn-danger delete-project" data-id="${project.id}">🗑️ Delete</button>
+                        </div>
+                    </div>
+                `;
+            });
+            html += '</div>';
+            $('#area-project-list-container').html(html);
+        }
+
+        function filterProjects() {
+            const status = $('#filter-status').val();
+            const datePreset = $('#filter-date-preset').val();
+            const customDate = $('#filter-custom-date').val();
+
+            let filtered = allProjects.filter(p => {
+                // Status filter
+                if (status && p.status !== status) return false;
+
+                // Date filter
+                if (datePreset) {
+                    const projectDate = new Date(p.start_date || p.created_at);
+                    const today = new Date();
+                    today.setHours(0, 0, 0, 0);
+
+                    if (datePreset === 'today') {
+                        const pDate = new Date(projectDate);
+                        pDate.setHours(0, 0, 0, 0);
+                        if (pDate.getTime() !== today.getTime()) return false;
+                    } else if (datePreset === 'yesterday') {
+                        const yesterday = new Date(today);
+                        yesterday.setDate(yesterday.getDate() - 1);
+                        const pDate = new Date(projectDate);
+                        pDate.setHours(0, 0, 0, 0);
+                        if (pDate.getTime() !== yesterday.getTime()) return false;
+                    } else if (datePreset === 'week') {
+                        const weekAgo = new Date(today);
+                        weekAgo.setDate(weekAgo.getDate() - 7);
+                        if (projectDate < weekAgo) return false;
+                    } else if (datePreset === 'custom' && customDate) {
+                        const selectedDate = new Date(customDate);
+                        const pDate = new Date(projectDate);
+                        pDate.setHours(0, 0, 0, 0);
+                        selectedDate.setHours(0, 0, 0, 0);
+                        if (pDate.getTime() !== selectedDate.getTime()) return false;
+                    }
+                }
+
+                return true;
+            });
+
+            renderProjects(filtered);
+        }
+
+        // Clear filters button
+        $(document).on('click', '.clear-project-filters-btn', function () {
+            $('#filter-status, #filter-date-preset, #filter-custom-date').val('');
+            $('#custom-date-wrapper').hide();
+            renderProjects(allProjects);
+        });
+
+        window.clearProjectFilters = function () {
+            $('#filter-status, #filter-date-preset, #filter-custom-date').val('');
+            $('#custom-date-wrapper').hide();
+            renderProjects(allProjects);
+        };
+
+        // Show/hide custom date input and trigger filter
+        $(document).on('change', '#filter-date-preset', function () {
+            const preset = $(this).val();
+            if (preset === 'custom') {
+                $('#custom-date-wrapper').show();
+                // Set default to today if no date selected
+                if (!$('#filter-custom-date').val()) {
+                    const today = new Date().toISOString().split('T')[0];
+                    $('#filter-custom-date').val(today);
+                }
+                // Trigger filter with the date
+                filterProjects();
+            } else {
+                $('#custom-date-wrapper').hide();
+                $('#filter-custom-date').val(''); // Clear custom date when switching away
+                filterProjects();
+            }
+        });
+
+        // Trigger filter when custom date is changed via calendar
+        $(document).on('change', '#filter-custom-date', function () {
+            if ($('#filter-date-preset').val() === 'custom') {
+                console.log('Custom date selected:', $(this).val());
+                filterProjects();
+            }
+        });
+
+        // Attach filter listeners for status
+        $(document).on('change', '#filter-status', filterProjects);
+
+        // View project details button handler
+        $(document).on('click', '.view-project-details', function () {
+            const projectId = $(this).data('id');
+            console.log('View project details:', projectId);
+            if (typeof openProjectModal === 'function') {
+                openProjectModal(projectId);
+            } else {
+                console.error('openProjectModal function not found');
+            }
+        });
 
         // --- Load Reviews ---
         function loadReviews() {
@@ -390,6 +678,7 @@ if (typeof jQuery === 'undefined') {
             }
         });
 
+        // --- Create Project ---
         $('#create-project-form').on('submit', function (e) {
             e.preventDefault();
             const form = $(this);
@@ -439,7 +728,8 @@ if (typeof jQuery === 'undefined') {
 
         // --- Lead Management ---
         function loadLeads() {
-            $('#leads-list-container').html('<p>Loading leads...</p>');
+            console.log('🔄 Loading leads...');
+            $('#area-leads-container').html('<p>Loading leads...</p>');
             $.ajax({
                 url: ajaxUrl,
                 type: 'POST',
@@ -448,6 +738,7 @@ if (typeof jQuery === 'undefined') {
                     nonce: sp_area_dashboard_vars.get_leads_nonce,
                 },
                 success: function (response) {
+                    console.log('✅ Leads loaded:', response);
                     if (response.success) {
                         let html = '';
                         if (response.data.leads.length > 0) {
@@ -473,10 +764,15 @@ if (typeof jQuery === 'undefined') {
                         } else {
                             html = '<p>No leads found.</p>';
                         }
-                        $('#leads-list-container').html(html);
+                        $('#area-leads-container').html(html);
                     } else {
-                        $('#leads-list-container').html('<p class="text-danger">Error loading leads.</p>');
+                        console.error('❌ Lead loading failed:', response);
+                        $('#area-leads-container').html('<p class="text-danger">Error loading leads.</p>');
                     }
+                },
+                error: function (xhr, status, error) {
+                    console.error('❌ AJAX error:', error);
+                    $('#area-leads-container').html('<p class="text-danger">AJAX error. Check console.</p>');
                 }
             });
         }
@@ -812,7 +1108,7 @@ if (typeof jQuery === 'undefined') {
         });
         // --- My Clients ---
         function loadMyClients() {
-            $('#my-clients-list-container').html('<p>Loading clients...</p>');
+            $('#my-clients-container').html('<p>Loading clients...</p>');
             $.ajax({
                 url: ajaxUrl,
                 type: 'POST',
@@ -821,9 +1117,10 @@ if (typeof jQuery === 'undefined') {
                     nonce: sp_area_dashboard_vars.get_clients_nonce,
                 },
                 success: function (response) {
+                    console.log('Clients loaded:', response);
                     if (response.success) {
                         let html = '';
-                        if (response.data.clients.length > 0) {
+                        if (response.data.clients && response.data.clients.length > 0) {
                             html += '<table class="wp-list-table widefat fixed striped"><thead><tr><th>Name</th><th>Username</th><th>Email</th><th>Actions</th></tr></thead><tbody>';
                             response.data.clients.forEach(client => {
                                 html += `
@@ -841,10 +1138,14 @@ if (typeof jQuery === 'undefined') {
                         } else {
                             html = '<p>No clients found.</p>';
                         }
-                        $('#my-clients-list-container').html(html);
+                        $('#my-clients-container').html(html);
                     } else {
-                        $('#my-clients-list-container').html('<p class="text-danger">Error loading clients.</p>');
+                        $('#my-clients-container').html('<p class="text-danger">Error: ' + (response.data?.message || 'Failed to load clients') + '</p>');
                     }
+                },
+                error: function (xhr, status, error) {
+                    console.error('Client load AJAX error:', error);
+                    $('#my-clients-container').html('<p class="text-danger">Error loading clients. Please try again.</p>');
                 }
             });
         }
