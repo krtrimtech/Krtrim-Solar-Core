@@ -222,6 +222,14 @@ final class Krtrim_Solar_Core {
 				'states_cities' => isset($states_cities['states']) ? $states_cities['states'] : [],
 			]);
 		}
+
+		// Load bid submission JS on single project pages
+		if (is_singular('solar_project')) {
+			wp_enqueue_script('project-bid-js', $this->dir_url . 'assets/js/project-bid.js', ['jquery'], $this->version, true);
+			wp_localize_script('project-bid-js', 'project_bid_vars', [
+				'ajax_url' => admin_url('admin-ajax.php'),
+			]);
+		}
 	}
 
 	public function enqueue_admin_scripts( $hook ) {

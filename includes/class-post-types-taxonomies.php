@@ -175,21 +175,28 @@ class SP_Post_Types_Taxonomies {
         ));
 
         echo '<table class="widefat fixed" cellspacing="0" id="bids-meta-box-table">';
-        echo '<thead><tr><th>Vendor</th><th>Bid Amount</th><th>Type</th><th>Details</th><th>Action</th></tr></thead>';
+        echo '<thead><tr><th>Vendor</th><th>Bid Amount</th><th>Type</th><th>Details</th><th>Date</th><th>Action</th></tr></thead>';
         echo '<tbody>';
 
         if ($bids) {
-            $winning_vendor_id = get_post_meta($post->ID, 'winning_vendor_id', true);
             foreach ($bids as $bid) {
-                $is_awarded = ($bid->vendor_id == $winning_vendor_id);
-                echo '<tr' . ($is_awarded ? ' class="awarded-bid"' : '') . '>';
+                $awarded_vendor_id = get_post_meta($post->ID, '_vendor_user_id', true);
+                $is_awarded = ($awarded_vendor_id == $bid->vendor_id);
+                $row_class = $is_awarded ? 'awarded-bid' : '';
+                
+                // Determine bid type styling
+                $bid_type_class = ($bid->bid_type === 'open') ? 'bid-type-open' : 'bid-type-hidden';
+                $bid_type_label = ($bid->bid_type === 'open') ? '👁️ Open' : '🔒 Hidden';
+                
+                echo '<tr class="' . $row_class . '">';
                 echo '<td>' . esc_html($bid->display_name) . '</td>';
                 echo '<td>₹' . number_format($bid->bid_amount) . '</td>';
-                echo '<td>' . ucfirst($bid->bid_type) . '</td>';
+                echo '<td><span class="' . $bid_type_class . '">' . $bid_type_label . '</span></td>';
                 echo '<td>' . esc_html($bid->bid_details) . '</td>';
+                echo '<td>' . esc_html(date('M j, Y', strtotime($bid->created_at))) . '</td>';
                 echo '<td>';
                 if ($is_awarded) {
-                    echo '<strong>Awarded</strong>';
+                    echo '<span class="awarded-badge">✓ Awarded</span>';
                 } else {
                     echo '<button type="button" class="button button-primary award-bid-btn" data-project-id="' . $post->ID . '" data-vendor-id="' . $bid->vendor_id . '" data-bid-amount="' . $bid->bid_amount . '">Award Project</button>';
                 }
@@ -197,11 +204,35 @@ class SP_Post_Types_Taxonomies {
                 echo '</tr>';
             }
         } else {
-            echo '<tr><td colspan="5">No bids have been placed on this project yet.</td></tr>';
+            echo '<tr><td colspan="6">No bids have been placed on this project yet.</td></tr>';
         }
 
         echo '</tbody></table>';
-        echo '<style>.awarded-bid { background-color: #d4edda; }</style>';
+        echo '<style>
+            .awarded-bid { background-color: #d4edda; }
+            .bid-type-open { 
+                display: inline-block;
+                padding: 3px 8px;
+                border-radius: 3px;
+                background-color: #d4edda;
+                color: #155724;
+                font-size: 12px;
+                font-weight: 600;
+            }
+            .bid-type-hidden { 
+                display: inline-block;
+                padding: 3px 8px;
+                border-radius: 3px;
+                background-color: #fff3cd;
+                color: #856404;
+                font-size: 12px;
+                font-weight: 600;
+            }
+            .awarded-badge {
+                color: #155724;
+                font-weight: 600;
+            }
+        </style>';
         wp_nonce_field('award_bid_nonce', 'award_bid_nonce_field');
     }
 }

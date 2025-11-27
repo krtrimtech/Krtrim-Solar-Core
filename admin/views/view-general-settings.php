@@ -13,12 +13,16 @@ function sp_render_general_settings_page() {
         <h2 class="nav-tab-wrapper">
             <a href="?page=ksc-settings&tab=vendor_registration" class="nav-tab <?php echo $active_tab == 'vendor_registration' ? 'nav-tab-active' : ''; ?>">Vendor Registration</a>
             <a href="?page=ksc-settings&tab=notifications" class="nav-tab <?php echo $active_tab == 'notifications' ? 'nav-tab-active' : ''; ?>">Notifications</a>
+            <a href="?page=ksc-settings&tab=project_settings" class="nav-tab <?php echo $active_tab == 'project_settings' ? 'nav-tab-active' : ''; ?>">Project Settings</a>
         </h2>
         <form method="post" action="options.php">
             <?php
             if ($active_tab == 'vendor_registration') {
                 settings_fields('sp_vendor_settings_group');
                 do_settings_sections('vendor-registration-settings');
+            } elseif ($active_tab == 'project_settings') {
+                settings_fields('sp_project_settings_group');
+                do_settings_sections('project-settings');
             } else {
                 settings_fields('sp_notification_settings_group');
                 do_settings_sections('notification-settings');
@@ -224,8 +228,35 @@ function sp_register_general_settings() {
         'notification-settings',
         'sp_whatsapp_section'
     );
+
+    // --- Project Settings ---
+    register_setting('sp_project_settings_group', 'ksc_default_project_image');
+
+    add_settings_section(
+        'sp_project_section',
+        'Project Display Settings',
+        'sp_project_section_callback',
+        'project-settings'
+    );
+
+    add_settings_field(
+        'default_project_image',
+        'Default Project Featured Image',
+        'sp_default_project_image_callback',
+        'project-settings',
+        'sp_project_section'
+    );
 }
 add_action('admin_init', 'sp_register_general_settings');
+
+// Enqueue media uploader
+function sp_enqueue_admin_media_scripts($hook) {
+    if ($hook !== 'settings_page_ksc-settings') {
+        return;
+    }
+    wp_enqueue_media();
+}
+add_action('admin_enqueue_scripts', 'sp_enqueue_admin_media_scripts');
 
 // --- Callbacks ---
 
@@ -234,6 +265,65 @@ function sp_razorpay_section_callback() { echo 'Configure your Razorpay API cred
 function sp_fee_section_callback() { echo 'Set the fees for state and city coverage.'; }
 function sp_email_section_callback() { echo 'Configure which email notifications are sent automatically.'; }
 function sp_whatsapp_section_callback() { echo 'Enable "Click-to-Chat" buttons, which open a pre-filled WhatsApp chat in a new tab.'; }
+function sp_project_section_callback() { echo 'Configure default settings for solar projects displayed on the marketplace.'; }
+
+// Project Settings Fields
+function sp_default_project_image_callback() {
+    $image_url = get_option('ksc_default_project_image', '');
+    ?>
+    <div class="default-image-uploader">
+        <input type="hidden" id="ksc_default_project_image" name="ksc_default_project_image" value="<?php echo esc_attr($image_url); ?>" />
+        <div class="image-preview" style="margin-bottom: 10px;">
+            <?php if ($image_url): ?>
+                <img src="<?php echo esc_url($image_url); ?>" style="max-width: 300px; height: auto; display: block; margin-bottom: 10px; border: 1px solid #ddd; padding: 5px;" />
+            <?php else: ?>
+                <img src="" style="max-width: 300px; height: auto; display: none; margin-bottom: 10px; border: 1px solid #ddd; padding: 5px;" />
+            <?php endif; ?>
+        </div>
+        <button type="button" class="button upload-default-image">Upload/Select Image</button>
+        <?php if ($image_url): ?>
+            <button type="button" class="button remove-default-image" style="margin-left: 10px;">Remove Image</button>
+        <?php endif; ?>
+        <p class="description">This image will be used as the featured image for projects that don't have one set. Recommended size: 400x250px</p>
+    </div>
+    <script>
+    jQuery(document).ready(function($) {
+        var mediaUploader;
+        
+        $('.upload-default-image').on('click', function(e) {
+            e.preventDefault();
+            
+            if (mediaUploader) {
+                mediaUploader.open();
+                return;
+            }
+            
+            mediaUploader = wp.media({
+                title: 'Select Default Project Image',
+                button: { text: 'Use this image' },
+                multiple: false
+            });
+            
+            mediaUploader.on('select', function() {
+                var attachment = mediaUploader.state().get('selection').first().toJSON();
+                $('#ksc_default_project_image').val(attachment.url);
+                $('.image-preview img').attr('src', attachment.url).show();
+                $('.remove-default-image').show();
+            });
+            
+            mediaUploader.open();
+        });
+        
+        $('.remove-default-image').on('click', function(e) {
+            e.preventDefault();
+            $('#ksc_default_project_image').val('');
+            $('.image-preview img').attr('src', '').hide();
+            $(this).hide();
+        });
+    });
+    </script>
+    <?php
+}
 
 // Vendor Fields
 function sp_razorpay_mode_callback() {

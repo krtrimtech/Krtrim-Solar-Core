@@ -16,11 +16,12 @@ get_header(); ?>
         $is_vendor = in_array('solar_vendor', (array)$current_user->roles);
 
         // --- Get Project Data ---
-        $client_amount = get_post_meta($project_id, '_client_amount', true) ?: 'N/A';
-        $vendor_paid_amount = get_post_meta($project_id, '_vendor_paid_amount', true) ?: 'N/A';
-        $location = get_post_meta($project_id, '_installation_location', true) ?: 'N/A';
-        $cities = get_the_terms($project_id, 'project_city');
-        $city_name = !empty($cities) ? $cities[0]->name : 'N/A';
+        $project_state = get_post_meta($project_id, '_project_state', true) ?: 'N/A';
+        $project_city = get_post_meta($project_id, '_project_city', true) ?: 'N/A';
+        $system_size = get_post_meta($project_id, '_solar_system_size_kw', true) ?: 'N/A';
+        $total_cost = get_post_meta($project_id, '_total_project_cost', true) ?: 'N/A';
+        $start_date = get_post_meta($project_id, '_project_start_date', true) ?: 'N/A';
+        $assignment_method = get_post_meta($project_id, '_vendor_assignment_method', true);
 
         ?>
         <article id="post-<?php the_ID(); ?>" <?php post_class('solar-project-single'); ?>>
@@ -30,9 +31,13 @@ get_header(); ?>
 
             <div class="entry-content">
                 <div class="project-details-grid">
-                    <div class="detail-item"><strong>Budget:</strong> ₹<?php echo is_numeric($client_amount) ? number_format($client_amount) : esc_html($client_amount); ?></div>
-                    <div class="detail-item"><strong>City:</strong> <?php echo esc_html($city_name); ?></div>
-                    <div class="detail-item"><strong>Location:</strong> <?php echo esc_html($location); ?></div>
+                    <div class="detail-item"><strong>State:</strong> <?php echo esc_html($project_state); ?></div>
+                    <div class="detail-item"><strong>City:</strong> <?php echo esc_html($project_city); ?></div>
+                    <div class="detail-item"><strong>System Size:</strong> <?php echo esc_html($system_size); ?> kW</div>
+                    <div class="detail-item"><strong>Budget:</strong> ₹<?php echo is_numeric($total_cost) ? number_format($total_cost) : esc_html($total_cost); ?></div>
+                    <?php if ($start_date !== 'N/A'): ?>
+                    <div class="detail-item"><strong>Start Date:</strong> <?php echo esc_html(date('F j, Y', strtotime($start_date))); ?></div>
+                    <?php endif; ?>
                 </div>
 
                 <?php the_content(); ?>
@@ -72,42 +77,67 @@ get_header(); ?>
                     </div>
 
                     <!-- Place Bid Form -->
-                    <div class="place-bid-form-wrapper">
-                        <h3>Place Your Bid</h3>
-                        <?php if (is_user_logged_in()): ?>
-                            <?php if ($is_vendor): ?>
-                                <form id="place-bid-form" class="place-bid-form">
-                                    <input type="hidden" name="project_id" value="<?php echo $project_id; ?>">
-                                    <?php wp_nonce_field('submit_bid_nonce_' . $project_id, 'submit_bid_nonce'); ?>
+                <div class="place-bid-form-wrapper">
+                    <h3>Place Your Bid</h3>
+                    <?php if (is_user_logged_in()): ?>
+                        <?php if ($is_vendor): ?>
+                            <form id="place-bid-form" class="place-bid-form">
+                                <input type="hidden" name="project_id" value="<?php echo $project_id; ?>">
+                                <?php wp_nonce_field('submit_bid_nonce_' . $project_id, 'submit_bid_nonce'); ?>
 
-                                    <div class="form-group">
-                                        <label for="bid_amount">Your Bid Amount (₹)</label>
-                                        <input type="number" id="bid_amount" name="bid_amount" required>
+                                <div class="form-group">
+                                    <label for="bid_amount">Your Bid Amount (₹)</label>
+                                    <input type="number" id="bid_amount" name="bid_amount" required>
+                                </div>
+
+                                <div class="form-group">
+                                    <label for="bid_details">Details (Optional)</label>
+                                    <textarea id="bid_details" name="bid_details" rows="3"></textarea>
+                                </div>
+
+                                <div class="form-group">
+                                    <label>Bid Type</label>
+                                    <div class="radio-group">
+                                        <label><input type="radio" name="bid_type" value="open" checked> Open Bid (Visible to everyone)</label>
+                                        <label><input type="radio" name="bid_type" value="hidden"> Hidden Bid (Visible to managers only)</label>
                                     </div>
+                                </div>
 
-                                    <div class="form-group">
-                                        <label for="bid_details">Details (Optional)</label>
-                                        <textarea id="bid_details" name="bid_details" rows="3"></textarea>
-                                    </div>
-
-                                    <div class="form-group">
-                                        <label>Bid Type</label>
-                                        <div class="radio-group">
-                                            <label><input type="radio" name="bid_type" value="open" checked> Open Bid (Visible to everyone)</label>
-                                            <label><input type="radio" name="bid_type" value="hidden"> Hidden Bid (Visible to managers only)</label>
-                                        </div>
-                                    </div>
-
-                                    <button type="submit" class="btn btn-primary">Submit Bid</button>
-                                    <div id="bid-form-feedback" style="display:none; margin-top:15px;"></div>
-                                </form>
-                            <?php else: ?>
-                                <p>Only registered vendors are able to place bids on projects.</p>
-                            <?php endif; ?>
+                                <button type="submit" class="btn btn-primary">Submit Bid</button>
+                                <div id="bid-form-feedback" style="display:none; margin-top:15px;"></div>
+                            </form>
                         <?php else: ?>
-                            <p>You must be <a href="<?php echo wp_login_url(get_permalink()); ?>">logged in</a> as a vendor to place a bid. <a href="<?php echo wp_registration_url(); ?>">Register here</a>.</p>
+                            <div class="vendor-registration-notice" style="text-align: center; padding: 40px 20px; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); border-radius: 12px; color: white;">
+                                <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="margin: 0 auto 20px;">
+                                    <path d="M12 2L2 7l10 5 10-5-10-5z"></path>
+                                    <path d="M2 17l10 5 10-5M2 12l10 5 10-5"></path>
+                                </svg>
+                                <h4 style="margin: 0 0 15px; font-size: 20px;">Become a Vendor to Bid</h4>
+                                <p style="margin: 0 0 25px; opacity: 0.9;">Register as a solar vendor to submit bids on projects. It's quick and easy!</p>
+                                <a href="<?php echo home_url('/vendor-registration/'); ?>" class="btn-vendor-register" style="display: inline-block; background: white; color: #667eea; padding: 14px 32px; border-radius: 8px; text-decoration: none; font-weight: 600; font-size: 16px; transition: transform 0.2s;">
+                                    Register as Vendor →
+                                </a>
+                            </div>
                         <?php endif; ?>
-                    </div>
+                    <?php else: ?>
+                        <div class="login-notice" style="text-align: center; padding: 40px 20px; background: #f7fafc; border: 2px dashed #cbd5e0; border-radius: 12px;">
+                            <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="#667eea" stroke-width="2" style="margin: 0 auto 20px;">
+                                <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path>
+                                <circle cx="12" cy="7" r="4"></circle>
+                            </svg>
+                            <h4 style="margin: 0 0 15px; color: #2d3748; font-size: 20px;">Login or Register to Bid</h4>
+                            <p style="margin: 0 0 25px; color: #4a5568;">You need to be logged in as a vendor to place bids on this project.</p>
+                            <div style="display: flex; gap: 15px; justify-content: center; flex-wrap: wrap;">
+                                <a href="<?php echo wp_login_url(get_permalink()); ?>" class="btn" style="display: inline-block; background: #667eea; color: white; padding: 12px 28px; border-radius: 8px; text-decoration: none; font-weight: 600;">
+                                    Login
+                                </a>
+                                <a href="<?php echo home_url('/vendor-registration/'); ?>" class="btn" style="display: inline-block; background: white; color: #667eea; padding: 12px 28px; border-radius: 8px; text-decoration: none; font-weight: 600; border: 2px solid #667eea;">
+                                    Register as Vendor
+                                </a>
+                            </div>
+                        </div>
+                    <?php endif; ?>
+                </div>
                 </section>
 
             </div><!-- .entry-content -->

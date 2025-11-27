@@ -573,36 +573,198 @@ class SP_API_Handlers {
             error_log('Found ' . $query->found_posts . ' projects');
 
             if ($query->have_posts()) {
-                ob_start();
-                while ($query->have_posts()) {
-                    $query->the_post();
-                    $project_id = get_the_ID();
-                    
-                    // Get all meta data with defaults
-                    $total_cost = get_post_meta($project_id, '_total_project_cost', true);
-                    $total_cost = $total_cost ? $total_cost : '0';
-                    
-                    $state_val = get_post_meta($project_id, '_project_state', true);
-                    $city_val = get_post_meta($project_id, '_project_city', true);
-                    $system_size = get_post_meta($project_id, '_solar_system_size_kw', true);
-                    $location = trim($city_val . ', ' . $state_val, ', ');
-                    ?>
-                    <div class="project-item">
-                        <h3><?php echo esc_html(get_the_title()); ?></h3>
-                        <p><strong>Location:</strong> <?php echo esc_html($location ?: 'Not specified'); ?></p>
-                        <p><strong>System Size:</strong> <?php echo esc_html($system_size ?: 'N/A'); ?> kW</p>
-                        <p><strong>Budget:</strong> ₹<?php echo esc_html(number_format($total_cost)); ?></p>
-                        <a href="<?php echo esc_url(get_permalink()); ?>" class="btn btn-primary">View Details</a>
-                    </div>
-                    <?php
-                }
-                $html = ob_get_clean();
-                wp_reset_postdata();
+            ob_start();
+            while ($query->have_posts()) {
+                $query->the_post();
+                $project_id = get_the_ID();
                 
-                wp_send_json_success(['html' => $html, 'count' => $query->found_posts]);
-            } else {
-                wp_send_json_success(['html' => '', 'count' => 0]);
+                // Get all meta data with defaults
+                $state_val = get_post_meta($project_id, '_project_state', true);
+                $city_val = get_post_meta($project_id, '_project_city', true);
+                $system_size = get_post_meta($project_id, '_solar_system_size_kw', true);
+                $location = trim($city_val . ', ' . $state_val, ', ');
+                
+                // Get featured image or default
+                $thumbnail_url = get_the_post_thumbnail_url($project_id, 'medium');
+                if (!$thumbnail_url) {
+                    // Get default image from settings
+                    $default_image = get_option('ksc_default_project_image', '');
+                    $thumbnail_url = $default_image ?: 'https://via.placeholder.com/400x250/667eea/ffffff?text=Solar+Project';
+                }
+                ?>
+                <div class="project-card">
+                    <div class="project-card-image">
+                        <img src="<?php echo esc_url($thumbnail_url); ?>" alt="<?php echo esc_attr(get_the_title()); ?>">
+                        <div class="project-card-badge">
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <circle cx="12" cy="12" r="5"></circle>
+                                <line x1="12" y1="1" x2="12" y2="3"></line>
+                                <line x1="12" y1="21" x2="12" y2="23"></line>
+                                <line x1="4.22" y1="4.22" x2="5.64" y2="5.64"></line>
+                                <line x1="18.36" y1="18.36" x2="19.78" y2="19.78"></line>
+                                <line x1="1" y1="12" x2="3" y2="12"></line>
+                                <line x1="21" y1="12" x2="23" y2="12"></line>
+                                <line x1="4.22" y1="19.78" x2="5.64" y2="18.36"></line>
+                                <line x1="18.36" y1="5.64" x2="19.78" y2="4.22"></line>
+                            </svg>
+                            Open for Bids
+                        </div>
+                    </div>
+                    <div class="project-card-content">
+                        <h3 class="project-card-title"><?php echo esc_html(get_the_title()); ?></h3>
+                        
+                        <div class="project-card-details">
+                            <div class="project-detail-item">
+                                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                    <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"></path>
+                                    <circle cx="12" cy="10" r="3"></circle>
+                                </svg>
+                                <span><?php echo esc_html($location ?: 'Location not specified'); ?></span>
+                            </div>
+                            
+                            <?php if ($system_size): ?>
+                            <div class="project-detail-item">
+                                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                    <rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect>
+                                    <line x1="9" y1="9" x2="15" y2="15"></line>
+                                    <line x1="15" y1="9" x2="9" y2="15"></line>
+                                </svg>
+                                <span><?php echo esc_html($system_size); ?> kW System</span>
+                            </div>
+                            <?php endif; ?>
+                        </div>
+                        
+                        <a href="<?php echo esc_url(get_permalink()); ?>" class="project-card-btn">
+                            View Details & Bid
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <line x1="5" y1="12" x2="19" y2="12"></line>
+                                <polyline points="12 5 19 12 12 19"></polyline>
+                            </svg>
+                        </a>
+                    </div>
+                </div>
+                <?php
             }
+            $html = ob_get_clean();
+            wp_reset_postdata();
+            
+            // Add CSS for beautiful cards
+            $html .= '<style>
+                .project-card {
+                    background: #ffffff;
+                    border-radius: 12px;
+                    overflow: hidden;
+                    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.07);
+                    transition: all 0.3s ease;
+                    margin-bottom: 24px;
+                }
+                .project-card:hover {
+                    transform: translateY(-4px);
+                    box-shadow: 0 12px 24px rgba(102, 126, 234, 0.15);
+                }
+                .project-card-image {
+                    position: relative;
+                    height: 200px;
+                    overflow: hidden;
+                    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+                }
+                .project-card-image img {
+                    width: 100%;
+                    height: 100%;
+                    object-fit: cover;
+                    transition: transform 0.3s ease;
+                }
+                .project-card:hover .project-card-image img {
+                    transform: scale(1.05);
+                }
+                .project-card-badge {
+                    position: absolute;
+                    top: 12px;
+                    right: 12px;
+                    background: rgba(255, 255, 255, 0.95);
+                    color: #667eea;
+                    padding: 6px 12px;
+                    border-radius: 20px;
+                    font-size: 12px;
+                    font-weight: 600;
+                    display: flex;
+                    align-items: center;
+                    gap: 6px;
+                    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+                }
+                .project-card-content {
+                    padding: 20px;
+                }
+                .project-card-title {
+                    font-size: 18px;
+                    font-weight: 700;
+                    color: #1a202c;
+                    margin: 0 0 16px 0;
+                    line-height: 1.4;
+                }
+                .project-card-details {
+                    display: flex;
+                    flex-direction: column;
+                    gap: 10px;
+                    margin-bottom: 20px;
+                }
+                .project-detail-item {
+                    display: flex;
+                    align-items: center;
+                    gap: 8px;
+                    color: #4a5568;
+                    font-size: 14px;
+                }
+                .project-detail-item svg {
+                    color: #667eea;
+                    flex-shrink: 0;
+                }
+                .project-card-btn {
+                    display: inline-flex;
+                    align-items: center;
+                    gap: 8px;
+                    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+                    color: #ffffff;
+                    padding: 12px 24px;
+                    border-radius: 8px;
+                    text-decoration: none;
+                    font-weight: 600;
+                    font-size: 14px;
+                    transition: all 0.3s ease;
+                    width: 100%;
+                    justify-content: center;
+                }
+                .project-card-btn:hover {
+                    background: linear-gradient(135deg, #764ba2 0%, #667eea 100%);
+                    transform: translateX(2px);
+                    color: #ffffff;
+                }
+                .project-card-btn svg {
+                    transition: transform 0.3s ease;
+                }
+                .project-card-btn:hover svg {
+                    transform: translateX(4px);
+                }
+                
+                /* Grid layout for cards */
+                #project-listings-container {
+                    display: grid;
+                    grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+                    gap: 24px;
+                    padding: 20px 0;
+                }
+                
+                @media (max-width: 768px) {
+                    #project-listings-container {
+                        grid-template-columns: 1fr;
+                    }
+                }
+            </style>';
+            
+            wp_send_json_success(['html' => $html, 'count' => $query->found_posts]);
+        } else {
+            wp_send_json_success(['html' => '', 'count' => 0]);
+        }
         } catch (Exception $e) {
             error_log('Marketplace error: ' . $e->getMessage());
             wp_send_json_error(['message' => 'Server error: ' . $e->getMessage()]);
