@@ -5,6 +5,10 @@ function render_solar_vendor_dashboard() {
     $vendor_id = get_current_user_id();
     $view_project_id = isset($_GET['view_project']) ? intval($_GET['view_project']) : 0;
     
+    // Get vendor coverage data (needed for both display and JavaScript)
+    $purchased_states = get_user_meta($vendor_id, 'purchased_states', true) ?: [];
+    $purchased_cities = get_user_meta($vendor_id, 'purchased_cities', true) ?: [];
+    
     $args = array(
         'post_type' => 'solar_project',
         'posts_per_page' => -1,
@@ -78,6 +82,10 @@ function render_solar_vendor_dashboard() {
                 <a href="#" class="nav-item" data-section="timeline" onclick="switchVendorSection(event, 'timeline')">
                     <span class="icon">🔄</span>
                     <span>Work Timeline</span>
+                </a>
+                <a href="#" class="nav-item" data-section="profile" onclick="switchVendorSection(event, 'profile')">
+                    <span class="icon">👤</span>
+                    <span>Profile & Coverage</span>
                 </a>
             </nav>
             
@@ -153,7 +161,7 @@ function render_solar_vendor_dashboard() {
                                 <span class="stat-icon">✅</span>
                             </div>
                             <div class="stat-value"><?php echo $total_completed; ?></div>
-                            <div class="stat-subtitle">Finished</div>
+                            <div class="stat-subtitle">Projects Done</div>
                         </div>
                         
                         <div class="stat-card">
@@ -579,9 +587,136 @@ function render_solar_vendor_dashboard() {
                     <?php endif; ?>
                     <?php wp_reset_postdata(); ?>
                 </div>
+
+                <!-- PROFILE & COVERAGE SECTION -->
+                <div class="section-content" id="profile-section" style="display: none;">
+                    <div class="profile-grid" style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px;">
+                        
+                        <!-- Profile Settings -->
+                        <div class="card" style="background: white; padding: 20px; border-radius: 10px; box-shadow: 0 2px 10px rgba(0,0,0,0.05);">
+                            <h3>Profile Settings</h3>
+                            <form id="vendor-profile-form">
+                                <p>
+                                    <label>Company Name</label><br>
+                                    <input type="text" id="profile-company" class="form-control" value="<?php echo esc_attr(get_user_meta($vendor_id, 'company_name', true)); ?>" required style="width:100%; padding:8px; margin-top:5px;">
+                                </p>
+                                <p>
+                                    <label>Phone</label><br>
+                                    <input type="text" id="profile-phone" class="form-control" value="<?php echo esc_attr(get_user_meta($vendor_id, 'phone', true)); ?>" required style="width:100%; padding:8px; margin-top:5px;">
+                                </p>
+                                <button type="submit" class="button button-primary" style="margin-top:10px;">Update Profile</button>
+                            </form>
+                        </div>
+
+                        <!-- Current Coverage -->
+                        <div class="card" style="background: white; padding: 20px; border-radius: 10px; box-shadow: 0 2px 10px rgba(0,0,0,0.05);">
+                            <h3>My Coverage Area</h3>
+                            <div style="margin-bottom: 15px;">
+                                <strong>States (<?php echo count($purchased_states); ?>):</strong>
+                                <div style="display: flex; flex-wrap: wrap; gap: 5px; margin-top: 5px;">
+                                    <?php foreach($purchased_states as $state): ?>
+                                        <span style="background: #eef2f7; padding: 4px 8px; border-radius: 4px; font-size: 12px;"><?php echo esc_html($state); ?></span>
+                                    <?php endforeach; ?>
+                                </div>
+                            </div>
+                            <div>
+                                <strong>Cities (<?php echo count($purchased_cities); ?>):</strong>
+                                <div style="display: flex; flex-wrap: wrap; gap: 5px; margin-top: 5px;">
+                                    <?php foreach($purchased_cities as $city): ?>
+                                        <span style="background: #eef2f7; padding: 4px 8px; border-radius: 4px; font-size: 12px;"><?php echo esc_html($city); ?></span>
+                                    <?php endforeach; ?>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Add Coverage -->
+                        <div class="card" style="grid-column: 1 / -1; background: white; padding: 25px; border-radius: 12px; box-shadow: 0 4px 20px rgba(0,0,0,0.08);">
+                            <h3 style="margin-bottom: 5px;">Expand Coverage Area</h3>
+                            <p style="color: #666; font-size: 14px; margin-bottom: 20px;">Grow your business by adding more states or specific cities.</p>
+                            
+                            <div class="coverage-expansion-grid" style="display: grid; grid-template-columns: 1.5fr 1fr; gap: 30px;">
+                                
+                                <!-- Left: Selection -->
+                                <div class="selection-panel">
+                                    
+                                    <!-- Step 1: Select State -->
+                                    <div class="form-group" style="margin-bottom: 20px;">
+                                        <label style="display: block; font-weight: 600; margin-bottom: 8px;">1. Select State</label>
+                                        <select id="coverage-state-select" class="form-control" style="width: 100%; padding: 10px; border-radius: 6px; border: 1px solid #ddd;">
+                                            <option value="">-- Choose a State --</option>
+                                            <!-- Populated via JS -->
+                                        </select>
+                                    </div>
+
+                                    <!-- Step 2: State Options (Hidden by default) -->
+                                    <div id="state-options-container" style="display: none; margin-bottom: 20px; padding: 15px; background: #f8f9fa; border-radius: 8px; border: 1px solid #eee;">
+                                        <div id="buy-state-option" style="margin-bottom: 15px;">
+                                            <label class="custom-checkbox" style="display: flex; align-items: center; cursor: pointer;">
+                                                <input type="checkbox" id="buy-state-checkbox" style="width: 18px; height: 18px; margin-right: 10px;">
+                                                <span>
+                                                    <strong>Buy Entire State Coverage</strong>
+                                                    <span style="display: block; font-size: 12px; color: #666;">Includes all current and future cities in this state.</span>
+                                                </span>
+                                                <span style="margin-left: auto; font-weight: 700; color: #2c3e50;">₹500</span>
+                                            </label>
+                                        </div>
+                                        <div id="owned-state-msg" style="display: none; color: #28a745; font-weight: 600; margin-bottom: 15px;">
+                                            ✅ You already own this state.
+                                        </div>
+                                    </div>
+
+                                    <!-- Step 3: City Selection -->
+                                    <div id="city-selection-container" style="display: none;">
+                                        <label style="display: block; font-weight: 600; margin-bottom: 8px;">2. Select Specific Cities (Optional)</label>
+                                        <div id="city-checkboxes" style="display: grid; grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: 10px; max-height: 300px; overflow-y: auto; padding: 10px; border: 1px solid #eee; border-radius: 6px;">
+                                            <!-- Populated via JS -->
+                                        </div>
+                                        <small style="display: block; margin-top: 5px; color: #888;">Cities are ₹100 each.</small>
+                                    </div>
+
+                                </div>
+
+                                <!-- Right: Summary/Cart -->
+                                <div class="summary-panel" style="background: #f8f9fa; padding: 20px; border-radius: 10px; border: 1px solid #eee; height: fit-content;">
+                                    <h4 style="margin-top: 0; border-bottom: 1px solid #ddd; padding-bottom: 10px;">Order Summary</h4>
+                                    
+                                    <div id="cart-items" style="min-height: 100px; margin-bottom: 20px;">
+                                        <p style="color: #999; text-align: center; margin-top: 30px;">No items selected</p>
+                                    </div>
+
+                                    <div style="border-top: 1px solid #ddd; padding-top: 15px; margin-top: auto;">
+                                        <div style="display: flex; justify-content: space-between; margin-bottom: 15px; font-size: 18px; font-weight: 700;">
+                                            <span>Total</span>
+                                            <span id="cart-total">₹0</span>
+                                        </div>
+                                        <button id="pay-add-coverage-btn" class="button button-primary" style="width: 100%; padding: 12px; font-size: 16px; background: linear-gradient(135deg, #007bff, #0056b3); border: none;" disabled>
+                                            Pay & Add Coverage
+                                        </button>
+                                    </div>
+                                </div>
+
+                            </div>
+                        </div>
+
+                    </div>
+                </div>
             </div>
         </main>
     </div>
+    
+    <!-- Razorpay Script -->
+    <script src="https://checkout.razorpay.com/v1/checkout.js"></script>
+    
+    <script>
+    // Pass PHP data to JS
+    var vendorCoverage = {
+        ownedStates: <?php echo json_encode($purchased_states); ?>,
+        ownedCities: <?php echo json_encode($purchased_cities); ?>,
+        userEmail: '<?php echo esc_js($current_user->user_email); ?>',
+        userName: '<?php echo esc_js($current_user->display_name); ?>',
+        userPhone: '<?php echo esc_js(get_user_meta($vendor_id, 'phone', true)); ?>'
+    };
+    </script>
 
     <!-- Image Modal -->
     <div id="imageModal" class="image-modal" onclick="closeImageModal()">

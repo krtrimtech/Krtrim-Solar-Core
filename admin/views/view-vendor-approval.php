@@ -102,6 +102,13 @@ function sp_render_vendor_approval_page() {
                                         Manual Approve
                                     </button>
                                 <?php endif; ?>
+                                <button class="button vendor-edit-btn" 
+                                    data-user-id="<?php echo $user_id; ?>"
+                                    data-company="<?php echo esc_attr($company_name); ?>"
+                                    data-phone="<?php echo esc_attr($phone); ?>"
+                                    data-states='<?php echo json_encode($purchased_states); ?>'
+                                    data-cities='<?php echo json_encode($purchased_cities); ?>'
+                                >Edit</button>
                                 <?php if ($account_approved !== 'denied'): ?>
                                     <button class="button button-secondary vendor-action-btn" data-action="deny" data-user-id="<?php echo $user_id; ?>">Deny</button>
                                 <?php endif; ?>
@@ -116,6 +123,63 @@ function sp_render_vendor_approval_page() {
             </tbody>
         </table>
         <?php wp_nonce_field('sp_vendor_approval_nonce', 'sp_vendor_approval_nonce_field'); ?>
+
+        <!-- Edit Vendor Modal -->
+        <div id="edit-vendor-modal" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.5); z-index:9999;">
+            <div style="background:#fff; width:500px; margin:50px auto; padding:20px; border-radius:5px; box-shadow:0 0 10px rgba(0,0,0,0.3);">
+                <h2>Edit Vendor Details</h2>
+                <form id="edit-vendor-form">
+                    <input type="hidden" id="edit-vendor-id" name="user_id">
+                    
+                    <p>
+                        <label for="edit-company-name">Company Name:</label><br>
+                        <input type="text" id="edit-company-name" name="company_name" class="widefat" required>
+                    </p>
+                    
+                    <p>
+                        <label for="edit-phone">Phone:</label><br>
+                        <input type="text" id="edit-phone" name="phone" class="widefat" required>
+                    </p>
+                    
+                    <p>
+                        <label>Coverage States:</label><br>
+                        <select id="edit-states" name="states[]" multiple class="widefat" style="height:100px;">
+                            <?php
+                            $json_file = plugin_dir_path(dirname(dirname(__FILE__))) . 'assets/data/indian-states-cities.json';
+                            if (file_exists($json_file)) {
+                                $json_data = file_get_contents($json_file);
+                                $data = json_decode($json_data, true);
+                                if ($data && isset($data['states'])) {
+                                    foreach ($data['states'] as $state) {
+                                        echo '<option value="' . esc_attr($state['state']) . '">' . esc_html($state['state']) . '</option>';
+                                    }
+                                }
+                            }
+                            ?>
+                        </select>
+                        <small>Hold Ctrl/Cmd to select multiple</small>
+                    </p>
+                    
+                    <p>
+                        <label>Coverage Cities:</label><br>
+                        <select id="edit-cities" name="cities[]" multiple class="widefat" style="height:100px;">
+                            <!-- Populated via JS based on states -->
+                        </select>
+                        <small>Hold Ctrl/Cmd to select multiple</small>
+                    </p>
+                    
+                    <div style="margin-top:20px; text-align:right;">
+                        <button type="button" class="button" onclick="document.getElementById('edit-vendor-modal').style.display='none'">Cancel</button>
+                        <button type="submit" class="button button-primary">Save Changes</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+
+        <script>
+        // Pass PHP data to JS
+        var indianStatesCities = <?php echo isset($json_data) ? $json_data : '{}'; ?>;
+        </script>
     </div>
     <?php
 }

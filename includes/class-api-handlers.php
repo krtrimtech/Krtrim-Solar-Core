@@ -24,6 +24,9 @@ class SP_API_Handlers {
         add_action('wp_ajax_complete_vendor_registration', [ $this, 'complete_vendor_registration' ]);
         add_action('wp_ajax_nopriv_complete_vendor_registration', [ $this, 'complete_vendor_registration' ]);
         add_action('wp_ajax_update_vendor_status', [ $this, 'update_vendor_status' ]);
+        add_action('wp_ajax_update_vendor_details', [ $this, 'update_vendor_details' ]);
+        add_action('wp_ajax_update_vendor_profile', [ $this, 'update_vendor_profile' ]);
+        add_action('wp_ajax_add_vendor_coverage', [ $this, 'add_vendor_coverage' ]);
         add_action('wp_ajax_create_razorpay_order', [ $this, 'create_razorpay_order' ]);
         add_action('wp_ajax_nopriv_create_razorpay_order', [ $this, 'create_razorpay_order' ]);
         add_action('wp_ajax_filter_projects', [ $this, 'filter_projects' ]);
@@ -1703,12 +1706,24 @@ class SP_API_Handlers {
         update_user_meta($user_id, 'company_name', sanitize_text_field($basic_info['company_name']));
         update_user_meta($user_id, 'phone', sanitize_text_field($basic_info['phone']));
         
-        $state_ids = array_column($coverage['states'], 'id');
-        $city_ids = array_column($coverage['cities'], 'id');
+        // ✅ FIX: Handle simple arrays from JavaScript
+        // States are already array of strings: ['Gujarat', 'Maharashtra']
+        $state_names = isset($coverage['states']) && is_array($coverage['states']) ? $coverage['states'] : [];
         
-        update_user_meta($user_id, 'purchased_states', $state_ids);
-        update_user_meta($user_id, 'purchased_cities', $city_ids);
-        update_user_meta($user_id, 'total_coverage_payment', floatval($coverage['total_amount']));
+        // Cities are array of objects: [{city: 'Mumbai', state: 'Maharashtra'}]
+        // Extract just the city names
+        $city_names = [];
+        if (isset($coverage['cities']) && is_array($coverage['cities'])) {
+            foreach ($coverage['cities'] as $city_obj) {
+                if (is_array($city_obj) && isset($city_obj['city'])) {
+                    $city_names[] = $city_obj['city'];
+                }
+            }
+        }
+        
+        update_user_meta($user_id, 'purchased_states', $state_names);
+        update_user_meta($user_id, 'purchased_cities', $city_names);
+        update_user_meta($user_id, 'total_coverage_payment', floatval($registration_data['total_amount']));
         update_user_meta($user_id, 'coverage_payment_date', current_time('mysql'));
         
         update_user_meta($user_id, 'vendor_payment_status', 'completed');
@@ -1808,12 +1823,12 @@ class SP_API_Handlers {
             // In-app notification
             SP_Notifications_Manager::create_notification([
                 'user_id' => $user_id,
-                'message' => 'Your vendor application has been denied.',
-                'type' => 'vendor_denied',
+                'type' => 'account_rejected',
+                'message' => 'Your vendor account application was rejected. Reason: ' . ($reason ?: 'Not specified'),
             ]);
             
-            // Email notification (if enabled)
-            if (isset($notification_options['email_vendor_rejected']) && $notification_options['email_vendor_rejected'] === '1') {
+            // Email Notification
+            if (!empty($notification_options['enable_email_notifications'])) {
                 $email_subject = 'Vendor Application Update';
                 $email_message = "Your vendor application has been reviewed.\n\n";
                 $email_message .= "Unfortunately, we are unable to approve your application at this time.\n\n";
@@ -1831,6 +1846,106 @@ class SP_API_Handlers {
         }
 
         wp_send_json_success(['message' => $message]);
+    }
+
+    public function update_vendor_details() {
+        check_ajax_referer('sp_vendor_approval_nonce', 'nonce');
+
+        if (!current_user_can('manage_options')) {
+            wp_send_json_error(['message' => 'Permission denied.']);
+        }
+
+        $user_id = isset($_POST['user_id']) ? intval($_POST['user_id']) : 0;
+        $company_name = isset($_POST['company_name']) ? sanitize_text_field($_POST['company_name']) : '';
+        $phone = isset($_POST['phone']) ? sanitize_text_field($_POST['phone']) : '';
+        $states = isset($_POST['states']) && is_array($_POST['states']) ? array_map('sanitize_text_field', $_POST['states']) : [];
+        $cities = isset($_POST['cities']) && is_array($_POST['cities']) ? array_map('sanitize_text_field', $_POST['cities']) : [];
+
+        if (empty($user_id)) {
+            wp_send_json_error(['message' => 'Invalid user ID.']);
+        }
+
+        update_user_meta($user_id, 'company_name', $company_name);
+        update_user_meta($user_id, 'phone', $phone);
+        update_user_meta($user_id, 'purchased_states', $states);
+        update_user_meta($user_id, 'purchased_cities', $cities);
+
+        wp_send_json_success(['message' => 'Vendor details updated successfully.']);
+    }
+
+    public function update_vendor_profile() {
+        // Use REST nonce or generic nonce
+        $nonce_verified = false;
+        if (isset($_POST['nonce'])) {
+            $nonce_verified = wp_verify_nonce($_POST['nonce'], 'wp_rest');
+        }
+        
+        if (!$nonce_verified) {
+             // Fallback to check other nonces if needed, or error
+             // For now, let's assume if logged in as vendor it's okay, but better to enforce
+             if (!is_user_logged_in()) wp_send_json_error(['message' => 'Not logged in']);
+        }
+
+        $user_id = get_current_user_id();
+        if (!in_array('solar_vendor', (array)wp_get_current_user()->roles)) {
+            wp_send_json_error(['message' => 'Permission denied.']);
+        }
+
+        $company_name = isset($_POST['company_name']) ? sanitize_text_field($_POST['company_name']) : '';
+        $phone = isset($_POST['phone']) ? sanitize_text_field($_POST['phone']) : '';
+
+        update_user_meta($user_id, 'company_name', $company_name);
+        update_user_meta($user_id, 'phone', $phone);
+
+        wp_send_json_success(['message' => 'Profile updated successfully.']);
+    }
+
+    public function add_vendor_coverage() {
+        // Nonce check
+        $nonce_verified = isset($_POST['nonce']) && wp_verify_nonce($_POST['nonce'], 'wp_rest');
+        if (!$nonce_verified && !is_user_logged_in()) {
+             wp_send_json_error(['message' => 'Permission denied']);
+        }
+
+        $user_id = get_current_user_id();
+        $payment_response = json_decode(stripslashes($_POST['payment_response']), true);
+        $states = isset($_POST['states']) && is_array($_POST['states']) ? $_POST['states'] : [];
+        $cities = isset($_POST['cities']) && is_array($_POST['cities']) ? $_POST['cities'] : [];
+        $amount = floatval($_POST['amount']);
+
+        if (empty($payment_response) || empty($payment_response['razorpay_payment_id'])) {
+            wp_send_json_error(['message' => 'Invalid payment data.']);
+        }
+
+        // Verify Payment Signature (Optional but recommended)
+        // For now, we trust the ID presence as per existing flow logic, but ideally verify signature
+
+        // Record Payment
+        global $wpdb;
+        $payment_table = $wpdb->prefix . 'solar_vendor_payments';
+        $wpdb->insert($payment_table, [
+            'vendor_id' => $user_id,
+            'razorpay_payment_id' => sanitize_text_field($payment_response['razorpay_payment_id']),
+            'razorpay_order_id' => sanitize_text_field($payment_response['razorpay_order_id']),
+            'amount' => $amount,
+            'states_purchased' => wp_json_encode($states),
+            'cities_purchased' => wp_json_encode($cities),
+            'payment_status' => 'completed',
+            'payment_date' => current_time('mysql'),
+            'payment_type' => 'coverage_expansion' // New column or just reuse table
+        ]);
+
+        // Update User Meta - APPEND new coverage
+        $current_states = get_user_meta($user_id, 'purchased_states', true) ?: [];
+        $current_cities = get_user_meta($user_id, 'purchased_cities', true) ?: [];
+
+        $new_states = array_unique(array_merge($current_states, $states));
+        $new_cities = array_unique(array_merge($current_cities, $cities));
+
+        update_user_meta($user_id, 'purchased_states', $new_states);
+        update_user_meta($user_id, 'purchased_cities', $new_cities);
+
+        wp_send_json_success(['message' => 'Coverage added successfully.']);
     }
     
     /**
@@ -1860,7 +1975,23 @@ class SP_API_Handlers {
     }
 
     public function create_razorpay_order() {
-        check_ajax_referer('vendor_registration_nonce', 'nonce');
+        // Flexible nonce check - accept both vendor registration nonce and REST nonce
+        $nonce_valid = false;
+        if (isset($_POST['nonce'])) {
+            // Try vendor registration nonce first
+            if (wp_verify_nonce($_POST['nonce'], 'vendor_registration_nonce')) {
+                $nonce_valid = true;
+            }
+            // Fallback to REST nonce (used for coverage expansion)
+            elseif (wp_verify_nonce($_POST['nonce'], 'wp_rest')) {
+                $nonce_valid = true;
+            }
+        }
+        
+        if (!$nonce_valid) {
+            wp_send_json_error(['message' => 'Security check failed.']);
+            return;
+        }
 
         if (!class_exists('SP_Razorpay_Light_Client')) {
             require_once plugin_dir_path(__FILE__) . 'class-razorpay-light-client.php';

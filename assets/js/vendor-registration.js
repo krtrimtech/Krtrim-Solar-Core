@@ -115,8 +115,8 @@
      */
     function saveStep1Data() {
         registrationData.basic_info = {
-            name: $('#vreg-name').val().trim(),
-            company: $('#vreg-company').val().trim(),
+            full_name: $('#vreg-name').val().trim(),
+            company_name: $('#vreg-company').val().trim(),
             email: $('#vreg-email').val().trim(),
             phone: $('#vreg-phone').val().trim(),
             password: $('#vreg-password').val().trim()
@@ -296,8 +296,8 @@
         // Basic Info Summary
         html += '<div class="summary-section">';
         html += '<h3>Basic Information</h3>';
-        html += '<p><strong>Name:</strong> ' + registrationData.basic_info.name + '</p>';
-        html += '<p><strong>Company:</strong> ' + registrationData.basic_info.company + '</p>';
+        html += '<p><strong>Name:</strong> ' + registrationData.basic_info.full_name + '</p>';
+        html += '<p><strong>Company:</strong> ' + registrationData.basic_info.company_name + '</p>';
         html += '<p><strong>Email:</strong> ' + registrationData.basic_info.email + '</p>';
         html += '<p><strong>Phone:</strong> ' + registrationData.basic_info.phone + '</p>';
         html += '</div>';
@@ -382,7 +382,7 @@
                 completeRegistration(response);
             },
             prefill: {
-                name: registrationData.basic_info.name,
+                name: registrationData.basic_info.full_name,
                 email: registrationData.basic_info.email,
                 contact: registrationData.basic_info.phone
             },
