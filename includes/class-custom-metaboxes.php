@@ -50,11 +50,10 @@ class SP_Custom_Metaboxes {
         $client_phone_number = get_post_meta( $post->ID, '_client_phone_number', true );
         $project_start_date = get_post_meta( $post->ID, '_project_start_date', true );
         $total_project_cost = get_post_meta( $post->ID, '_total_project_cost', true );
-        
-        $vendor_assignment_method = get_post_meta( $post->ID, '_vendor_assignment_method', true ) ?: 'manual';
-        $assigned_vendor_id = get_post_meta( $post->ID, '_assigned_vendor_id', true );
+        $paid_amount = get_post_meta( $post->ID, '_paid_amount', true );
         $paid_to_vendor = get_post_meta( $post->ID, '_paid_to_vendor', true );
-        
+        $assigned_vendor_id = get_post_meta( $post->ID, '_assigned_vendor_id', true );
+        $vendor_assignment_method = get_post_meta( $post->ID, '_vendor_assignment_method', true );
         $winning_vendor_id = get_post_meta( $post->ID, '_winning_vendor_id', true );
         $winning_bid_amount = get_post_meta( $post->ID, '_winning_bid_amount', true );
 
@@ -108,6 +107,14 @@ class SP_Custom_Metaboxes {
                     <th><label for="total_project_cost">Total Project Cost (₹)</label></th>
                     <td>
                         <input type="number" id="total_project_cost" name="total_project_cost" value="<?php echo esc_attr($total_project_cost); ?>" step="0.01" placeholder="e.g., 500000">
+                        <p class="description">Total price quoted to the client for this project</p>
+                    </td>
+                </tr>
+                <tr>
+                    <th><label for="paid_amount">Paid Amount (₹)</label></th>
+                    <td>
+                        <input type="number" id="paid_amount" name="paid_amount" value="<?php echo esc_attr($paid_amount); ?>" step="0.01" placeholder="e.g., 300000">
+                        <p class="description">Total amount received from client so far (for token, installments, etc.)</p>
                     </td>
                 </tr>
                 <tr>
@@ -276,6 +283,7 @@ class SP_Custom_Metaboxes {
             'project_state',
             'project_city',
             'total_project_cost',
+            'paid_amount',
             'project_status',
             'client_user_id',
             'solar_system_size_kw',
