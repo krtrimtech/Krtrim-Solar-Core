@@ -6,7 +6,7 @@ function render_solar_vendor_dashboard() {
     $view_project_id = isset($_GET['view_project']) ? intval($_GET['view_project']) : 0;
     
     $args = array(
-        'post_type' => 'solar-project',
+        'post_type' => 'solar_project',
         'posts_per_page' => -1,
         'post_status' => 'publish',
         'meta_query' => array(
@@ -231,7 +231,7 @@ function render_solar_vendor_dashboard() {
                         
                         <?php
                         $project = get_post($view_project_id);
-                        if ($project && $project->post_type === 'solar-project') :
+                        if ($project && $project->post_type === 'solar_project') :
                             $assigned_vendor = get_post_meta($view_project_id, 'assigned_vendor_id', true);
                             
                             $has_access = false;

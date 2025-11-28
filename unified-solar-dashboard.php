@@ -149,7 +149,7 @@ final class Krtrim_Solar_Core {
 		if ( is_page( 'solar-dashboard' ) && in_array( 'solar_client', (array) wp_get_current_user()->roles ) ) {
 			$client_id = get_current_user_id();
 			$args = array(
-				'post_type' => 'solar-project',
+				'post_type' => 'solar_project',
 				'posts_per_page' => 1,
 				'post_status' => 'publish',
 				'meta_query' => array(
@@ -229,6 +229,16 @@ final class Krtrim_Solar_Core {
 			wp_localize_script('project-bid-js', 'project_bid_vars', [
 				'ajax_url' => admin_url('admin-ajax.php'),
 			]);
+		}
+
+		// Load client dashboard enhancements
+		global $post;
+		if (is_a($post, 'WP_Post') && has_shortcode($post->post_content, 'unified_solar_dashboard')) {
+			// Enqueue Chart.js from CDN
+			wp_enqueue_script('chartjs', 'https://cdn.jsdelivr.net/npm/chart.js@3.9.1/dist/chart.min.js', [], '3.9.1', true);
+			
+			// Enqueue client dashboard CSS
+			wp_enqueue_style('client-dashboard-enhancements', $this->dir_url . 'assets/css/client-dashboard-enhancements.css', [], $this->version);
 		}
 	}
 

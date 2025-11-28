@@ -1,0 +1,429 @@
+/**
+ * Client Dashboard Enhancements CSS
+ * Modern styles for vendor info and area manager contact cards
+ */
+
+/* ===== Vendor Card ===== */
+.vendor-card,
+.area-manager-card {
+    background: white;
+    border-radius: 16px;
+    overflow: hidden;
+    box-shadow: 0 8px 20px rgba(0, 0, 0, 0.08);
+    transition: all 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+    position: relative;
+}
+
+.vendor-card::before,
+.area-manager-card::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: 4px;
+    background: linear-gradient(90deg, #667eea 0%, #764ba2 100%);
+    transform: scaleX(0);
+    transform-origin: left;
+    transition: transform 0.4s ease;
+}
+
+.vendor-card:hover::before,
+.area-manager-card:hover::before {
+    transform: scaleX(1);
+}
+
+.vendor-card:hover,
+.area-manager-card:hover {
+    transform: translateY(-6px);
+    box-shadow: 0 16px 32px rgba(102, 126, 234, 0.2);
+}
+
+/* Vendor Info Content */
+.vendor-info-content,
+.manager-info-content {
+    padding: 20px;
+    display: flex;
+    gap: 16px;
+    align-items: center;
+}
+
+.vendor-avatar,
+.manager-avatar {
+    flex-shrink: 0;
+}
+
+.vendor-avatar img,
+.manager-avatar img {
+    width: 80px;
+    height: 80px;
+    border-radius: 50%;
+    border: 4px solid #f7fafc;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+    object-fit: cover;
+    animation: float 3s ease-in-out infinite;
+}
+
+@keyframes float {
+
+    0%,
+    100% {
+        transform: translateY(0px);
+    }
+
+    50% {
+        transform: translateY(-8px);
+    }
+}
+
+.vendor-details,
+.manager-details {
+    flex: 1;
+}
+
+.vendor-details h4,
+.manager-details h4 {
+    margin: 0 0 8px 0;
+    font-size: 18px;
+    font-weight: 700;
+    color: #1a202c;
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+}
+
+.manager-role {
+    font-size: 13px;
+    color: #718096;
+    margin: 0;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    font-weight: 600;
+}
+
+.vendor-email,
+.vendor-phone {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 14px;
+    color: #4a5568;
+    margin: 8px 0 0 0;
+}
+
+.vendor-email svg,
+.vendor-phone svg {
+    color: #667eea;
+    flex-shrink: 0;
+}
+
+/* Vendor Empty State */
+.vendor-card-empty {
+    border: 2px dashed #cbd5e0;
+    background: linear-gradient(135deg, #f7fafc 0%, #edf2f7 100%);
+}
+
+.vendor-empty-state {
+    padding: 40px 20px;
+    text-align: center;
+}
+
+.vendor-empty-state .empty-icon {
+    font-size: 48px;
+    margin-bottom: 16px;
+    animation: pulse 2s infinite;
+}
+
+@keyframes pulse {
+
+    0%,
+    100% {
+        opacity: 1;
+        transform: scale(1);
+    }
+
+    50% {
+        opacity: 0.7;
+        transform: scale(1.1);
+    }
+}
+
+.vendor-empty-state p {
+    font-size: 16px;
+    font-weight: 600;
+    color: #2d3748;
+    margin: 0 0 8px 0;
+}
+
+.vendor-empty-state small {
+    font-size: 13px;
+    color: #718096;
+}
+
+/* ===== Area Manager Contact Buttons ===== */
+.contact-buttons {
+    display: flex;
+    gap: 12px;
+    padding: 0 20px 20px 20px;
+}
+
+.contact-btn {
+    flex: 1;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    padding: 12px 20px;
+    border-radius: 10px;
+    text-decoration: none;
+    font-weight: 600;
+    font-size: 14px;
+    transition: all 0.3s ease;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+}
+
+.email-btn {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    color: white;
+}
+
+.email-btn:hover {
+    background: linear-gradient(135deg, #764ba2 0%, #667eea 100%);
+    transform: translateY(-3px) scale(1.05);
+    box-shadow: 0 8px 20px rgba(102, 126, 234, 0.3);
+    color: white;
+}
+
+.whatsapp-btn {
+    background: linear-gradient(135deg, #25D366 0%, #128C7E 100%);
+    color: white;
+}
+
+.whatsapp-btn:hover {
+    background: linear-gradient(135deg, #128C7E 0%, #25D366 100%);
+    transform: translateY(-3px) scale(1.05);
+    box-shadow: 0 8px 20px rgba(37, 211, 102, 0.3);
+    color: white;
+}
+
+.contact-btn svg {
+    transition: transform 0.3s ease;
+}
+
+.contact-btn:hover svg {
+    transform: scale(1.2);
+}
+
+/* Manager Help Text */
+.manager-help-text {
+    padding: 16px 20px;
+    background: linear-gradient(135deg, #f5f7fa 0%, #edf2f7 100%);
+    border-top: 1px solid #e2e8f0;
+}
+
+.manager-help-text p {
+    margin: 0;
+    font-size: 13px;
+    color: #4a5568;
+    text-align: center;
+}
+
+/* ===== Progress Enhancements ===== */
+.progress-circle {
+    position: relative;
+    animation: fadeInScale 0.8s ease-out;
+}
+
+@keyframes fadeInScale {
+    from {
+        opacity: 0;
+        transform: scale(0.8);
+    }
+
+    to {
+        opacity: 1;
+        transform: scale(1);
+    }
+}
+
+.progress-fill {
+    stroke-dasharray: 283;
+    stroke-dashoffset: calc(283 - (283 * var(--percentage) / 100));
+    animation: fillProgress 1.5s ease-out forwards;
+}
+
+@keyframes fillProgress {
+    from {
+        stroke-dashoffset: 283;
+    }
+
+    to {
+        stroke-dashoffset: calc(283 - (283 * var(--percentage) / 100));
+    }
+}
+
+/* ===== Stat Cards Enhancement ===== */
+.stat-card {
+    position: relative;
+    overflow: hidden;
+}
+
+.stat-card::after {
+    content: '';
+    position: absolute;
+    top: -50%;
+    right: -50%;
+    width: 200%;
+    height: 200%;
+    background: linear-gradient(45deg, transparent, rgba(255, 255, 255, 0.3), transparent);
+    transform: translateX(-100%);
+    transition: transform 0.6s;
+}
+
+.stat-card:hover::after {
+    transform: translateX(100%);
+}
+
+.stat-value {
+    animation: countUp 0.8s ease-out;
+}
+
+@keyframes countUp {
+    from {
+        opacity: 0;
+        transform: translateY(20px);
+    }
+
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+/* ===== Payment Card Enhancement ===== */
+.payment-item {
+    transition: all 0.3s ease;
+}
+
+.payment-item:hover {
+    transform: translateX(8px);
+}
+
+.payment-icon {
+    animation: bounce 1.5s infinite;
+}
+
+@keyframes bounce {
+
+    0%,
+    100% {
+        transform: translateY(0);
+    }
+
+    50% {
+        transform: translateY(-8px);
+    }
+}
+
+/* ===== Responsive Design ===== */
+@media (max-width: 768px) {
+    .contact-buttons {
+        flex-direction: column;
+    }
+
+    .vendor-info-content,
+    .manager-info-content {
+        flex-direction: column;
+        text-align: center;
+    }
+
+    .vendor-avatar img,
+    .manager-avatar img {
+        width: 60px;
+        height: 60px;
+    }
+}
+
+/* ===== Timeline Enhancement ===== */
+.timeline-card {
+    position: relative;
+    transition: all 0.3s ease;
+}
+
+.timeline-card:hover {
+    transform: translateX(8px);
+    box-shadow: 0 8px 20px rgba(102, 126, 234, 0.15);
+}
+
+.step-circle-large {
+    position: relative;
+}
+
+.step-circle-large::after {
+    content: '';
+    position: absolute;
+    inset: -4px;
+    border-radius: 50%;
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    opacity: 0;
+    transition: opacity 0.3s ease;
+    z-index: -1;
+}
+
+.timeline-card:hover .step-circle-large::after {
+    opacity: 0.3;
+    animation: pulse-ring 1.5s infinite;
+}
+
+@keyframes pulse-ring {
+
+    0%,
+    100% {
+        transform: scale(1);
+        opacity: 0.3;
+    }
+
+    50% {
+        transform: scale(1.1);
+        opacity: 0;
+    }
+}
+
+/* ===== Card Header Enhancement ===== */
+.card-header h3 {
+    position: relative;
+    display: inline-block;
+}
+
+.card-header h3::after {
+    content: '';
+    position: absolute;
+    bottom: -4px;
+    left: 0;
+    width: 0;
+    height: 3px;
+    background: linear-gradient(90deg, #667eea 0%, #764ba2 100%);
+    transition: width 0.4s ease;
+}
+
+.card:hover .card-header h3::after {
+    width: 100%;
+}
+
+/* ===== Loading States ===== */
+.loading-shimmer {
+    background: linear-gradient(90deg, #f0f0f0 25%, #e0e0e0 50%, #f0f0f0 75%);
+    background-size: 200% 100%;
+    animation: shimmer 1.5s infinite;
+}
+
+@keyframes shimmer {
+    0% {
+        background-position: -200% 0;
+    }
+
+    100% {
+        background-position: 200% 0;
+    }
+}
