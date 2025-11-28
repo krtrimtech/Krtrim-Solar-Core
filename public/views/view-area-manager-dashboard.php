@@ -96,6 +96,20 @@ function sp_area_manager_dashboard_shortcode() {
                                 <span>Total Revenue</span>
                             </div>
                         </div>
+                        <div class="stat-card stat-success">
+                            <div class="stat-icon">✅</div>
+                            <div class="stat-details">
+                                <h3 id="client-payments-stat">₹0</h3>
+                                <span>Client Payments Collected</span>
+                            </div>
+                        </div>
+                        <div class="stat-card stat-warning">
+                            <div class="stat-icon">⏳</div>
+                            <div class="stat-details">
+                                <h3 id="outstanding-balance-stat">₹0</h3>
+                                <span>Outstanding Balance</span>
+                            </div>
+                        </div>
                         <div class="stat-card">
                             <div class="stat-icon">💸</div>
                             <div class="stat-details">
@@ -115,6 +129,13 @@ function sp_area_manager_dashboard_shortcode() {
                             <div class="stat-details">
                                 <h3 id="profit-margin-stat">0%</h3>
                                 <span>Profit Margin</span>
+                            </div>
+                        </div>
+                        <div class="stat-card">
+                            <div class="stat-icon">📊</div>
+                            <div class="stat-details">
+                                <h3 id="collection-rate-stat">0%</h3>
+                                <span>Collection Rate</span>
                             </div>
                         </div>
                         <div class="stat-card">
@@ -242,6 +263,11 @@ function sp_area_manager_dashboard_shortcode() {
                             <div class="form-group">
                                 <label for="project_title">Project Title</label>
                                 <input type="text" id="project_title" name="project_title" required>
+                            </div>
+                            <div class="form-group">
+                                <label for="project_description">Project Description</label>
+                                <textarea id="project_description" name="project_description" rows="5" placeholder="Enter detailed information about the project, requirements, specifications, etc."></textarea>
+                                <small style="color: #666;">Provide detailed information about the project that will be visible to vendors and clients.</small>
                             </div>
                             <?php
                             $user_state = get_user_meta($user->ID, 'state', true);

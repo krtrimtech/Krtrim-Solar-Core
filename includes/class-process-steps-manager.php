@@ -238,6 +238,17 @@ class SP_Process_Steps_Manager {
                 }
             }
         }
+                
+        // ✅ NOTIFY CLIENT - Step Rejected
+        $client_id = get_post_meta($project_id, '_client_user_id', true);
+        if ($client_id) {
+            SP_Notifications_Manager::create_notification([
+                'user_id' => $client_id,
+                'project_id' => $project_id,
+                'message' => sprintf('Step "%s" for your project needs rework', $submission->step_name),
+                'type' => 'step_rejected',
+            ]);
+        }
 
         return [
             'success' => true, 

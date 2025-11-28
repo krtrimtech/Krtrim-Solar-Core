@@ -50,6 +50,18 @@ class SP_API_Handlers {
         add_action('wp_ajax_get_area_manager_clients', [ $this, 'get_area_manager_clients' ]);
         add_action('wp_ajax_create_client_from_dashboard', [ $this, 'create_client_from_dashboard' ]);
         add_action('wp_ajax_reset_client_password', [ $this, 'reset_client_password' ]);
+        
+        // Payment Management
+        add_action('wp_ajax_record_client_payment', [ $this, 'record_client_payment' ]);
+        
+        // Vendor Email Verification
+        add_action('wp_ajax_verify_vendor_email', [ $this, 'verify_vendor_email' ]);
+        add_action('wp_ajax_nopriv_verify_vendor_email', [ $this, 'verify_vendor_email' ]);
+        add_action('wp_ajax_resend_verification_email', [ $this, 'resend_verification_email']);
+        
+        // Vendor Registration - Coverage Areas
+        add_action('wp_ajax_get_coverage_areas', [ $this, 'get_coverage_areas' ]);
+        add_action('wp_ajax_nopriv_get_coverage_areas', [ $this, 'get_coverage_areas' ]);
     }
 
     public function get_area_manager_dashboard_stats() {
@@ -86,12 +98,17 @@ class SP_API_Handlers {
         $total_revenue = 0;
         $total_costs = 0;
         $total_profit = 0;
+        
+        // Client payment tracking
+        $total_client_payments = 0;
+        $total_outstanding = 0;
 
         // Monthly data arrays (last 6 months)
         $months = [];
         $monthly_projects = [];
         $monthly_revenue = [];
         $monthly_costs = [];
+        $monthly_payments = [];
         
         for ($i = 5; $i >= 0; $i--) {
             $month = date('M', strtotime("-$i months"));
@@ -99,12 +116,14 @@ class SP_API_Handlers {
             $monthly_projects[$month] = 0;
             $monthly_revenue[$month] = 0;
             $monthly_costs[$month] = 0;
+            $monthly_payments[$month] = 0;
         }
 
         foreach ($projects as $project) {
             $status = get_post_meta($project->ID, '_project_status', true);
             $project_cost = floatval(get_post_meta($project->ID, '_total_project_cost', true) ?: 0);
             $vendor_cost = floatval(get_post_meta($project->ID, '_vendor_paid_amount', true) ?: 0);
+            $paid_amount = floatval(get_post_meta($project->ID, '_paid_amount', true) ?: 0);
             $profit = floatval(get_post_meta($project->ID, '_company_profit', true) ?: ($project_cost - $vendor_cost));
 
             // Count by status
@@ -120,6 +139,10 @@ class SP_API_Handlers {
             $total_revenue += $project_cost;
             $total_costs += $vendor_cost;
             $total_profit += $profit;
+            
+            // Client payment totals
+            $total_client_payments += $paid_amount;
+            $total_outstanding += ($project_cost - $paid_amount);
 
             // Monthly breakdown
             $project_month = date('M', strtotime($project->post_date));
@@ -127,11 +150,13 @@ class SP_API_Handlers {
                 $monthly_projects[$project_month]++;
                 $monthly_revenue[$project_month] += $project_cost;
                 $monthly_costs[$project_month] += $vendor_cost;
+                $monthly_payments[$project_month] += $paid_amount;
             }
         }
 
-        // Calculate profit margin
+        // Calculate profit margin and collection rate
         $profit_margin = $total_revenue > 0 ? ($total_profit / $total_revenue) * 100 : 0;
+        $collection_rate = $total_revenue > 0 ? ($total_client_payments / $total_revenue) * 100 : 0;
 
         // Get lead stats
         $lead_args = [
@@ -175,6 +200,11 @@ class SP_API_Handlers {
             'total_costs' => round($total_costs, 2),
             'total_profit' => round($total_profit, 2),
             'profit_margin' => round($profit_margin, 2),
+            // Client payment stats
+            'total_client_payments' => round($total_client_payments, 2),
+            'total_outstanding' => round($total_outstanding, 2),
+            'collection_rate' => round($collection_rate, 2),
+            // Other stats
             'total_leads' => $total_leads,
             'conversion_rate' => round($conversion_rate, 2),
             'pending_reviews' => intval($pending_reviews),
@@ -189,7 +219,8 @@ class SP_API_Handlers {
             ],
             'financial_data' => [
                 'revenue' => array_values($monthly_revenue),
-                'costs' => array_values($monthly_costs)
+                'costs' => array_values($monthly_costs),
+                'payments' => array_values($monthly_payments)
             ],
             'lead_data' => [
                 'converted' => $converted_leads,
@@ -1155,6 +1186,58 @@ class SP_API_Handlers {
         wp_send_json_success(['message' => 'Password reset successfully.']);
     }
 
+    /**
+     * Record a client payment for a project
+     */
+    public function record_client_payment() {
+        check_ajax_referer('record_payment_nonce', 'nonce');
+
+        if (!is_user_logged_in() || !in_array('area_manager', (array)wp_get_current_user()->roles)) {
+            wp_send_json_error(['message' => 'Permission denied.']);
+        }
+
+        $project_id = isset($_POST['project_id']) ? intval($_POST['project_id']) : 0;
+        $payment_amount = isset($_POST['payment_amount']) ? floatval($_POST['payment_amount']) : 0;
+        $payment_note = isset($_POST['payment_note']) ? sanitize_textarea_field($_POST['payment_note']) : '';
+
+        if (empty($project_id) || $payment_amount <= 0) {
+            wp_send_json_error(['message' => 'Invalid project or payment amount.']);
+        }
+
+        // Verify project belongs to this area manager
+        $project = get_post($project_id);
+        if (!$project || $project->post_type !== 'solar_project' || $project->post_author != get_current_user_id()) {
+            wp_send_json_error(['message' => 'You do not have permission to manage this project.']);
+        }
+
+        // Get current paid amount and total cost
+        $current_paid = floatval(get_post_meta($project_id, '_paid_amount', true) ?: 0);
+        $total_cost = floatval(get_post_meta($project_id, '_total_project_cost', true) ?: 0);
+
+        // Add new payment to current total
+        $new_paid_amount = $current_paid + $payment_amount;
+
+        // Check if payment exceeds total cost
+        if ($new_paid_amount > $total_cost) {
+            wp_send_json_error(['message' => 'Payment amount exceeds total project cost. Remaining balance: ₹' . number_format($total_cost - $current_paid, 2)]);
+        }
+
+        // Update paid amount
+        update_post_meta($project_id, '_paid_amount', $new_paid_amount);
+
+        // Optionally store payment history in a log (you can enhance this later)
+        // For now, we'll just update the meta
+
+        $balance = $total_cost - $new_paid_amount;
+
+        wp_send_json_success([
+            'message' => 'Payment recorded successfully!',
+            'paid_amount' => $new_paid_amount,
+            'balance' => $balance,
+            'total_cost' => $total_cost
+        ]);
+    }
+
 
 
     public function submit_project_bid() {
@@ -1244,6 +1327,21 @@ class SP_API_Handlers {
                     'message' => urlencode($whatsapp_message)
                 ];
             }
+        }
+
+        // ✅ NOTIFY CLIENT - Vendor Assigned
+        $client_id = get_post_meta($project_id, '_client_user_id', true);
+        if ($client_id) {
+            $vendor_name = get_user_meta($vendor_id, 'company_name', true);
+            if (empty($vendor_name)) {
+                $vendor_name = $winning_vendor->display_name;
+            }
+            SP_Notifications_Manager::create_notification([
+                'user_id' => $client_id,
+                'project_id' => $project_id,
+                'message' => sprintf('Vendor "%s" has been assigned to your project', $vendor_name),
+                'type' => 'vendor_assigned',
+            ]);
         }
 
         wp_send_json_success([
@@ -1380,6 +1478,7 @@ class SP_API_Handlers {
 
         $project_data = [
             'post_title'   => sanitize_text_field($data['project_title']),
+            'post_content' => isset($data['project_description']) ? wp_kses_post($data['project_description']) : '',
             'post_status'  => 'publish',
             'post_author'  => $manager->ID,
             'post_type'    => 'solar_project',
@@ -1444,6 +1543,17 @@ class SP_API_Handlers {
             update_post_meta($project_id, '_profit_margin_percentage', $profit_margin);
         }
 
+
+        // ✅ NOTIFY CLIENT - Project Created
+        $client_id = isset($data['client_user_id']) ? sanitize_text_field($data['client_user_id']) : '';
+        if ($client_id) {
+            SP_Notifications_Manager::create_notification([
+                'user_id' => $client_id,
+                'project_id' => $project_id,
+                'message' => sprintf('Your solar project "%s" has been created', $project_title),
+                'type' => 'project_created',
+            ]);
+        }
 
         wp_send_json_success(['message' => 'Project created successfully!', 'project_id' => $project_id]);
     }
@@ -1605,6 +1715,33 @@ class SP_API_Handlers {
         update_user_meta($user_id, 'email_verified', 'no');
         update_user_meta($user_id, 'account_approved', 'no');
         
+        // Generate email verification token
+        $token = wp_generate_password(32, false);
+        update_user_meta($user_id, 'email_verification_token', $token);
+        update_user_meta($user_id, 'email_verification_sent_date', current_time('mysql'));
+        
+        // Create verification URL
+        $verify_url = add_query_arg([
+            'action' => 'verify_vendor_email',
+            'token' => $token,
+            'user' => $user_id
+        ], home_url('/'));
+        
+        // Send verification email
+        $subject = 'Verify Your Email - Solar Vendor Registration';
+        $message = sprintf(
+            "Welcome to our Solar Vendor Platform!\n\n" .
+            "Thank you for registering. Please verify your email address by clicking the link below:\n\n" .
+            "%s\n\n" .
+            "Once your email is verified, your account will be automatically approved and you can start bidding on projects.\n\n" .
+            "If you didn't register for this account, please ignore this email.\n\n" .
+            "Best regards,\n" .
+            "Solar Dashboard Team",
+            $verify_url
+        );
+        
+        wp_mail($basic_info['email'], $subject, $message);
+        
         global $wpdb;
         $payment_table = $wpdb->prefix . 'solar_vendor_payments';
         $wpdb->insert($payment_table, [
@@ -1618,7 +1755,10 @@ class SP_API_Handlers {
             'payment_date' => current_time('mysql'),
         ]);
         
-        wp_send_json_success(['message' => 'Registration completed! Please check your email to verify your account.']);
+        // Check for auto-approval (in case email was somehow already verified)
+        $this->check_auto_approval($user_id);
+        
+        wp_send_json_success(['message' => 'Registration completed! Please check your email to verify your account and get instant approval.']);
     }
 
     public function update_vendor_status() {
@@ -1630,18 +1770,89 @@ class SP_API_Handlers {
 
         $user_id = isset($_POST['user_id']) ? intval($_POST['user_id']) : 0;
         $status = isset($_POST['status']) ? sanitize_text_field($_POST['status']) : '';
+        $reason = isset($_POST['reason']) ? sanitize_textarea_field($_POST['reason']) : '';
 
-        if (empty($user_id) || !in_array($status, ['yes', 'no'])) {
+        if (empty($user_id) || !in_array($status, ['yes', 'no', 'denied'])) {
             wp_send_json_error(['message' => 'Invalid data provided.']);
         }
 
+        // Update approval status
         update_user_meta($user_id, 'account_approved', $status);
 
         if ($status === 'yes') {
+            // ✅ MANUAL APPROVAL - BYPASSES all checks
+            update_user_meta($user_id, 'account_approved_date', current_time('mysql'));
+            update_user_meta($user_id, 'account_approved_by', get_current_user_id());
+            update_user_meta($user_id, 'approval_method', 'manual');
+            
+            if (!empty($reason)) {
+                update_user_meta($user_id, 'manual_approval_reason', $reason);
+            }
+            
+            // Trigger approval hook (sends notifications)
             do_action('sp_vendor_approved', $user_id);
+            
+            $message = 'Vendor manually approved successfully.';
+        } elseif ($status === 'denied') {
+            update_user_meta($user_id, 'account_denied_date', current_time('mysql'));
+            update_user_meta($user_id, 'account_denied_by', get_current_user_id());
+            
+            if (!empty($reason)) {
+                update_user_meta($user_id, 'denial_reason', $reason);
+            }
+            
+            // ✅ VENDOR REJECTION NOTIFICATIONS
+            $vendor = get_userdata($user_id);
+            $notification_options = get_option('sp_notification_options');
+            
+            // In-app notification
+            SP_Notifications_Manager::create_notification([
+                'user_id' => $user_id,
+                'message' => 'Your vendor application has been denied.',
+                'type' => 'vendor_denied',
+            ]);
+            
+            // Email notification (if enabled)
+            if (isset($notification_options['email_vendor_rejected']) && $notification_options['email_vendor_rejected'] === '1') {
+                $email_subject = 'Vendor Application Update';
+                $email_message = "Your vendor application has been reviewed.\n\n";
+                $email_message .= "Unfortunately, we are unable to approve your application at this time.\n\n";
+                if (!empty($reason)) {
+                    $email_message .= "Reason: " . $reason . "\n\n";
+                }
+                $email_message .= "If you have questions, please contact support.";
+                
+                wp_mail($vendor->user_email, $email_subject, $email_message);
+            }
+            
+            $message = 'Vendor denied.';
+        } else {
+            $message = 'Vendor status updated.';
         }
 
-        wp_send_json_success(['message' => 'Vendor status updated.']);
+        wp_send_json_success(['message' => $message]);
+    }
+    
+    /**
+     * Get Coverage Areas (States/Cities) for Vendor Registration
+     */
+    public function get_coverage_areas() {
+        $json_file = plugin_dir_path(__FILE__) . '../assets/data/indian-states-cities.json';
+        
+        if (!file_exists($json_file)) {
+            wp_send_json_error(['message' => 'Coverage data not found']);
+            return;
+        }
+        
+        $json_data = file_get_contents($json_file);
+        $data = json_decode($json_data, true);
+        
+        if (!$data || !isset($data['states'])) {
+            wp_send_json_error(['message' => 'Invalid coverage data']);
+            return;
+        }
+        
+        wp_send_json_success($data['states']);
     }
 
     public function filter_projects() {
@@ -1669,6 +1880,132 @@ class SP_API_Handlers {
             wp_send_json_success(['order_id' => $order_data['data']['id']]);
         } else {
             wp_send_json_error(['message' => 'Could not create Razorpay order: ' . $order_data['message']]);
+        }
+    }
+
+    /**
+     * Check if vendor meets criteria for auto-approval
+     * Triggers when both payment is completed AND email is verified
+     */
+    private function check_auto_approval($user_id) {
+        // Already approved? Skip
+        $current_status = get_user_meta($user_id, 'account_approved', true);
+        if ($current_status === 'yes') {
+            return;
+        }
+        
+        // Check both conditions
+        $payment_complete = get_user_meta($user_id, 'vendor_payment_status', true) === 'completed';
+        $email_verified = get_user_meta($user_id, 'email_verified', true) === 'yes';
+        
+        if ($payment_complete && $email_verified) {
+            // ✅ AUTO-APPROVE
+            update_user_meta($user_id, 'account_approved', 'yes');
+            update_user_meta($user_id, 'account_approved_date', current_time('mysql'));
+            update_user_meta($user_id, 'account_approved_by', 'auto');
+            update_user_meta($user_id, 'approval_method', 'auto');
+            
+            // Trigger approval action (sends notifications)
+            do_action('sp_vendor_approved', $user_id);
+            
+            error_log("Vendor $user_id auto-approved after email verification");
+        }
+    }
+
+    /**
+     * Handle email verification link clicks
+     * URL: /?action=verify_vendor_email&token=xxx&user=123
+     */
+    public function verify_vendor_email() {
+        $token = isset($_GET['token']) ? sanitize_text_field($_GET['token']) : '';
+        $user_id = isset($_GET['user']) ? intval($_GET['user']) : 0;
+        
+        if (empty($token) || empty($user_id)) {
+            wp_die('Invalid verification link.');
+        }
+        
+        // Validate token
+        $stored_token = get_user_meta($user_id, 'email_verification_token', true);
+        
+        if ($token !== $stored_token) {
+            wp_die('Invalid or expired verification token. Please request a new verification email.');
+        }
+        
+        // Check if already verified
+        $already_verified = get_user_meta($user_id, 'email_verified', true) === 'yes';
+        
+        if ($already_verified) {
+            wp_die('Your email is already verified. You can now <a href="' . wp_login_url() . '">login to your account</a>.');
+        }
+        
+        // Mark email as verified
+        update_user_meta($user_id, 'email_verified', 'yes');
+        update_user_meta($user_id, 'email_verified_date', current_time('mysql'));
+        
+        // Delete token (one-time use)
+        delete_user_meta($user_id, 'email_verification_token');
+        
+        // ✅ CHECK FOR AUTO-APPROVAL
+        $this->check_auto_approval($user_id);
+        
+        // Check if they got approved
+        $is_approved = get_user_meta($user_id, 'account_approved', true) === 'yes';
+        
+        if ($is_approved) {
+            $message = 'Email verified successfully! Your account has been automatically approved. You can now <a href="' . wp_login_url() . '">login</a> and start bidding on projects.';
+        } else {
+            $message = 'Email verified successfully! Your account is pending payment verification. You will be automatically approved once payment is confirmed.';
+        }
+        
+        wp_die($message);
+    }
+
+    /**
+     * Resend verification email to vendor
+     */
+    public function resend_verification_email() {
+        check_ajax_referer('resend_email_nonce', 'nonce');
+        
+        $user = wp_get_current_user();
+        
+        if (!in_array('solar_vendor', $user->roles)) {
+            wp_send_json_error(['message' => 'Not authorized']);
+        }
+        
+        $email_verified = get_user_meta($user->ID, 'email_verified', true);
+        if ($email_verified === 'yes') {
+            wp_send_json_error(['message' => 'Your email is already verified']);
+        }
+        
+        // Generate new token
+        $token = wp_generate_password(32, false);
+        update_user_meta($user->ID, 'email_verification_token', $token);
+        update_user_meta($user->ID, 'email_verification_sent_date', current_time('mysql'));
+        
+        // Create verification URL
+        $verify_url = add_query_arg([
+            'action' => 'verify_vendor_email',
+            'token' => $token,
+            'user' => $user->ID
+        ], home_url('/'));
+        
+        // Send email
+        $subject = 'Verify Your Email - Solar Vendor Registration';
+        $message = sprintf(
+            "Please verify your email address by clicking the link below:\n\n" .
+            "%s\n\n" .
+            "Once verified, your account will be automatically approved.\n\n" .
+            "Best regards,\n" .
+            "Solar Dashboard Team",
+            $verify_url
+        );
+        
+        $sent = wp_mail($user->user_email, $subject, $message);
+        
+        if ($sent) {
+            wp_send_json_success(['message' => 'Verification email sent! Please check your inbox.']);
+        } else {
+            wp_send_json_error(['message' => 'Failed to send email. Please try again later.']);
         }
     }
 }

@@ -66,6 +66,7 @@ final class Krtrim_Solar_Core {
 		require_once $this->dir_path . 'public/views/view-area-manager-dashboard.php';
 		require_once $this->dir_path . 'public/views/view-marketplace.php';
 		require_once $this->dir_path . 'public/views/view-vendor-registration.php';
+		require_once $this->dir_path . 'public/views/view-vendor-status.php';
 	}
 
 	private function init_hooks() {
@@ -86,6 +87,7 @@ final class Krtrim_Solar_Core {
 		add_shortcode( 'area_manager_dashboard', 'sp_area_manager_dashboard_shortcode' );
 		add_shortcode( 'vendor_registration_form', 'sp_vendor_registration_form_shortcode' );
 		add_shortcode( 'solar_project_marketplace', 'sp_project_marketplace_shortcode' );
+		add_shortcode( 'vendor_status_dashboard', 'sp_vendor_status_dashboard_shortcode' );
 		
 		add_shortcode( 'solar_project_marketplace', 'sp_project_marketplace_shortcode' );
 		
@@ -113,7 +115,14 @@ final class Krtrim_Solar_Core {
             }
             // Solar Vendor
             if ( in_array( 'solar_vendor', $user->roles ) ) {
-                return home_url( '/solar-dashboard/' );
+                // Check if vendor is approved
+                $account_approved = get_user_meta( $user->ID, 'account_approved', true );
+                if ( $account_approved === 'yes' ) {
+                    return home_url( '/solar-dashboard/' );
+                } else {
+                    // Send to status page if not approved
+                    return home_url( '/vendor-status/' );
+                }
             }
             // Manager (generic)
             if ( in_array( 'manager', $user->roles ) ) {
@@ -253,6 +262,44 @@ final class Krtrim_Solar_Core {
 			]);
 		}
 
+		// ✅ VENDOR REGISTRATION PAGE
+		if ( is_a( $post, 'WP_Post' ) && has_shortcode( $post->post_content, 'vendor_registration_form' ) ) {
+			// Enqueue styles
+			wp_enqueue_style('vendor-registration-css', $this->dir_url . 'assets/css/vendor-registration.css', [], '1.0.0');
+			
+			// Enqueue Razorpay
+			wp_enqueue_script('razorpay-checkout', 'https://checkout.razorpay.com/v1/checkout.js', [], null, true);
+			
+			// Enqueue custom vendor registration script
+			wp_enqueue_script(
+				'vendor-registration-js',
+				$this->dir_url . 'assets/js/vendor-registration.js',
+				['jquery'],
+				'1.0.0',
+				true
+			);
+
+			// Get vendor options and determine correct Razorpay key
+			$options = get_option('sp_vendor_options');
+			$mode = isset($options['razorpay_mode']) ? $options['razorpay_mode'] : 'test';
+			
+			// Select correct key based on mode
+			if ($mode === 'live') {
+				$razorpay_key = isset($options['razorpay_live_key_id']) ? $options['razorpay_live_key_id'] : '';
+			} else {
+				$razorpay_key = isset($options['razorpay_test_key_id']) ? $options['razorpay_test_key_id'] : '';
+			}
+
+			// Localize script with config
+			wp_localize_script('vendor-registration-js', 'vendor_reg_vars', [
+				'ajax_url' => admin_url('admin-ajax.php'),
+				'razorpay_key_id' => $razorpay_key,
+				'per_state_fee' => isset($options['per_state_fee']) ? $options['per_state_fee'] : 500,
+				'per_city_fee' => isset($options['per_city_fee']) ? $options['per_city_fee'] : 100,
+				'nonce' => wp_create_nonce('vendor_registration_nonce'),
+			]);
+		}
+
 		
 		// TEMPORARY: Load marketplace JS on ALL pages to test
 		// TODO: Revert to conditional loading after testing
@@ -268,6 +315,7 @@ final class Krtrim_Solar_Core {
 				'states_cities' => isset($states_cities['states']) ? $states_cities['states'] : [],
 			]);
 		}
+
 
 		// Load bid submission JS on single project pages
 		if (is_singular('solar_project')) {
@@ -433,7 +481,8 @@ function sp_create_plugin_essentials() {
 		['title' => 'Dashboard', 'slug' => 'solar-dashboard', 'content' => '[unified_solar_dashboard]'],
 		['title' => 'Area Manager Dashboard', 'slug' => 'area-manager-dashboard', 'content' => '[area_manager_dashboard]'],
 		['title' => 'Vendor Registration', 'slug' => 'vendor-registration', 'content' => '[vendor_registration_form]'],
-		['title' => 'Project Marketplace', 'slug' => 'project-marketplace', 'content' => '[solar_project_marketplace]']
+		['title' => 'Project Marketplace', 'slug' => 'project-marketplace', 'content' => '[solar_project_marketplace]'],
+		['title' => 'Vendor Status', 'slug' => 'vendor-status', 'content' => '[vendor_status_dashboard]']
 	];
 
 	foreach ( $pages_to_create as $page ) {

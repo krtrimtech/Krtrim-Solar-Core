@@ -26,6 +26,8 @@ class SP_Notifications_Manager {
             'message' => '',
             'type' => 'info',
             'status' => 'unread',
+            'sent_email' => 0,      // ✅ NEW: Track if email was sent
+            'sent_whatsapp' => 0,   // ✅ NEW: Track if WhatsApp was prepared
         ];
         $data = wp_parse_args($args, $defaults);
 
@@ -39,10 +41,12 @@ class SP_Notifications_Manager {
             'message' => $data['message'],
             'type' => $data['type'],
             'status' => $data['status'],
+            'sent_email' => $data['sent_email'],      // ✅ Store email flag
+            'sent_whatsapp' => $data['sent_whatsapp'], // ✅ Store WhatsApp flag
             'created_at' => current_time('mysql'),
         ]);
         
-        // Here you could add email or WhatsApp sending logic
+        return $wpdb->insert_id; // ✅ Return notification ID for tracking
     }
 
     public function ajax_get_user_notifications() {
@@ -112,8 +116,35 @@ class SP_Notifications_Manager {
             ]);
         }
 
-        // Notify area manager if assigned
-        // This part needs logic to find the area manager for the project's location
+        // ✅ NOTIFY AREA MANAGER - Step Submitted
+        $project_state = get_post_meta($project_id, '_project_state', true);
+        $project_city = get_post_meta($project_id, '_project_city', true);
+
+        if ($project_state && $project_city) {
+            $area_managers = get_users([
+                'role' => 'area_manager',
+                'meta_query' => [
+                    'relation' => 'AND',
+                    [
+                        'key' => 'state',
+                        'value' => $project_state,
+                    ],
+                    [
+                        'key' => 'city',
+                        'value' => $project_city,
+                    ]
+                ]
+            ]);
+
+            foreach ($area_managers as $area_manager) {
+                self::create_notification([
+                    'user_id' => $area_manager->ID,
+                    'project_id' => $project_id,
+                    'message' => $message,
+                    'type' => 'vendor_submission',
+                ]);
+            }
+        }
     }
 
     public function handle_step_review($step_id, $project_id, $decision) {
@@ -156,11 +187,14 @@ class SP_Notifications_Manager {
             ]);
         }
         
-        // Send email to vendor
-        wp_mail(
-            $vendor->user_email,
-            'Your account has been approved!',
-            'Congratulations, your vendor account has been approved. You can now log in and start bidding on projects.'
-        );
+        // Send email to vendor (if enabled in settings)
+        $notification_options = get_option('sp_notification_options');
+        if (isset($notification_options['email_vendor_approved']) && $notification_options['email_vendor_approved'] === '1') {
+            wp_mail(
+                $vendor->user_email,
+                'Your account has been approved!',
+                'Congratulations, your vendor account has been approved. You can now log in and start bidding on projects.'
+            );
+        }
     }
 }

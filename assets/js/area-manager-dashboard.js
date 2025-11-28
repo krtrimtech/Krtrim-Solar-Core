@@ -201,9 +201,12 @@ if (typeof jQuery === 'undefined') {
             console.log('Updating stats:', stats);
             $('#total-projects-stat').text(stats.total_projects || 0);
             $('#total-revenue-stat').text('₹' + (stats.total_revenue || 0).toLocaleString('en-IN'));
+            $('#client-payments-stat').text('₹' + (stats.total_client_payments || 0).toLocaleString('en-IN'));
+            $('#outstanding-balance-stat').text('₹' + (stats.total_outstanding || 0).toLocaleString('en-IN'));
             $('#total-costs-stat').text('₹' + (stats.total_costs || 0).toLocaleString('en-IN'));
             $('#total-profit-stat').text('₹' + (stats.total_profit || 0).toLocaleString('en-IN'));
             $('#profit-margin-stat').text((stats.profit_margin || 0).toFixed(1) + '%');
+            $('#collection-rate-stat').text((stats.collection_rate || 0).toFixed(1) + '%');
             $('#total-leads-stat').text(stats.total_leads || 0);
         }
 
@@ -290,7 +293,15 @@ if (typeof jQuery === 'undefined') {
                                 fill: true
                             },
                             {
-                                label: 'Costs',
+                                label: 'Client Payments',
+                                data: stats.financial_data?.payments || [0, 0, 0, 0, 0, 0],
+                                borderColor: '#3b82f6',
+                                backgroundColor: 'rgba(59, 130, 246, 0.1)',
+                                tension: 0.4,
+                                fill: true
+                            },
+                            {
+                                label: 'Vendor Costs',
                                 data: stats.financial_data?.costs || [0, 0, 0, 0, 0, 0],
                                 borderColor: '#ef4444',
                                 backgroundColor: 'rgba(239, 68, 68, 0.1)',
@@ -1521,6 +1532,7 @@ if (typeof jQuery === 'undefined') {
                     action: 'create_solar_project',
                     sp_create_project_nonce: createProjectNonce,
                     project_title: $('#project_title').val(),
+                    project_description: $('#project_description').val(),
                     project_state: $('#project_state').val(),
                     project_city: $('#project_city').val(),
                     project_status: $('#project_status').val(),
@@ -1529,8 +1541,7 @@ if (typeof jQuery === 'undefined') {
                     client_address: $('#client_address').val(),
                     client_phone_number: $('#client_phone_number').val(),
                     project_start_date: $('#project_start_date').val(),
-                    project_start_date: $('#project_start_date').val(),
-                    project_start_date: $('#project_start_date').val(),
+                    total_project_cost: $('#total_project_cost').val(),
                     vendor_assignment_method: $('input[name="vendor_assignment_method"]:checked').val(),
                     assigned_vendor_id: $('#assigned_vendor_id').val(),
                     paid_to_vendor: $('#paid_to_vendor').val(),
