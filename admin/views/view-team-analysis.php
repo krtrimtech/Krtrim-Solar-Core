@@ -274,7 +274,7 @@ function sp_render_single_manager_view($manager_id) {
     $vendors = [];
 
     foreach ($projects as $project) {
-        $status = get_post_meta($project->ID, '_project_status', true) ?: 'pending';
+        $status = get_post_meta($project->ID, 'project_status', true) ?: 'pending';
         if (isset($stats[$status])) {
             $stats[$status]++;
         }

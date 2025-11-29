@@ -443,7 +443,7 @@ class SP_Admin_Widgets {
             'post_type' => 'solar_project',
             'posts_per_page' => 2,
             'meta_query' => [
-                ['key' => '_project_status', 'value' => 'completed']
+                ['key' => 'project_status', 'value' => 'completed']
             ]
         ]);
 
@@ -452,6 +452,27 @@ class SP_Admin_Widgets {
                 'icon' => '✅',
                 'text' => 'Project completed: ' . $project->post_title,
                 'time' => strtotime($project->post_modified)
+            ];
+        }
+
+        // ✅ RECENT BIDS (last 7 days)
+        global $wpdb;
+        $bids_table = $wpdb->prefix . 'project_bids';
+        $recent_bids = $wpdb->get_results($wpdb->prepare(
+            "SELECT b.*, p.post_title, u.display_name 
+            FROM {$bids_table} b 
+            JOIN {$wpdb->posts} p ON b.project_id = p.ID 
+            JOIN {$wpdb->users} u ON b.vendor_id = u.ID 
+            WHERE b.created_at >= DATE_SUB(NOW(), INTERVAL 7 DAY)
+            ORDER BY b.created_at DESC 
+            LIMIT 3"
+        ));
+
+        foreach ($recent_bids as $bid) {
+            $activities[] = [
+                'icon' => '🎯',
+                'text' => sprintf('Bid by %s on %s - ₹%s', $bid->display_name, $bid->post_title, number_format($bid->bid_amount, 0)),
+                'time' => strtotime($bid->created_at)
             ];
         }
 
@@ -494,7 +515,7 @@ class SP_Admin_Widgets {
         $unassigned = get_posts([
             'post_type' => 'solar_project',
             'meta_query' => [
-                ['key' => '_project_status', 'value' => 'pending']
+                ['key' => 'project_status', 'value' => 'pending']
             ],
             'fields' => 'ids'
         ]);
@@ -511,7 +532,7 @@ class SP_Admin_Widgets {
         $count = get_posts([
             'post_type' => 'solar_project',
             'meta_query' => [
-                ['key' => '_project_status', 'value' => $status]
+                ['key' => 'project_status', 'value' => $status]
             ],
             'fields' => 'ids'
         ]);

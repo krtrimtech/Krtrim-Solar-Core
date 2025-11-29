@@ -69,7 +69,7 @@ function sp_get_project_details() {
     $data = [
         'id' => $project_id,
         'title' => get_the_title($project_id),
-        'status' => get_post_meta($project_id, '_project_status', true),
+        'status' => get_post_meta($project_id, 'project_status', true),
         'project_state' => get_post_meta($project_id, '_project_state', true),
         'project_city' => get_post_meta($project_id, '_project_city', true),
         'solar_system_size_kw' => get_post_meta($project_id, '_solar_system_size_kw', true),

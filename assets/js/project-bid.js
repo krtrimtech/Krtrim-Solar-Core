@@ -53,12 +53,35 @@ jQuery(document).ready(function ($) {
                         location.reload();
                     }, 1500);
                 } else {
-                    // Show error message
-                    feedbackDiv
-                        .removeClass('success')
-                        .addClass('error')
-                        .html('✗ ' + (response.data.message || 'Failed to submit bid'))
-                        .show();
+                    // ✅ CHECK IF COVERAGE IS NEEDED
+                    if (response.data && response.data.coverage_needed) {
+                        const state = response.data.project_state || '';
+                        const city = response.data.project_city || '';
+
+                        // Show coverage modal
+                        const modalHtml = `
+                            <div id="coverage-needed-modal" style="position: fixed; inset: 0; background: rgba(0,0,0,0.7); z-index: 99999; display: flex; align-items: center; justify-content: center;">
+                                <div style="background: white; padding: 40px; border-radius: 16px; max-width: 500px; text-align: center; box-shadow: 0 20px 60px rgba(0,0,0,0.3);">
+                                    <div style="font-size: 48px; margin-bottom: 20px;">🚫</div>
+                                    <h2 style="margin: 0 0 15px; color: #2d3748; font-size: 24px;">Coverage Area Required</h2>
+                                    <p style="margin: 0 0 10px; color: #4a5568; font-size: 16px;">You can only bid on projects in your coverage area.</p>
+                                    <p style="margin: 0 0 25px; color: #667eea; font-weight: 600; font-size: 18px;">Location: ${city}, ${state}</p>
+                                    <div style="display: flex; gap: 12px; justify-content: center;">
+                                        <button onclick="document.getElementById('coverage-needed-modal').remove()" style="padding: 12px 24px; background: #e2e8f0; border: none; border-radius: 8px; cursor: pointer; font-weight: 600; font-size: 15px;">Cancel</button>
+                                        <button onclick="window.location.href='/solar-dashboard/#profile-coverage'" style="padding: 12px 24px; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; border: none; border-radius: 8px; cursor: pointer; font-weight: 600; font-size: 15px;">Expand Coverage Area →</button>
+                                    </div>
+                                </div>
+                            </div>
+                        `;
+                        $('body').append(modalHtml);
+                    } else {
+                        // Show regular error message
+                        feedbackDiv
+                            .removeClass('success')
+                            .addClass('error')
+                            .html('✗ ' + (response.data.message || 'Failed to submit bid'))
+                            .show();
+                    }
 
                     // Re-enable submit button
                     submitBtn.prop('disabled', false).text('Submit Bid');

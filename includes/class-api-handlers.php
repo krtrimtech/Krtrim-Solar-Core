@@ -127,7 +127,7 @@ class SP_API_Handlers {
         }
 
         foreach ($projects as $project) {
-            $status = get_post_meta($project->ID, '_project_status', true);
+            $status = get_post_meta($project->ID, 'project_status', true);
             $project_cost = floatval(get_post_meta($project->ID, '_total_project_cost', true) ?: 0);
             $vendor_cost = floatval(get_post_meta($project->ID, '_vendor_paid_amount', true) ?: 0);
             $paid_amount = floatval(get_post_meta($project->ID, '_paid_amount', true) ?: 0);
@@ -1264,6 +1264,37 @@ class SP_API_Handlers {
             wp_send_json_error(['message' => 'Project ID and bid amount are required.']);
         }
 
+        // ✅ CHECK COVERAGE AREA
+        $project_state = get_post_meta($project_id, '_project_state', true);
+        $project_city = get_post_meta($project_id, '_project_city', true);
+        $purchased_states = get_user_meta($vendor_id, 'purchased_states', true) ?: [];
+        $purchased_cities = get_user_meta($vendor_id, 'purchased_cities', true) ?: [];
+
+        $has_state_coverage = in_array($project_state, $purchased_states);
+        
+        // Check city coverage - cities are stored as [{city: "X", state: "Y"}]
+        $has_city_coverage = false;
+        if (is_array($purchased_cities)) {
+            foreach ($purchased_cities as $city_obj) {
+                if (is_array($city_obj) && isset($city_obj['city']) && $city_obj['city'] === $project_city) {
+                    $has_city_coverage = true;
+                    break;
+                } elseif (is_string($city_obj) && $city_obj === $project_city) {
+                    $has_city_coverage = true;
+                    break;
+                }
+            }
+        }
+
+        if (!$has_state_coverage && !$has_city_coverage) {
+            wp_send_json_error([
+                'message' => 'You can only submit bids for projects in your coverage area.',
+                'coverage_needed' => true,
+                'project_state' => $project_state,
+                'project_city' => $project_city
+            ]);
+        }
+
         global $wpdb;
         $table_name = $wpdb->prefix . 'project_bids';
 
@@ -1281,6 +1312,41 @@ class SP_API_Handlers {
         );
 
         if ($result) {
+            $bid_id = $wpdb->insert_id;
+            $project_title = get_the_title($project_id);
+            $vendor_name = wp_get_current_user()->display_name;
+            $vendor_company = get_user_meta($vendor_id, 'company_name', true);
+            $display_name = $vendor_company ?: $vendor_name;
+
+            // ✅ NOTIFY ADMIN
+            $admin_users = get_users(['role' => 'administrator']);
+            foreach ($admin_users as $admin) {
+                SP_Notifications_Manager::create_notification([
+                    'user_id' => $admin->ID,
+                    'project_id' => $project_id,
+                    'message' => sprintf('New bid received from %s on project "%s" - Amount: ₹%s', $display_name, $project_title, number_format($bid_amount, 2)),
+                    'type' => 'bid_received',
+                ]);
+            }
+
+            // ✅ NOTIFY AREA MANAGER (if project was created by one)
+            $project = get_post($project_id);
+            if ($project) {
+                $author_id = $project->post_author;
+                $author = get_userdata($author_id);
+                if ($author && in_array('area_manager', (array)$author->roles)) {
+                    SP_Notifications_Manager::create_notification([
+                        'user_id' => $author_id,
+                        'project_id' => $project_id,
+                        'message' => sprintf('New bid from %s on your project "%s" - Amount: ₹%s', $display_name, $project_title, number_format($bid_amount, 2)),
+                        'type' => 'bid_received',
+                    ]);
+                }
+            }
+
+            // ✅ FIRE HOOK for extensibility
+            do_action('sp_bid_submitted', $bid_id, $project_id, $vendor_id, $bid_amount);
+
             wp_send_json_success(['message' => 'Bid submitted successfully!']);
         } else {
             wp_send_json_error(['message' => 'Failed to save bid to the database.']);
@@ -1290,7 +1356,12 @@ class SP_API_Handlers {
     public function award_project_to_vendor() {
         check_ajax_referer('award_bid_nonce', 'nonce');
 
-        if (!is_user_logged_in() || !in_array('area_manager', (array)wp_get_current_user()->roles)) {
+        // ✅ ALLOW ADMIN OR AREA_MANAGER (matches pattern from class-custom-metaboxes.php:65)
+        $current_user = wp_get_current_user();
+        $is_admin = current_user_can('manage_options');
+        $is_area_manager = in_array('area_manager', (array)$current_user->roles);
+        
+        if (!is_user_logged_in() || (!$is_admin && !$is_area_manager)) {
             wp_send_json_error(['message' => 'Permission denied.']);
         }
 
@@ -1303,19 +1374,21 @@ class SP_API_Handlers {
         }
 
         $project = get_post($project_id);
-        $manager = wp_get_current_user();
 
-        if (!$project || $project->post_author != $manager->ID) {
+        // ✅ ADMINS CAN AWARD ANY PROJECT, AREA MANAGERS ONLY THEIR OWN
+        if (!$project) {
+            wp_send_json_error(['message' => 'Project not found.']);
+        }
+        
+        if (!$is_admin && $project->post_author != $current_user->ID) {
             wp_send_json_error(['message' => 'You do not have permission to award this project.']);
         }
 
         update_post_meta($project_id, 'winning_vendor_id', $vendor_id);
         update_post_meta($project_id, 'winning_bid_amount', $bid_amount);
-        update_post_meta($project_id, 'assigned_vendor_id', $vendor_id);
+        update_post_meta($project_id, '_assigned_vendor_id', $vendor_id);
         update_post_meta($project_id, 'total_project_cost', $bid_amount);
-        update_post_meta($project_id, '_project_status', 'assigned');
-
-        wp_update_post(['ID' => $project_id, 'post_status' => 'assigned']);
+        update_post_meta($project_id, 'project_status', 'assigned');
 
         $winning_vendor = get_userdata($vendor_id);
         $project_title = get_the_title($project_id);
@@ -1403,7 +1476,7 @@ class SP_API_Handlers {
             while ($projects->have_posts()) {
                 $projects->the_post();
                 $project_id = get_the_ID();
-                $status = get_post_status($project_id) == 'publish' ? (get_post_meta($project_id, '_project_status', true) ?: 'pending') : get_post_status($project_id);
+                $status = get_post_status($project_id) == 'publish' ? (get_post_meta($project_id, 'project_status', true) ?: 'pending') : get_post_status($project_id);
 
                 if (isset($stats[$status])) {
                     $stats[$status]++;
@@ -1507,8 +1580,7 @@ class SP_API_Handlers {
                 if (isset($data['paid_to_vendor'])) {
                     update_post_meta($project_id, '_paid_to_vendor', sanitize_text_field($data['paid_to_vendor']));
                 }
-                update_post_meta($project_id, '_project_status', 'assigned');
-                wp_update_post(['ID' => $project_id, 'post_status' => 'assigned']);
+                update_post_meta($project_id, 'project_status', 'assigned');
             } else {
                 // Bidding mode
                 delete_post_meta($project_id, '_assigned_vendor_id');
@@ -1599,7 +1671,7 @@ class SP_API_Handlers {
                 $projects_data[] = [
                     'id' => $project_id,
                     'title' => get_the_title(),
-                    'status' => get_post_meta($project_id, '_project_status', true) ?: 'pending',
+                    'status' => get_post_meta($project_id, 'project_status', true) ?: 'pending',
                     'project_state' => get_post_meta($project_id, '_project_state', true),
                     'project_city' => get_post_meta($project_id, '_project_city', true),
                     'solar_system_size_kw' => get_post_meta($project_id, '_solar_system_size_kw', true),
@@ -1637,7 +1709,7 @@ class SP_API_Handlers {
         $meta = [
             'System Size' => get_post_meta($project_id, '_solar_system_size_kw', true) . ' kW',
             'Client Address' => get_post_meta($project_id, '_client_address', true),
-            'Status' => get_post_meta($project_id, '_project_status', true),
+            'Status' => get_post_meta($project_id, 'project_status', true),
         ];
 
         // Get vendor submissions

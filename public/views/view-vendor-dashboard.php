@@ -16,7 +16,7 @@ function render_solar_vendor_dashboard() {
         'meta_query' => array(
             'relation' => 'AND',
             array(
-                'key' => 'assigned_vendor_id',
+                'key' => '_assigned_vendor_id',
                 'value' => $vendor_id,
             ),
             array(
@@ -38,7 +38,7 @@ function render_solar_vendor_dashboard() {
             $vendor_projects->the_post();
             $paid_to_vendor = floatval(get_post_meta(get_the_ID(), '_paid_to_vendor', true));
             $total_received += $paid_to_vendor;
-            $project_status = get_post_meta(get_the_ID(), '_project_status', true);
+            $project_status = get_post_meta(get_the_ID(), 'project_status', true);
             if ($project_status === 'in_progress') {
                 $total_working++;
             } elseif ($project_status === 'completed') {
@@ -240,7 +240,7 @@ function render_solar_vendor_dashboard() {
                         <?php
                         $project = get_post($view_project_id);
                         if ($project && $project->post_type === 'solar_project') :
-                            $assigned_vendor = get_post_meta($view_project_id, 'assigned_vendor_id', true);
+                            $assigned_vendor = get_post_meta($view_project_id, '_assigned_vendor_id', true);
                             
                             $has_access = false;
                             if (is_array($assigned_vendor)) {
@@ -264,7 +264,7 @@ function render_solar_vendor_dashboard() {
                                 $client_id = get_post_meta($view_project_id, '_client_user_id', true);
                                 $paid_to_vendor = floatval(get_post_meta($view_project_id, '_paid_to_vendor', true));
                                 $system_size = get_post_meta($view_project_id, '_solar_system_size_kw', true);
-                                $status = get_post_meta($view_project_id, '_project_status', true);
+                                $status = get_post_meta($view_project_id, 'project_status', true);
                                 $total_cost = get_post_meta($view_project_id, '_total_project_cost', true);
                                 $client_address = get_post_meta($view_project_id, '_client_address', true);
                                 $client_phone = get_post_meta($view_project_id, '_client_phone_number', true);
@@ -485,7 +485,7 @@ function render_solar_vendor_dashboard() {
                             while ($vendor_projects->have_posts()) : $vendor_projects->the_post();
                                 $project_id = get_the_ID();
                                 $paid_to_vendor = floatval(get_post_meta($project_id, '_paid_to_vendor', true));
-                                $status = get_post_meta($project_id, '_project_status', true);
+                                $status = get_post_meta($project_id, 'project_status', true);
                                 $system_size = get_post_meta($project_id, '_solar_system_size_kw', true);
                                 $client_id = get_post_meta($project_id, '_client_user_id', true);
                                 if (is_object($client_id)) $client_id = $client_id->ID;

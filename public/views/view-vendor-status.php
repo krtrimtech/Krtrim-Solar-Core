@@ -100,7 +100,7 @@ function sp_vendor_status_dashboard_shortcode() {
                             <p><small>Approved on: <?php echo date('F j, Y', strtotime($approved_date)); ?></small></p>
                         <?php endif; ?>
                         <p style="margin-top: 15px;">
-                            <a href="<?php echo home_url('/vendor-dashboard'); ?>" class="button button-primary">
+                            <a href="<?php echo home_url('/solar-dashboard'); ?>" class="button button-primary">
                                 Go to Dashboard →
                             </a>
                         </p>

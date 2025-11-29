@@ -261,7 +261,7 @@ function toggleProjectDetails(projectId) {
                     <?php while ($project_query->have_posts()) : $project_query->the_post(); ?>
                         <?php
                         $project_id = get_the_ID();
-                        $project_status = get_post_meta($project_id, '_project_status', true);
+                        $project_status = get_post_meta($project_id, 'project_status', true);
                         $solar_system_size = get_post_meta($project_id, '_solar_system_size_kw', true);
                         $total_project_cost = floatval(get_post_meta($project_id, '_total_project_cost', true));
                         $paid_amount = floatval(get_post_meta($project_id, '_paid_amount', true));
@@ -565,7 +565,7 @@ function toggleProjectDetails(projectId) {
                         $project_query->rewind_posts(); // Start fresh for projects list
                         while ($project_query->have_posts()) : $project_query->the_post(); 
                             $proj_id = get_the_ID();
-                            $proj_status = get_post_meta($proj_id, '_project_status', true);
+                            $proj_status = get_post_meta($proj_id, 'project_status', true);
                             $proj_size = get_post_meta($proj_id, '_solar_system_size_kw', true);
                             $proj_cost = floatval(get_post_meta($proj_id, '_total_project_cost', true));
                             $proj_paid = floatval(get_post_meta($proj_id, '_paid_amount', true));
