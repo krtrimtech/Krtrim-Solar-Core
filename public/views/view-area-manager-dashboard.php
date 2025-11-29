@@ -270,8 +270,8 @@ function sp_area_manager_dashboard_shortcode() {
                                 <small style="color: #666;">Provide detailed information about the project that will be visible to vendors and clients.</small>
                             </div>
                             <?php
-                            $user_state = get_user_meta($user->ID, 'state', true);
-                            $user_city = get_user_meta($user->ID, 'city', true);
+                            $user_state = get_user_meta($user->ID, 'assigned_state', true);
+                            $user_city = get_user_meta($user->ID, 'assigned_city', true);
 
                             if ($user_state && $user_city) {
                                 // Area Manager with assigned location

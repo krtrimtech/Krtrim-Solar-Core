@@ -65,6 +65,10 @@ class SP_API_Handlers {
         // Vendor Registration - Coverage Areas
         add_action('wp_ajax_get_coverage_areas', [ $this, 'get_coverage_areas' ]);
         add_action('wp_ajax_nopriv_get_coverage_areas', [ $this, 'get_coverage_areas' ]);
+        
+        // Email validation
+        add_action('wp_ajax_check_email_exists', [ $this, 'check_email_exists' ]);
+        add_action('wp_ajax_nopriv_check_email_exists', [ $this, 'check_email_exists' ]);
     }
 
     public function get_area_manager_dashboard_stats() {
@@ -1970,7 +1974,22 @@ class SP_API_Handlers {
         wp_send_json_success($data['states']);
     }
 
-    public function filter_projects() {
+    /**
+     * Check if email already exists (for vendor registration)
+     */
+    public function check_email_exists() {
+        $email = isset($_POST['email']) ? sanitize_email($_POST['email']) : '';
+        
+        if (empty($email)) {
+            wp_send_json_error(['message' => 'Email is required']);
+            return;
+        }
+        
+        $exists = email_exists($email);
+        wp_send_json_success(['exists' => (bool)$exists]);
+    }
+
+   public function filter_projects() {
         // ... (existing function)
     }
 

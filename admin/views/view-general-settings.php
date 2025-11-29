@@ -9,7 +9,7 @@ function sp_render_general_settings_page() {
     $active_tab = isset($_GET['tab']) ? $_GET['tab'] : 'vendor_registration';
     ?>
     <div class="wrap">
-        <h1>Kritim Solar Core Settings</h1>
+        <h1>Krtrim Solar Core Settings</h1>
         <h2 class="nav-tab-wrapper">
             <a href="?page=ksc-settings&tab=vendor_registration" class="nav-tab <?php echo $active_tab == 'vendor_registration' ? 'nav-tab-active' : ''; ?>">Vendor Registration</a>
             <a href="?page=ksc-settings&tab=notifications" class="nav-tab <?php echo $active_tab == 'notifications' ? 'nav-tab-active' : ''; ?>">Notifications</a>

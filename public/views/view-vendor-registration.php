@@ -38,7 +38,15 @@ function sp_vendor_registration_form_shortcode() {
             </div>
             <div class="form-group">
                 <label for="vreg-password">Password *</label>
-                <input type="password" id="vreg-password" required>
+                <div class="password-wrapper">
+                    <input type="password" id="vreg-password" required>
+                    <button type="button" class="toggle-password" id="toggle-vreg-password" aria-label="Toggle password visibility">
+                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="eye-icon">
+                            <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path>
+                            <circle cx="12" cy="12" r="3"></circle>
+                        </svg>
+                    </button>
+                </div>
             </div>
             <button id="vreg-step1-next" class="btn btn-primary">Next</button>
         </div>

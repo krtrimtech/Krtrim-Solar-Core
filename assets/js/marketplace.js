@@ -103,8 +103,8 @@ jQuery(document).ready(function ($) {
 
                 spinner.hide();
                 if (response.success) {
-                    // Remove existing project items but keep spinner
-                    container.find('.project-item').remove();
+                    // Remove existing project items and messages
+                    container.find('.project-card').remove();
                     container.find('.no-projects').remove();
 
                     if (response.data.html) {

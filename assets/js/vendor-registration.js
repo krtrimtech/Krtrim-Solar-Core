@@ -25,15 +25,49 @@
     $(document).ready(function () {
         initializeStepNavigation();
         loadCoverageAreas();
+        initializePasswordToggle();
     });
+
+    /**
+     * Initialize password visibility toggle
+     */
+    function initializePasswordToggle() {
+        $('#toggle-vreg-password').on('click', function () {
+            const passwordInput = $('#vreg-password');
+            const currentType = passwordInput.attr('type');
+            const $button = $(this);
+
+            if (currentType === 'password') {
+                // Show password - use eye-off icon
+                passwordInput.attr('type', 'text');
+                $button.html(`
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="eye-icon">
+                        <path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"></path>
+                        <line x1="1" y1="1" x2="23" y2="23"></line>
+                    </svg>
+                `);
+                $button.attr('aria-label', 'Hide password');
+            } else {
+                // Hide password - use eye icon
+                passwordInput.attr('type', 'password');
+                $button.html(`
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="eye-icon">
+                        <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path>
+                        <circle cx="12" cy="12" r="3"></circle>
+                    </svg>
+                `);
+                $button.attr('aria-label', 'Show password');
+            }
+        });
+    }
 
     /**
      * Step Navigation Initialization
      */
     function initializeStepNavigation() {
         // Step 1: Basic Info → Coverage
-        $('#vreg-step1-next').on('click', function () {
-            if (validateStep1()) {
+        $('#vreg-step1-next').on('click', async function () {
+            if (await validateStep1()) {
                 saveStep1Data();
                 showStep(2);
             }
@@ -73,9 +107,9 @@
     }
 
     /**
-     * Validate Step 1 (Basic Info)
+     * Validate Step 1 (Basic Info) - Async to check email
      */
-    function validateStep1() {
+    async function validateStep1() {
         const name = $('#vreg-name').val().trim();
         const company = $('#vreg-company').val().trim();
         const email = $('#vreg-email').val().trim();
@@ -92,6 +126,31 @@
         if (!emailRegex.test(email)) {
             showFeedback('Please enter a valid email address', 'error');
             return false;
+        }
+
+        // Check if email already exists
+        try {
+            showFeedback('Checking email availability...', 'info');
+
+            const emailCheck = await $.ajax({
+                url: config.ajax_url,
+                type: 'POST',
+                data: {
+                    action: 'check_email_exists',
+                    email: email
+                }
+            });
+
+            if (emailCheck.success && emailCheck.data.exists) {
+                showFeedback('This email is already registered. Please use a different email or login.', 'error');
+                return false;
+            } else if (emailCheck.success && !emailCheck.data.exists) {
+                showFeedback('Email is available!', 'success');
+            }
+        } catch (error) {
+            console.error('Email check error:', error);
+            showFeedback('Unable to verify email. Please check your connection and try again.', 'error');
+            return false; // Block progression on network failure
         }
 
         // Basic phone validation (10 digits)
