@@ -44,30 +44,18 @@ function sp_render_bid_management_page() {
         }
     }
 
-    // Pagination
-    $paged = isset($_GET['paged']) ? max(1, intval($_GET['paged'])) : 1;
-    $per_page = 20;
-    $offset = ($paged - 1) * $per_page;
-
+    // Get Projects that have bids
     global $wpdb;
     $bids_table = $wpdb->prefix . 'project_bids';
     $projects_table = $wpdb->posts;
     $users_table = $wpdb->users;
 
-    // Get Total Count
-    $total_bids = $wpdb->get_var("SELECT COUNT(*) FROM {$bids_table}");
-    $total_pages = ceil($total_bids / $per_page);
-
-    // Get Bids
-    $bids = $wpdb->get_results($wpdb->prepare(
-        "SELECT b.*, p.post_title, p.ID as project_id, u.display_name as vendor_name, u.user_email 
-        FROM {$bids_table} b 
-        JOIN {$projects_table} p ON b.project_id = p.ID 
-        JOIN {$users_table} u ON b.vendor_id = u.ID 
-        ORDER BY b.created_at DESC 
-        LIMIT %d OFFSET %d",
-        $per_page, $offset
-    ));
+    $projects_with_bids = $wpdb->get_results(
+        "SELECT DISTINCT p.ID, p.post_title, p.post_status, p.post_date 
+         FROM {$projects_table} p 
+         JOIN {$bids_table} b ON p.ID = b.project_id 
+         ORDER BY p.post_date DESC"
+    );
 
     ?>
 
@@ -75,95 +63,128 @@ function sp_render_bid_management_page() {
         <h1 class="wp-heading-inline">Bid Management</h1>
         <hr class="wp-header-end">
 
-        <div class="tablenav top">
-            <div class="tablenav-pages">
-                <span class="displaying-num"><?php echo $total_bids; ?> items</span>
-                <?php if ($total_pages > 1): ?>
-                    <span class="pagination-links">
-                        <?php
-                        echo paginate_links([
-                            'base' => add_query_arg('paged', '%#%'),
-                            'format' => '',
-                            'prev_text' => '&laquo;',
-                            'next_text' => '&raquo;',
-                            'total' => $total_pages,
-                            'current' => $paged
-                        ]);
-                        ?>
-                    </span>
-                <?php endif; ?>
-            </div>
-        </div>
-
-        <table class="wp-list-table widefat fixed striped table-view-list">
+        <table class="wp-list-table widefat fixed striped">
             <thead>
                 <tr>
-                    <th scope="col" class="manage-column column-primary">Project</th>
-                    <th scope="col" class="manage-column">Vendor</th>
-                    <th scope="col" class="manage-column">Bid Amount</th>
-                    <th scope="col" class="manage-column">Type</th>
-                    <th scope="col" class="manage-column">Date</th>
-                    <th scope="col" class="manage-column">Status</th>
-                    <th scope="col" class="manage-column">Action</th>
+                    <th style="width: 40%;">Project</th>
+                    <th style="width: 15%;">Total Bids</th>
+                    <th style="width: 15%;">Status</th>
+                    <th style="width: 15%;">Created</th>
+                    <th style="width: 15%;">Action</th>
                 </tr>
             </thead>
             <tbody>
-                <?php if (!empty($bids)) : ?>
-                    <?php foreach ($bids as $bid) : ?>
+                <?php if (!empty($projects_with_bids)) : ?>
+                    <?php foreach ($projects_with_bids as $project) : ?>
                         <?php 
-                        $project_status = get_post_meta($bid->project_id, 'project_status', true);
-                        $assigned_vendor = get_post_meta($bid->project_id, '_assigned_vendor_id', true);
-                        $is_winner = ($assigned_vendor == $bid->vendor_id);
+                        $project_id = $project->ID;
+                        $project_status = get_post_meta($project_id, 'project_status', true);
+                        $assigned_vendor_id = get_post_meta($project_id, '_assigned_vendor_id', true);
+                        $assigned_vendor_name = '';
+                        
+                        if (!empty($assigned_vendor_id) && $assigned_vendor_id > 0) {
+                            $vendor = get_userdata($assigned_vendor_id);
+                            $assigned_vendor_name = $vendor ? $vendor->display_name : 'Unknown';
+                        }
+
+                        // Get bids for this project
+                        $bids = $wpdb->get_results($wpdb->prepare(
+                            "SELECT b.*, u.display_name as vendor_name, u.user_email 
+                             FROM {$bids_table} b 
+                             JOIN {$users_table} u ON b.vendor_id = u.ID 
+                             WHERE b.project_id = %d 
+                             ORDER BY b.created_at DESC",
+                            $project_id
+                        ));
+                        
+                        $bid_count = count($bids);
                         ?>
-                        <tr>
-                            <td class="column-primary">
-                                <strong><a href="<?php echo get_edit_post_link($bid->project_id); ?>"><?php echo esc_html($bid->post_title); ?></a></strong>
-                            </td>
+                        
+                        <!-- Project Row -->
+                        <tr class="project-row" id="project-<?php echo $project_id; ?>">
                             <td>
-                                <?php echo esc_html($bid->vendor_name); ?><br>
-                                <small><?php echo esc_html($bid->user_email); ?></small>
-                            </td>
-                            <td>
-                                <strong>₹<?php echo number_format($bid->bid_amount); ?></strong>
-                            </td>
-                            <td>
-                                <?php if ($bid->bid_type === 'open'): ?>
-                                    <span class="badge badge-success" style="background:#d4edda; color:#155724; padding:2px 6px; border-radius:4px; font-size:11px;">Open</span>
-                                <?php else: ?>
-                                    <span class="badge badge-warning" style="background:#fff3cd; color:#856404; padding:2px 6px; border-radius:4px; font-size:11px;">Hidden</span>
-                                <?php endif; ?>
-                            </td>
-                            <td><?php echo date('M j, Y', strtotime($bid->created_at)); ?></td>
-                            <td>
-                                <?php if ($is_winner): ?>
-                                    <span class="dashicons dashicons-awards" style="color: #28a745;"></span> <strong style="color: #28a745;">Winner</strong>
-                                <?php elseif ($assigned_vendor): ?>
-                                    <span style="color: #999;">Lost</span>
-                                <?php else: ?>
-                                    <span style="color: #ffc107;">Pending</span>
+                                <strong><a href="<?php echo get_edit_post_link($project_id); ?>"><?php echo esc_html($project->post_title); ?></a></strong>
+                                <?php if ($assigned_vendor_name): ?>
+                                    <br><small style="color: #28a745;">Awarded to: <?php echo esc_html($assigned_vendor_name); ?></small>
                                 <?php endif; ?>
                             </td>
                             <td>
-                                <?php if (!$assigned_vendor): ?>
-                                    <form method="post" style="display:inline;" onsubmit="return confirm('Are you sure you want to award this project to <?php echo esc_js($bid->vendor_name); ?>?');">
-                                        <input type="hidden" name="action" value="award_bid">
-                                        <input type="hidden" name="project_id" value="<?php echo $bid->project_id; ?>">
-                                        <input type="hidden" name="vendor_id" value="<?php echo $bid->vendor_id; ?>">
-                                        <input type="hidden" name="bid_amount" value="<?php echo $bid->bid_amount; ?>">
-                                        <?php wp_nonce_field('award_bid_action', 'bid_nonce'); ?>
-                                        <button type="submit" class="button button-primary button-small">Award</button>
-                                    </form>
-                                <?php elseif ($is_winner): ?>
-                                    <button class="button button-disabled" disabled>Awarded</button>
+                                <span class="badge badge-info"><?php echo $bid_count; ?> Bids</span>
+                            </td>
+                            <td>
+                                <?php if (!empty($assigned_vendor_id) && $assigned_vendor_id > 0): ?>
+                                    <span style="color: #28a745; font-weight: bold;">Awarded</span>
                                 <?php else: ?>
-                                    <button class="button button-disabled" disabled>Closed</button>
+                                    <span style="color: #ffc107; font-weight: bold;">Open</span>
                                 <?php endif; ?>
+                            </td>
+                            <td><?php echo date('M j, Y', strtotime($project->post_date)); ?></td>
+                            <td>
+                                <button type="button" class="button toggle-bids-btn" data-project-id="<?php echo $project_id; ?>">Show Bids</button>
                             </td>
                         </tr>
+
+                        <!-- Bids Row (Hidden by default) -->
+                        <tr class="bids-row" id="bids-row-<?php echo $project_id; ?>" style="display: none; background-color: #f9f9f9;">
+                            <td colspan="5" style="padding: 0;">
+                                <div style="padding: 10px 20px;">
+                                    <table class="wp-list-table widefat fixed striped" style="box-shadow: none; border: 1px solid #ddd;">
+                                        <thead>
+                                            <tr>
+                                                <th>Vendor</th>
+                                                <th>Bid Amount</th>
+                                                <th>Type</th>
+                                                <th>Date</th>
+                                                <th>Action</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            <?php foreach ($bids as $bid): ?>
+                                                <?php 
+                                                $is_winner = ($assigned_vendor_id == $bid->vendor_id);
+                                                ?>
+                                                <tr>
+                                                    <td>
+                                                        <?php echo esc_html($bid->vendor_name); ?><br>
+                                                        <small><?php echo esc_html($bid->user_email); ?></small>
+                                                    </td>
+                                                    <td><strong>₹<?php echo number_format($bid->bid_amount); ?></strong></td>
+                                                    <td>
+                                                        <?php if ($bid->bid_type === 'open'): ?>
+                                                            <span style="color: green;">Open</span>
+                                                        <?php else: ?>
+                                                            <span style="color: orange;">Hidden</span>
+                                                        <?php endif; ?>
+                                                    </td>
+                                                    <td><?php echo date('M j, Y', strtotime($bid->created_at)); ?></td>
+                                                    <td>
+                                                        <?php if (empty($assigned_vendor_id) || $assigned_vendor_id <= 0): ?>
+                                                            <form class="award-bid-form" method="post" style="display:inline;">
+                                                                <input type="hidden" name="action" value="award_project_to_vendor">
+                                                                <input type="hidden" name="project_id" value="<?php echo $bid->project_id; ?>">
+                                                                <input type="hidden" name="vendor_id" value="<?php echo $bid->vendor_id; ?>">
+                                                                <input type="hidden" name="bid_amount" value="<?php echo $bid->bid_amount; ?>">
+                                                                <?php wp_nonce_field('award_bid_nonce', 'nonce'); ?>
+                                                                <button type="submit" class="button button-primary button-small">Award</button>
+                                                            </form>
+                                                        <?php elseif ($is_winner): ?>
+                                                            <span class="dashicons dashicons-awards" style="color: #28a745;"></span> <strong style="color: #28a745;">Winner</strong>
+                                                        <?php else: ?>
+                                                            <span style="color: #999;">Lost</span>
+                                                        <?php endif; ?>
+                                                    </td>
+                                                </tr>
+                                            <?php endforeach; ?>
+                                        </tbody>
+                                    </table>
+                                </div>
+                            </td>
+                        </tr>
+
                     <?php endforeach; ?>
                 <?php else : ?>
                     <tr>
-                        <td colspan="7">No bids found.</td>
+                        <td colspan="5">No projects with bids found.</td>
                     </tr>
                 <?php endif; ?>
             </tbody>

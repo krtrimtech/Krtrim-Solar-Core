@@ -65,7 +65,7 @@ get_header(); ?>
                         global $wpdb;
                         $bids_table = $wpdb->prefix . 'project_bids';
                         $open_bids = $wpdb->get_results($wpdb->prepare(
-                            "SELECT b.*, u.display_name FROM {$bids_table} b JOIN {$wpdb->users} u ON b.vendor_id = u.ID WHERE b.project_id = %d AND b.bid_type = 'open' ORDER BY b.created_at DESC",
+                            "SELECT b.*, u.display_name FROM {$bids_table} b JOIN {$wpdb->users} u ON b.vendor_id = u.ID WHERE b.project_id = %d AND (b.bid_type = 'open' OR b.bid_type IS NULL) ORDER BY b.created_at DESC",
                             $project_id
                         ));
 
