@@ -155,6 +155,9 @@ class KSC_Admin_Manager_API extends KSC_API_Base {
             if ($method === 'manual' && isset($data['assigned_vendor_id'])) {
                 update_post_meta($project_id, '_assigned_vendor_id', sanitize_text_field($data['assigned_vendor_id']));
                 update_post_meta($project_id, 'project_status', 'assigned');
+                
+                // Create default process steps (same as bidding flow)
+                $this->create_default_process_steps($project_id);
             }
         }
         
@@ -295,7 +298,7 @@ class KSC_Admin_Manager_API extends KSC_API_Base {
      * @param int $project_id
      * @return bool Success status
      */
-    private function create_default_process_steps($project_id) {
+    public function create_default_process_steps($project_id) {
         // Get default steps from template
         $default_steps = get_option('sp_default_process_steps', [
             'Site Visit',

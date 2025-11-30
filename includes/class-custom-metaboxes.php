@@ -302,6 +302,23 @@ class SP_Custom_Metaboxes {
                 update_post_meta( $post_id, $meta_key, sanitize_text_field( $_POST[ $field ] ) );
             }
         }
+        
+        // Auto-update project_status to 'assigned' when vendor is manually assigned
+        if (isset($_POST['vendor_assignment_method']) && $_POST['vendor_assignment_method'] === 'manual') {
+            if (isset($_POST['assigned_vendor_id']) && !empty($_POST['assigned_vendor_id']) && $_POST['assigned_vendor_id'] !== '-1') {
+                // Get current status
+                $current_status = get_post_meta($post_id, 'project_status', true);
+                
+                // Only auto-update if status is 'pending' (don't override manual status changes)
+                if ($current_status === 'pending' || empty($current_status)) {
+                    update_post_meta($post_id, 'project_status', 'assigned');
+                    
+                    // Create process steps using the same function as bidding flow
+                    $admin_api = new KSC_Admin_Manager_API();
+                    $admin_api->create_default_process_steps($post_id);
+                }
+            }
+        }
     }
 }
 
