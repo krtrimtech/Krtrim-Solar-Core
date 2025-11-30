@@ -21,7 +21,7 @@ class SP_Admin_Menus {
             'Vendor Approval',
             'manage_options',
             'vendor-approval',
-            'sp_render_vendor_approval_page',
+            [ $this, 'render_vendor_approval_page' ],
             'dashicons-businessperson',
             25
         );
@@ -32,7 +32,7 @@ class SP_Admin_Menus {
             'Team Analysis',
             'manage_options',
             'team-analysis',
-            'sp_render_team_analysis_page',
+            [ $this, 'render_team_analysis_page' ],
             'dashicons-chart-line',
             26
         );
@@ -43,7 +43,7 @@ class SP_Admin_Menus {
             'Leaderboard',
             'manage_options',
             'team-analysis',
-            'sp_render_team_analysis_page'
+            [ $this, 'render_team_analysis_page' ]
         );
 
         // Project Reviews Page
@@ -52,7 +52,7 @@ class SP_Admin_Menus {
             'Project Reviews',
             'edit_posts',
             'project-reviews',
-            'sp_render_project_reviews_page',
+            [ $this, 'render_project_reviews_page' ],
             'dashicons-visibility',
             27
         );
@@ -63,7 +63,7 @@ class SP_Admin_Menus {
             'Kritim Solar Core',
             'manage_options',
             'ksc-settings',
-            'sp_render_general_settings_page'
+            [ $this, 'render_general_settings_page' ]
         );
 
         // Bid Management Page (New)
@@ -73,7 +73,64 @@ class SP_Admin_Menus {
             'Bid Management',
             'manage_options',
             'bid-management',
-            'sp_render_bid_management_page'
+            [ $this, 'render_bid_management_page' ]
         );
+
+        // Process Step Template Page (New)
+        add_submenu_page(
+            'edit.php?post_type=solar_project',
+            'Process Step Template',
+            'Process Step Template',
+            'manage_options',
+            'process-step-template',
+            [ $this, 'render_process_step_template_page' ]
+        );
+        
+        // Debug Panel (Admin Only)
+        add_submenu_page(
+            'tools.php',
+            'Debug Panel',
+            'Debug Panel',
+            'manage_options',
+            'ksc-debug-panel',
+            [ $this, 'render_debug_panel' ]
+        );
+    }
+
+    public function render_vendor_approval_page() {
+        require_once plugin_dir_path( dirname( __FILE__ ) ) . 'admin/views/view-vendor-approval.php';
+        sp_render_vendor_approval_page();
+    }
+
+    public function render_team_analysis_page() {
+        require_once plugin_dir_path( dirname( __FILE__ ) ) . 'admin/views/view-team-analysis.php';
+        sp_render_team_analysis_page();
+    }
+
+    public function render_project_reviews_page() {
+        require_once plugin_dir_path( dirname( __FILE__ ) ) . 'admin/views/view-project-reviews.php';
+        sp_render_project_reviews_page();
+    }
+
+    public function render_general_settings_page() {
+        require_once plugin_dir_path( dirname( __FILE__ ) ) . 'admin/views/view-general-settings.php';
+        sp_render_general_settings_page();
+    }
+
+    public function render_bid_management_page() {
+        require_once plugin_dir_path( dirname( __FILE__ ) ) . 'admin/views/view-bid-management.php';
+        sp_render_bid_management_page();
+    }
+
+    public function render_process_step_template_page() {
+        require_once plugin_dir_path( dirname( __FILE__ ) ) . 'admin/views/view-process-step-template.php';
+        sp_render_process_step_template_page();
+    }
+    
+    /**
+     * Render debug panel page
+     */
+    public function render_debug_panel() {
+        require_once plugin_dir_path(dirname(__FILE__)) . '../admin/views/view-debug-panel.php';
     }
 }

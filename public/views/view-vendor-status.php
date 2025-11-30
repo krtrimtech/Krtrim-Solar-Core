@@ -279,5 +279,4 @@ function sp_vendor_status_dashboard_shortcode() {
     return ob_get_clean();
 }
 
-// Register shortcode
-add_shortcode('vendor_status_dashboard', 'sp_vendor_status_dashboard_shortcode');
+// Shortcode registration moved to unified-solar-dashboard.php to avoid duplicate registration

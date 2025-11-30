@@ -76,11 +76,15 @@ jQuery(document).ready(function ($) {
 
         spinner.show();
 
+        const coverageCheckbox = $('#coverage-only-filter');
+        const coverageOnly = coverageCheckbox.length ? coverageCheckbox.is(':checked') : false;
+
         const data = {
             action: 'filter_marketplace_projects',
             nonce: marketplace_vars.nonce,
             state: stateSelect.val(),
-            city: citySelect.val()
+            city: citySelect.val(),
+            coverage_only: coverageOnly ? '1' : '0'
         };
 
         console.log('📤 Sending AJAX request with data:', data);

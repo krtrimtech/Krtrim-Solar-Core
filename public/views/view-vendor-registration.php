@@ -78,4 +78,5 @@ function sp_vendor_registration_form_shortcode() {
     <?php
     return ob_get_clean();
 }
-add_shortcode('vendor_registration_form', 'sp_vendor_registration_form_shortcode');
+
+// Shortcode registration moved to unified-solar-dashboard.php to avoid duplicate registration

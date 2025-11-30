@@ -57,11 +57,17 @@ final class Krtrim_Solar_Core {
 		require_once $this->dir_path . 'includes/class-user-profile-fields.php';
 		require_once $this->dir_path . 'includes/class-process-steps-manager.php';
 		require_once $this->dir_path . 'includes/class-notifications-manager.php';
+		require_once $this->dir_path . 'includes/class-error-logger.php';
+		
+		// Admin view files (required by SP_Admin_Menus class)
 		require_once $this->dir_path . 'admin/views/view-vendor-approval.php';
 		require_once $this->dir_path . 'admin/views/view-project-reviews.php';
 		require_once $this->dir_path . 'admin/views/view-bid-management.php';
 		require_once $this->dir_path . 'admin/views/view-general-settings.php';
 		require_once $this->dir_path . 'admin/views/view-team-analysis.php';
+		require_once $this->dir_path . 'admin/views/view-process-step-template.php';
+		
+		// Public view files (for shortcodes)
 		require_once $this->dir_path . 'public/views/view-client-dashboard.php';
 		require_once $this->dir_path . 'public/views/view-vendor-dashboard.php';
 		require_once $this->dir_path . 'public/views/view-area-manager-dashboard.php';
@@ -73,11 +79,11 @@ final class Krtrim_Solar_Core {
 	private function init_hooks() {
 		new SP_Post_Types_Taxonomies();
 		new SP_Admin_Menus();
-		new SP_API_Handlers();
 		new SP_Admin_Widgets();
 		new SP_User_Profile_Fields();
 		new SP_Process_Steps_Manager();
 		new SP_Notifications_Manager();
+		new SP_API_Handlers(); // Must be AFTER Process Steps and Notifications managers
 
 		register_activation_hook( $this->file, [ $this, 'activate' ] );
 
@@ -89,8 +95,6 @@ final class Krtrim_Solar_Core {
 		add_shortcode( 'vendor_registration_form', 'sp_vendor_registration_form_shortcode' );
 		add_shortcode( 'solar_project_marketplace', 'sp_project_marketplace_shortcode' );
 		add_shortcode( 'vendor_status_dashboard', 'sp_vendor_status_dashboard_shortcode' );
-		
-		add_shortcode( 'solar_project_marketplace', 'sp_project_marketplace_shortcode' );
 		
 		add_filter( 'template_include', [ $this, 'template_include_single_project' ] );
 		add_filter( 'plugin_action_links_' . plugin_basename( $this->file ), [ $this, 'add_plugin_action_links' ] );
@@ -182,6 +186,11 @@ final class Krtrim_Solar_Core {
 
 	public function activate() {
 		sp_create_plugin_essentials();
+		
+		// Create error log table
+		require_once $this->dir_path . 'includes/class-error-logger.php';
+		KSC_Error_Logger::create_table();
+		
 		flush_rewrite_rules();
 	}
 
@@ -301,20 +310,21 @@ final class Krtrim_Solar_Core {
 			]);
 		}
 
-		
-		// TEMPORARY: Load marketplace JS on ALL pages to test
-		// TODO: Revert to conditional loading after testing
-		wp_enqueue_script('marketplace-js', $this->dir_url . 'assets/js/marketplace.js', ['jquery'], time(), true); // Using time() to prevent cache
-
-		$json_file = $this->dir_path . 'assets/data/indian-states-cities.json';
-		if (file_exists($json_file)) {
-			$states_cities = json_decode(file_get_contents($json_file), true);
+		// Load marketplace JS only on marketplace pages
+		global $post;
+		if ( is_a( $post, 'WP_Post' ) && ( has_shortcode( $post->post_content, 'solar_project_marketplace' ) || is_page( 'project-marketplace' ) ) ) {
+			wp_enqueue_script('marketplace-js', $this->dir_url . 'assets/js/marketplace.js', ['jquery'], $this->version, true);
 			
-			wp_localize_script('marketplace-js', 'marketplace_vars', [
-				'ajax_url' => admin_url('admin-ajax.php'),
-				'nonce' => wp_create_nonce('filter_projects_nonce'),
-				'states_cities' => isset($states_cities['states']) ? $states_cities['states'] : [],
-			]);
+			$json_file = $this->dir_path . 'assets/data/indian-states-cities.json';
+			if (file_exists($json_file)) {
+				$states_cities = json_decode(file_get_contents($json_file), true);
+				
+				wp_localize_script('marketplace-js', 'marketplace_vars', [
+					'ajax_url' => admin_url('admin-ajax.php'),
+					'nonce' => wp_create_nonce('filter_projects_nonce'),
+					'states_cities' => isset($states_cities['states']) ? $states_cities['states'] : [],
+				]);
+			}
 		}
 
 
@@ -338,8 +348,54 @@ final class Krtrim_Solar_Core {
 	}
 
 	public function enqueue_admin_scripts( $hook ) {
-		// Admin widgets already loaded above, skip duplicate
-		// wp_enqueue_style( 'ksc-admin-styles', $this->dir_url . 'assets/css/admin.css', [], $this->version );
+		// Enqueue admin styles
+		wp_enqueue_style( 'sp-admin-styles', $this->dir_url . 'assets/css/admin-styles.css', [], $this->version );
+
+		// Enqueue jQuery UI sortable for Process Step Template page
+		if ( isset($_GET['page']) && $_GET['page'] === 'process-step-template' ) {
+			wp_enqueue_script( 'jquery-ui-sortable' );
+		}
+
+		// Enqueue Chart.js for Team Analysis page
+		if ( $hook === 'toplevel_page_team-analysis' ) {
+			wp_enqueue_script(
+				'chartjs',
+				'https://cdn.jsdelivr.net/npm/chart.js@3.9.1/dist/chart.min.js',
+				[],
+				'3.9.1',
+				true
+			);
+		}
+
+		// Enqueue admin scripts for bid management
+		if ( $hook === 'solar_project_page_bid-management' ) {
+			wp_enqueue_script(
+				'sp-bid-management',
+				$this->dir_url . 'assets/js/bid-management.js',
+				[ 'jquery' ],
+				$this->version,
+				true
+			);
+			wp_localize_script(
+				'sp-bid-management',
+				'spBidManagement',
+				[
+					'ajaxurl' => admin_url( 'admin-ajax.php' ),
+					'nonce'   => wp_create_nonce( 'award_bid_nonce' ),
+				]
+			);
+		}
+
+		// Enqueue Project Reviews JS
+		if ( $hook === 'toplevel_page_project-reviews' ) {
+			wp_enqueue_script(
+				'sp-project-reviews',
+				$this->dir_url . 'assets/js/project-reviews.js',
+				[ 'jquery' ],
+				$this->version,
+				true
+			);
+		}
 		
 		// Only load admin.js if it exists
 		if ( file_exists( $this->dir_path . 'assets/js/admin.js' ) ) {

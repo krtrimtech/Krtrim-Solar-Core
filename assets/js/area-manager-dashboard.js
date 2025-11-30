@@ -451,20 +451,30 @@ if (typeof jQuery === 'undefined') {
             let html = '<div class="leads-grid">';
             projects.forEach(project => {
                 const statusClass = 'status-' + (project.status || 'pending');
+                const statusText = (project.status || 'pending').replace(/_/g, ' ').toUpperCase();
+                const totalCost = Number(project.total_cost || 0);
+                const paidAmount = Number(project.paid_amount || 0);
+                const balance = totalCost - paidAmount;
+
                 html += `
                     <div class="lead-card">
                         <div class="lead-card-header">
                             <h3 class="lead-card-title">${project.title}</h3>
-                            <span class="lead-card-status ${statusClass}">${project.status}</span>
+                            <span class="lead-card-status ${statusClass}">${statusText}</span>
                         </div>
                         <div class="lead-card-body">
-                            <div class="lead-info">📍 ${project.project_state || ''}, ${project.project_city || ''}</div>
+                            <div class="lead-info">📍 ${project.project_city || ''}, ${project.project_state || ''}</div>
                             <div class="lead-info">⚡ ${project.solar_system_size_kw || 0} kW</div>
-                            <div class="lead-info">💰 ₹${Number(project.total_cost || 0).toLocaleString()}</div>
+                            <div class="lead-info">💰 Total: ₹${totalCost.toLocaleString()}</div>
+                            <div class="lead-info">💵 Paid: ₹${paidAmount.toLocaleString()}</div>
+                            <div class="lead-info" style="font-weight: 600; color: ${balance > 0 ? '#ff9800' : '#4CAF50'}">
+                                💳 Balance: ₹${balance.toLocaleString()}
+                            </div>
+                            ${project.pending_submissions > 0 ? `<div class="lead-info" style="color: #ff9800;">🟡 ${project.pending_submissions} pending review(s)</div>` : ''}
                         </div>
                         <div class="lead-card-actions">
                             <button class="action-btn action-btn-primary view-project-details" data-id="${project.id}">👁️ View</button>
-                            <button class="action-btn action-btn-danger delete-project" data-id="${project.id}">🗑️ Delete</button>
+                            <button class="action-btn action-btn-secondary edit-project" data-id="${project.id}">✏️ Edit</button>
                         </div>
                     </div>
                 `;
@@ -569,6 +579,13 @@ if (typeof jQuery === 'undefined') {
             } else {
                 console.error('openProjectModal function not found');
             }
+        });
+
+        // Edit Project - Redirect to WordPress Admin
+        $(document).on('click', '.edit-project', function () {
+            const projectId = $(this).data('id');
+            // Redirect to WordPress admin edit page
+            window.location.href = ajaxUrl.replace('admin-ajax.php', 'post.php?post=' + projectId + '&action=edit');
         });
 
         // --- Load Reviews ---
@@ -689,53 +706,7 @@ if (typeof jQuery === 'undefined') {
             }
         });
 
-        // --- Create Project ---
-        $('#create-project-form').on('submit', function (e) {
-            e.preventDefault();
-            const form = $(this);
-            const feedback = $('#create-project-feedback');
-
-            $.ajax({
-                url: ajaxUrl,
-                type: 'POST',
-                data: {
-                    action: 'create_solar_project',
-                    sp_create_project_nonce: createProjectNonce,
-                    project_title: $('#project_title').val(),
-                    project_state: $('#project_state').val(),
-                    project_city: $('#project_city').val(),
-                    project_status: $('#project_status').val(),
-                    client_user_id: $('#client_user_id').val(),
-                    solar_system_size_kw: $('#solar_system_size_kw').val(),
-                    client_address: $('#client_address').val(),
-                    client_phone_number: $('#client_phone_number').val(),
-                    project_start_date: $('#project_start_date').val(),
-                    project_start_date: $('#project_start_date').val(),
-                    project_start_date: $('#project_start_date').val(),
-                    vendor_assignment_method: $('input[name="vendor_assignment_method"]:checked').val(),
-                    assigned_vendor_id: $('#assigned_vendor_id').val(),
-                    paid_to_vendor: $('#paid_to_vendor').val(),
-                },
-                beforeSend: function () {
-                    form.find('button').prop('disabled', true).text('Creating...');
-                    feedback.text('').removeClass('text-success text-danger');
-                },
-                success: function (response) {
-                    if (response.success) {
-                        showToast(response.data.message, 'success');
-                        form[0].reset();
-                        setTimeout(() => {
-                            $('.nav-item[data-section="projects"]').click();
-                        }, 1500);
-                    } else {
-                        feedback.text(response.data.message).addClass('text-danger');
-                    }
-                },
-                complete: function () {
-                    form.find('button').prop('disabled', false).text('Create Project');
-                }
-            });
-        });
+        // --- Create Project --- (Duplicate removed, see complete handler at line ~1523)
 
         // --- Lead Management ---
         function loadLeads() {
@@ -1542,6 +1513,7 @@ if (typeof jQuery === 'undefined') {
                     client_phone_number: $('#client_phone_number').val(),
                     project_start_date: $('#project_start_date').val(),
                     total_project_cost: $('#total_project_cost').val(),
+                    paid_amount: $('#paid_amount').val(),
                     vendor_assignment_method: $('input[name="vendor_assignment_method"]:checked').val(),
                     assigned_vendor_id: $('#assigned_vendor_id').val(),
                     paid_to_vendor: $('#paid_to_vendor').val(),
@@ -2019,6 +1991,225 @@ if (typeof jQuery === 'undefined') {
                     form.find('button').prop('disabled', false).text('Reset Password');
                 }
             });
+        });
+
+        // --- Open Project Modal ---
+        window.openProjectModal = function (projectId) {
+            console.log('Opening project modal for ID:', projectId);
+            const modal = $('#projectDetailModal');
+            const modalBody = modal.find('.modal-body');
+
+            // Show modal with loading state
+            modal.show();
+            $('#modalProjectTitle').text('Loading...');
+            $('#modalProjectInfo').html('<p>Loading details...</p>');
+            $('#modalClientInfo').html('');
+            $('#modalVendorInfo').html('');
+            $('#modalProgressSteps').html('');
+
+            $.ajax({
+                url: ajaxUrl,
+                type: 'POST',
+                data: {
+                    action: 'get_area_manager_project_details',
+                    nonce: projectDetailsNonce,
+                    project_id: projectId,
+                },
+                success: function (response) {
+                    if (response.success) {
+                        const data = response.data;
+                        $('#modalProjectTitle').text(data.title);
+
+                        let html = '';
+
+                        // Client Information Card
+                        html += `
+                            <div class="info-card client-info-card">
+                                <h3>👤 Client Information</h3>
+                                <div class="info-grid">
+                                    <div class="info-row">
+                                        <span class="info-label">Name:</span>
+                                        <span class="info-value">${data.client.name}</span>
+                                    </div>
+                                    <div class="info-row">
+                                        <span class="info-label">Email:</span>
+                                        <span class="info-value"><a href="mailto:${data.client.email}">${data.client.email}</a></span>
+                                    </div>
+                                    <div class="info-row">
+                                        <span class="info-label">Phone:</span>
+                                        <span class="info-value">${data.client.phone ? `<a href="tel:${data.client.phone}">${data.client.phone}</a>` : 'N/A'}</span>
+                                    </div>
+                                    <div class="info-row">
+                                        <span class="info-label">Address:</span>
+                                        <span class="info-value">${data.client.address || 'N/A'}</span>
+                                    </div>
+                                </div>
+                            </div>
+                        `;
+
+                        // Vendor Information Card (if assigned)
+                        if (data.vendor.id) {
+                            html += `
+                                <div class="info-card vendor-info-card">
+                                    <h3>🏢 Assigned Vendor</h3>
+                                    <div class="info-grid">
+                                        <div class="info-row">
+                                            <span class="info-label">Name:</span>
+                                            <span class="info-value">${data.vendor.name}</span>
+                                        </div>
+                                        <div class="info-row">
+                                            <span class="info-label">Email:</span>
+                                            <span class="info-value"><a href="mailto:${data.vendor.email}">${data.vendor.email}</a></span>
+                                        </div>
+                                        <div class="info-row">
+                                            <span class="info-label">Phone:</span>
+                                            <span class="info-value">${data.vendor.phone ? `<a href="tel:${data.vendor.phone}">${data.vendor.phone}</a>` : 'N/A'}</span>
+                                        </div>
+                                        <div class="info-row">
+                                            <span class="info-label">Company:</span>
+                                            <span class="info-value">${data.vendor.company || 'N/A'}</span>
+                                        </div>
+                                        <div class="info-row">
+                                            <span class="info-label">Method:</span>
+                                            <span class="info-value">${data.vendor.assignment_method || 'N/A'}</span>
+                                        </div>
+                                    </div>
+                                </div>
+                            `;
+                        }
+
+                        // Project Overview Card
+                        html += `
+                            <div class="info-card project-overview-card">
+                                <h3>📋 Project Overview</h3>
+                                <div class="info-grid">
+                                    <div class="info-row">
+                                        <span class="info-label">Location:</span>
+                                        <span class="info-value">${data.project_city}, ${data.project_state}</span>
+                                    </div>
+                                    <div class="info-row">
+                                        <span class="info-label">System Size:</span>
+                                        <span class="info-value">${data.solar_system_size_kw} kW</span>
+                                    </div>
+                                    <div class="info-row">
+                                        <span class="info-label">Status:</span>
+                                        <span class="info-value"><span class="status-badge status-${data.status}">${data.status}</span></span>
+                                    </div>
+                                    <div class="info-row">
+                                        <span class="info-label">Start Date:</span>
+                                        <span class="info-value">${data.project_start_date || 'N/A'}</span>
+                                    </div>
+                                </div>
+                                ${data.description ? `<div class="project-description"><strong>Description:</strong><br>${data.description}</div>` : ''}
+                            </div>
+                        `;
+
+                        // Financial Summary Card
+                        html += `
+                            <div class="info-card financial-card">
+                                <h3>💰 Financial Summary</h3>
+                                <div class="financial-summary-grid">
+                                    <div class="financial-item">
+                                        <div class="financial-label">Total Cost</div>
+                                        <div class="financial-value">₹${Number(data.financial.total_cost || 0).toLocaleString()}</div>
+                                    </div>
+                                    <div class="financial-item">
+                                        <div class="financial-label">Paid by Client</div>
+                                        <div class="financial-value">₹${Number(data.financial.paid_amount || 0).toLocaleString()}</div>
+                                    </div>
+                                    <div class="financial-item">
+                                        <div class="financial-label">Balance Due</div>
+                                        <div class="financial-value">₹${Number(data.financial.balance_due || 0).toLocaleString()}</div>
+                                    </div>
+                                </div>
+                            </div>
+                        `;
+
+                        // Complete Process Steps Overview
+                        html += `
+                            <div class="info-card steps-card">
+                                <h3>📋 Process Steps</h3>
+                                <div class="progress-bar-wrapper">
+                                    <div class="progress-bar-fill" style="width: ${data.steps_progress.percentage}%"></div>
+                                </div>
+                                <p class="progress-text">${data.steps_progress.approved} of ${data.steps_progress.total} steps approved (${data.steps_progress.percentage}%)</p>
+                                
+                                <div class="steps-list">
+                        `;
+
+                        if (data.all_steps && data.all_steps.length > 0) {
+                            data.all_steps.forEach(step => {
+                                html += `
+                                    <div class="step-item-enhanced status-${step.admin_status}">
+                                        <div class="step-number-badge">${step.step_number}</div>
+                                        <div class="step-details">
+                                            <div class="step-name">${step.step_name}</div>
+                                            <div class="step-meta">
+                                                ${step.image_url ? '📸 Submitted' : '⏳ Not submitted yet'}
+                                            </div>
+                                        </div>
+                                        <span class="step-status-badge ${step.admin_status}">
+                                            ${step.admin_status}
+                                        </span>
+                                    </div>
+                                `;
+                            });
+                        } else {
+                            html += '<p>No steps found.</p>';
+                        }
+
+                        html += `
+                                </div>
+                            </div>
+                        `;
+
+                        // Bids Section (if any)
+                        if (data.bids && data.bids.length > 0) {
+                            html += `
+                                <div class="info-card bids-card">
+                                    <h3>💼 Bids Received</h3>
+                                    <div class="bids-list">
+                            `;
+                            data.bids.forEach(bid => {
+                                html += `
+                                    <div class="bid-item">
+                                        <div><strong>${bid.vendor_name}</strong></div>
+                                        <div>Amount: ₹${Number(bid.bid_amount).toLocaleString()}</div>
+                                        <div>Status: <span class="badge">${bid.status}</span></div>
+                                    </div>
+                                `;
+                            });
+                            html += `
+                                    </div>
+                                </div>
+                            `;
+                        }
+
+                        $('#modalProjectInfo').html(html);
+                        $('#modalClientInfo').html('');
+                        $('#modalVendorInfo').html('');
+                        $('#modalProgressSteps').html('');
+
+                    } else {
+                        $('#modalProjectInfo').html(`<p class="text-danger">${response.data.message}</p>`);
+                    }
+                },
+                error: function () {
+                    $('#modalProjectInfo').html('<p class="text-danger">Failed to load project details.</p>');
+                }
+            });
+        };
+
+        // Close Modal Handler
+        $('.modal-close').on('click', function () {
+            $('#projectDetailModal').hide();
+        });
+
+        // Close modal when clicking outside
+        $(window).on('click', function (event) {
+            if ($(event.target).is('#projectDetailModal')) {
+                $('#projectDetailModal').hide();
+            }
         });
 
     });

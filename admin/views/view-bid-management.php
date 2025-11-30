@@ -171,3 +171,5 @@ function sp_render_bid_management_page() {
     </div>
     <?php
 }
+
+

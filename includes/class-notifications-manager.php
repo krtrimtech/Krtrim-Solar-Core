@@ -163,12 +163,36 @@ class SP_Notifications_Manager {
 
     public function handle_step_review($step_id, $project_id, $decision) {
         $project = get_post($project_id);
-        $step = get_post($step_id); // This is not correct, need to get step from db
         global $wpdb;
         $table = $wpdb->prefix . 'solar_process_steps';
         $step_data = $wpdb->get_row($wpdb->prepare("SELECT * FROM {$table} WHERE id = %d", $step_id));
 
+        if (!$step_data) return;
 
+        // 1. Notify Vendor (Project Author or Assigned Vendor)
+        $vendor_id = get_post_meta($project_id, '_assigned_vendor_id', true);
+        if ($vendor_id) {
+            $vendor_message = sprintf(
+                'Your step "%s" for project "%s" has been %s.',
+                $step_data->step_name,
+                $project->post_title,
+                $decision
+            );
+            
+            // Add reason if rejected
+            if ($decision === 'rejected' && !empty($step_data->admin_comment)) {
+                $vendor_message .= ' Reason: ' . $step_data->admin_comment;
+            }
+
+            self::create_notification([
+                'user_id' => $vendor_id,
+                'project_id' => $project_id,
+                'message' => $vendor_message,
+                'type' => 'step_' . $decision, // step_approved or step_rejected
+            ]);
+        }
+
+        // 2. Notify Client (Only on Approval)
         if ($decision === 'approved') {
             $client_id = get_post_meta($project_id, '_client_user_id', true);
             if ($client_id) {
