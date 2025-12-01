@@ -103,6 +103,10 @@ final class Krtrim_Solar_Core {
         add_filter( 'login_redirect', [ $this, 'custom_login_redirect' ], 10, 3 );
         add_action( 'admin_init', [ $this, 'restrict_wp_admin_access' ] );
         add_filter( 'logout_redirect', [ $this, 'custom_logout_redirect' ] );
+        
+        // Default featured image for solar projects (works everywhere including Elementor)
+        add_filter( 'post_thumbnail_html', [ $this, 'default_project_thumbnail_html' ], 10, 5 );
+        add_filter( 'post_thumbnail_url', [ $this, 'default_project_thumbnail_url' ], 10, 3 );
 	}
 
     /**
@@ -176,6 +180,46 @@ final class Krtrim_Solar_Core {
      */
     public function custom_logout_redirect() {
         return wp_login_url();
+    }
+
+    /**
+     * Provide default featured image HTML for solar projects when no featured image is set
+     * Works everywhere: Elementor loops, archives, standard templates
+     */
+    public function default_project_thumbnail_html( $html, $post_id, $post_thumbnail_id, $size, $attr ) {
+        if ( get_post_type( $post_id ) === 'solar_project' && empty( $html ) ) {
+            $default_image = get_option( 'ksc_default_project_image', '' );
+            $default_url = $default_image ?: 'https://via.placeholder.com/400x250/667eea/ffffff?text=Solar+Project';
+            
+            $attr_string = '';
+            if ( is_array( $attr ) ) {
+                foreach ( $attr as $name => $value ) {
+                    $attr_string .= sprintf( ' %s="%s"', esc_attr( $name ), esc_attr( $value ) );
+                }
+            }
+            
+            $html = sprintf(
+                '<img src="%s" alt="%s" class="attachment-%s size-%s wp-post-image"%s>',
+                esc_url( $default_url ),
+                esc_attr( get_the_title( $post_id ) ),
+                esc_attr( $size ),
+                esc_attr( $size ),
+                $attr_string
+            );
+        }
+        return $html;
+    }
+
+    /**
+     * Provide default featured image URL for solar projects when no featured image is set
+     * Works everywhere: Elementor loops, get_the_post_thumbnail_url(), etc.
+     */
+    public function default_project_thumbnail_url( $url, $post_id, $size ) {
+        if ( get_post_type( $post_id ) === 'solar_project' && empty( $url ) ) {
+            $default_image = get_option( 'ksc_default_project_image', '' );
+            $url = $default_image ?: 'https://via.placeholder.com/400x250/667eea/ffffff?text=Solar+Project';
+        }
+        return $url;
     }
 
 	public function add_plugin_action_links( $links ) {
@@ -254,6 +298,7 @@ final class Krtrim_Solar_Core {
 			wp_localize_script('area-manager-dashboard-js', 'sp_area_dashboard_vars', [
 				'ajax_url' => admin_url('admin-ajax.php'),
 				'create_project_nonce' => wp_create_nonce('sp_create_project_nonce_field'),
+				'update_project_nonce' => wp_create_nonce('sp_update_project_nonce'),
 				'project_details_nonce' => wp_create_nonce('sp_project_details_nonce'),
 				'review_submission_nonce' => wp_create_nonce('sp_review_nonce'),
 				'award_bid_nonce' => wp_create_nonce('award_bid_nonce'),

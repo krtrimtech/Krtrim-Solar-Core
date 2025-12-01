@@ -1,4 +1,4 @@
-# Kritim Solar Core
+# Krtrim Solar Core
 
 This plugin provides a comprehensive project management and bidding platform for solar companies. It creates a unified dashboard for "Solar Clients", "Solar Vendors", and "Area Managers".
 
@@ -28,7 +28,7 @@ This plugin provides a comprehensive project management and bidding platform for
 ## How to Use
 
 1.  **Install the plugin:** Upload the plugin files to your `/wp-content/plugins/` directory, or install as a zip file through the WordPress admin panel.
-2.  **Activate the plugin:** Activate the "Kritim Solar Core" plugin through the 'Plugins' menu in WordPress.
+2.  **Activate the plugin:** Activate the "Krtrim Solar Core" plugin through the 'Plugins' menu in WordPress.
 3.  **Shortcodes:** The plugin automatically creates the necessary pages with the following shortcodes:
     *   `[unified_solar_dashboard]` on the "Dashboard" page.
     *   `[area_manager_dashboard]` on the "Area Manager Dashboard" page.

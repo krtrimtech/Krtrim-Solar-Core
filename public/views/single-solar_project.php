@@ -117,7 +117,7 @@ get_header(); ?>
                                 <div id="bid-form-feedback" style="display:none; margin-top:15px;"></div>
                             </form>
                         <?php else: ?>
-                            <div class="vendor-registration-notice" style="text-align: center; padding: 40px 20px; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); border-radius: 12px; color: white;">
+                            <div class="vendor-egistration-notice" style="text-align: center; padding: 40px 20px; background: linear-gradient(135deg, #5e495f 0%, #f39b2f 100%); border-radius: 12px; color: white;">
                                 <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="margin: 0 auto 20px;">
                                     <path d="M12 2L2 7l10 5 10-5-10-5z"></path>
                                     <path d="M2 17l10 5 10-5M2 12l10 5 10-5"></path>
@@ -256,7 +256,7 @@ get_header(); ?>
                     <div style="text-align: center;">
                         <a href="<?php echo home_url('/project-marketplace/?filter_city=' . urlencode($project_city) . '&filter_state=' . urlencode($project_state)); ?>" 
                            class="see-more-btn" 
-                           style="display: inline-flex; align-items: center; gap: 10px; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; padding: 14px 32px; border-radius: 10px; text-decoration: none; font-weight: 600; font-size: 16px; transition: all 0.3s ease;">
+                           style="display: inline-flex; align-items: center; gap: 10px; background: linear-gradient(135deg, #667eea 0%, #03162e 100%); color: white; padding: 14px 32px; border-radius: 10px; text-decoration: none; font-weight: 600; font-size: 16px; transition: all 0.3s ease;">
                             See All Projects in <?php echo esc_html($project_city); ?>
                             <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                                 <line x1="5" y1="12" x2="19" y2="12"></line>
@@ -402,153 +402,6 @@ get_header(); ?>
     color: #721c24;
 }
 
-/* Beautiful Project Cards for Related Projects */
-.project-card {
-    background: #ffffff;
-    border-radius: 16px;
-    overflow: hidden;
-    box-shadow: 0 8px 16px rgba(0, 0, 0, 0.08);
-    transition: all 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
-    position: relative;
-}
-.project-card::before {
-    content: '';
-    position: absolute;
-    top: 0;
-    left: 0;
-    right: 0;
-    height: 4px;
-    background: linear-gradient(90deg, #667eea 0%, #764ba2 100%);
-    transform: scaleX(0);
-    transform-origin: left;
-    transition: transform 0.4s ease;
-}
-.project-card:hover::before {
-    transform: scaleX(1);
-}
-.project-card:hover {
-    transform: translateY(-8px) scale(1.02);
-    box-shadow: 0 16px 32px rgba(102, 126, 234, 0.2);
-}
-.project-card-image {
-    position: relative;
-    height: 220px;
-    overflow: hidden;
-    background: linear-gradient(135deg, #667eea 0%, #764ba2 50%, #f093fb 100%);
-}
-.project-card-image img {
-    width: 100%;
-    height: 100%;
-    object-fit: cover;
-    transition: transform 0.6s cubic-bezier(0.175, 0.885, 0.32, 1.275);
-}
-.project-card:hover .project-card-image img {
-    transform: scale(1.1) rotate(2deg);
-}
-.project-card-badge {
-    position: absolute;
-    top: 16px;
-    right: 16px;
-    background: rgba(255, 255, 255, 0.98);
-    backdrop-filter: blur(10px);
-    color: #667eea;
-    padding: 8px 16px;
-    border-radius: 24px;
-    font-size: 13px;
-    font-weight: 700;
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
-    animation: pulse 2s infinite;
-}
-@keyframes pulse {
-    0%, 100% { transform: scale(1); }
-    50% { transform: scale(1.05); }
-}
-.project-card-badge svg {
-    animation: spin 4s linear infinite;
-}
-@keyframes spin {
-    from { transform: rotate(0deg); }
-    to { transform: rotate(360deg); }
-}
-.project-card-content {
-    padding: 24px;
-}
-.project-card-title {
-    font-size: 20px;
-    font-weight: 700;
-    color: #1a202c;
-    margin: 0 0 18px 0;
-    line-height: 1.4;
-    display: -webkit-box;
-    -webkit-line-clamp: 2;
-    -webkit-box-orient: vertical;
-    overflow: hidden;
-}
-.project-card-details {
-    display: flex;
-    flex-direction: column;
-    gap: 12px;
-    margin-bottom: 24px;
-}
-.project-detail-item {
-    display: flex;
-    align-items: center;
-    gap: 10px;
-    color: #4a5568;
-    font-size: 14px;
-    padding: 8px 12px;
-    background: #f7fafc;
-    border-radius: 8px;
-    transition: all 0.3s ease;
-}
-.project-detail-item:hover {
-    background: #edf2f7;
-    transform: translateX(4px);
-}
-.project-detail-item svg {
-    color: #667eea;
-    flex-shrink: 0;
-}
-.project-card-btn {
-    display: inline-flex;
-    align-items: center;
-    gap: 10px;
-    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-    color: #ffffff;
-    padding: 14px 28px;
-    border-radius: 10px;
-    text-decoration: none;
-    font-weight: 700;
-    font-size: 15px;
-    transition: all 0.3s ease;
-    width: 100%;
-    justify-content: center;
-    box-shadow: 0 4px 12px rgba(102, 126, 234, 0.3);
-}
-.project-card-btn:hover {
-    background: linear-gradient(135deg, #764ba2 0%, #667eea 100%);
-    transform: translateY(-2px);
-    box-shadow: 0 6px 20px rgba(102, 126, 234, 0.4);
-    color: #ffffff;
-}
-.project-card-btn svg {
-    transition: transform 0.3s ease;
-}
-.project-card-btn:hover svg {
-    transform: translateX(6px);
-}
-
-/* Related Projects Grid */
-.related-projects-grid {
-    display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
-    gap: 28px;
-    margin-bottom: 40px;
-}
-
 /* See More Button Hover Effect */
 .see-more-btn:hover {
     transform: translateY(-3px) scale(1.05);
@@ -568,9 +421,6 @@ get_header(); ?>
 }
 
 @media (max-width: 768px) {
-    .related-projects-grid {
-        grid-template-columns: 1fr;
-    }
     .project-details-grid {
         grid-template-columns: 1fr;
     }

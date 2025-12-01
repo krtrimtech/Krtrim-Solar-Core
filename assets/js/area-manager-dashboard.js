@@ -585,11 +585,168 @@
         }
     });
 
-    // Edit Project - Redirect to WordPress Admin
+    // Edit Project - Open Modal
     $(document).on('click', '.edit-project', function () {
         const projectId = $(this).data('id');
-        // Redirect to WordPress admin edit page
-        window.location.href = ajaxUrl.replace('admin-ajax.php', 'post.php?post=' + projectId + '&action=edit');
+        openEditProjectModal(projectId);
+    });
+
+    // Open Edit Modal and Load Project Data
+    function openEditProjectModal(projectId) {
+        console.log('Opening edit modal for project:', projectId);
+
+        // Show modal with loading state
+        $('#edit-project-modal').show();
+        $('#edit-project-feedback').text('Loading project data...').removeClass('text-danger text-success');
+
+        // Fetch project details
+        $.ajax({
+            url: ajaxUrl,
+            type: 'POST',
+            data: {
+                action: 'get_area_manager_project_details',
+                nonce: projectDetailsNonce,
+                project_id: projectId,
+            },
+            success: function (response) {
+                if (response.success) {
+                    populateEditForm(response.data, projectId);
+                    $('#edit-project-feedback').text('');
+                } else {
+                    $('#edit-project-feedback').text('Error: ' + response.data.message).addClass('text-danger');
+                }
+            },
+            error: function (xhr, status, error) {
+                console.error('Error fetching project:', error);
+                $('#edit-project-feedback').text('Failed to load project data').addClass('text-danger');
+            }
+        });
+    }
+
+    // Populate Edit Form with Project Data
+    function populateEditForm(data, projectId) {
+        const project = data.project;
+        const meta = data.meta;
+
+        console.log('Populating form with data:', data);
+
+        // Set project ID
+        $('#edit_project_id').val(projectId);
+
+        // Set basic fields
+        $('#edit_project_title').val(project.title || '');
+        $('#edit_project_description').val(project.description || '');
+
+        // Set meta fields
+        $('#edit_project_state').val(meta.project_state || '');
+        $('#edit_solar_system_size_kw').val(meta.solar_system_size_kw || '');
+        $('#edit_client_address').val(meta.client_address || '');
+        $('#edit_client_phone_number').val(meta.client_phone_number || '');
+        $('#edit_project_start_date').val(meta.project_start_date || '');
+        $('#edit_total_project_cost').val(meta.total_project_cost || '');
+        $('#edit_paid_amount').val(meta.paid_amount || '');
+        $('#edit_project_status').val(meta.project_status || 'pending');
+        $('#edit_client_user_id').val(meta.client_user_id || '');
+
+        // Trigger state change to populate cities
+        if (meta.project_state) {
+            $('#edit_project_state').trigger('change');
+            // Set city after cities are loaded
+            setTimeout(() => {
+                $('#edit_project_city').val(meta.project_city || '');
+            }, 100);
+        }
+
+        // Set vendor assignment method
+        const vendorMethod = meta.vendor_assignment_method || 'bidding';
+        if (vendorMethod === 'manual') {
+            $('#edit_vendor_manual').prop('checked', true);
+            $('.edit-vendor-manual-fields').show();
+            $('#edit_assigned_vendor_id').val(meta.assigned_vendor_id || '');
+            $('#edit_paid_to_vendor').val(meta.vendor_paid_amount || '');
+        } else {
+            $('#edit_vendor_bidding').prop('checked', true);
+            $('.edit-vendor-manual-fields').hide();
+        }
+    }
+
+    // Handle vendor assignment method toggle in edit form
+    $(document).on('change', '.edit-vendor-method', function () {
+        if ($(this).val() === 'manual') {
+            $('.edit-vendor-manual-fields').show();
+        } else {
+            $('.edit-vendor-manual-fields').hide();
+        }
+    });
+
+    // Handle edit form submission
+    $('#edit-project-form').on('submit', function (e) {
+        e.preventDefault();
+        const form = $(this);
+        const feedback = $('#edit-project-feedback');
+
+        $.ajax({
+            url: ajaxUrl,
+            type: 'POST',
+            data: {
+                action: 'update_solar_project',
+                sp_update_project_nonce: sp_area_dashboard_vars.update_project_nonce,
+                project_id: $('#edit_project_id').val(),
+                project_title: $('#edit_project_title').val(),
+                project_description: $('#edit_project_description').val(),
+                project_state: $('#edit_project_state').val(),
+                project_city: $('#edit_project_city').val(),
+                project_status: $('#edit_project_status').val(),
+                client_user_id: $('#edit_client_user_id').val(),
+                solar_system_size_kw: $('#edit_solar_system_size_kw').val(),
+                client_address: $('#edit_client_address').val(),
+                client_phone_number: $('#edit_client_phone_number').val(),
+                project_start_date: $('#edit_project_start_date').val(),
+                total_project_cost: $('#edit_total_project_cost').val(),
+                paid_amount: $('#edit_paid_amount').val(),
+                vendor_assignment_method: $('input[name="vendor_assignment_method"]:checked').val(),
+                assigned_vendor_id: $('#edit_assigned_vendor_id').val(),
+                paid_to_vendor: $('#edit_paid_to_vendor').val(),
+            },
+            beforeSend: function () {
+                form.find('button[type="submit"]').prop('disabled', true).text('Updating...');
+                feedback.text('').removeClass('text-success text-danger');
+            },
+            success: function (response) {
+                if (response.success) {
+                    showToast(response.data.message, 'success');
+                    feedback.text(response.data.message).addClass('text-success');
+                    // Close modal and refresh projects after 1 second
+                    setTimeout(() => {
+                        $('#edit-project-modal').hide();
+                        loadProjects(); // Refresh project list
+                    }, 1000);
+                } else {
+                    feedback.text(response.data.message || 'Error updating project').addClass('text-danger');
+                    showToast(response.data.message || 'Error updating project', 'error');
+                }
+            },
+            error: function (xhr, status, error) {
+                console.error('Project update error:', error, xhr.responseText);
+                feedback.text('AJAX error: ' + error).addClass('text-danger');
+                showToast('Failed to update project. Check console.', 'error');
+            },
+            complete: function () {
+                form.find('button[type="submit"]').prop('disabled', false).text('Update Project');
+            }
+        });
+    });
+
+    // Close edit modal handlers
+    $(document).on('click', '.edit-modal-close', function () {
+        $('#edit-project-modal').hide();
+    });
+
+    // Close modal on outside click
+    $(window).on('click', function (event) {
+        if ($(event.target).is('#edit-project-modal')) {
+            $('#edit-project-modal').hide();
+        }
     });
 
     // --- Load Reviews ---

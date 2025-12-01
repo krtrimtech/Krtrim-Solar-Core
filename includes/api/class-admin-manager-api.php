@@ -22,6 +22,7 @@ class KSC_Admin_Manager_API extends KSC_API_Base {
         
         // Project management
         add_action('wp_ajax_create_solar_project', [$this, 'create_solar_project']);
+        add_action('wp_ajax_update_solar_project', [$this, 'update_solar_project']);
         add_action('wp_ajax_get_area_manager_projects', [$this, 'get_area_manager_projects']);
         add_action('wp_ajax_get_area_manager_project_details', [$this, 'get_area_manager_project_details']);
         
@@ -220,6 +221,96 @@ class KSC_Admin_Manager_API extends KSC_API_Base {
         }
         
         wp_send_json_success(['message' => 'Project created successfully!', 'project_id' => $project_id]);
+    }
+
+    /**
+     * Update solar project
+     */
+    public function update_solar_project() {
+        check_ajax_referer('sp_update_project_nonce', 'sp_update_project_nonce');
+        
+        $manager = $this->verify_area_manager_role();
+        $data = $_POST;
+        
+        $project_id = isset($data['project_id']) ? intval($data['project_id']) : 0;
+        
+        if (!$project_id) {
+            wp_send_json_error(['message' => 'Project ID is required']);
+        }
+        
+        // Verify project exists and belongs to this manager
+        $project = get_post($project_id);
+        if (!$project || $project->post_type !== 'solar_project') {
+            wp_send_json_error(['message' => 'Invalid project']);
+        }
+        
+        if ($project->post_author != $manager->ID) {
+            wp_send_json_error(['message' => 'You do not have permission to edit this project']);
+        }
+        
+        // Update post data
+        $project_data = [
+            'ID' => $project_id,
+            'post_title' => sanitize_text_field($data['project_title']),
+            'post_content' => isset($data['project_description']) ? wp_kses_post($data['project_description']) : '',
+        ];
+        
+        $updated = wp_update_post($project_data);
+        
+        if (is_wp_error($updated)) {
+            wp_send_json_error(['message' => 'Could not update project: ' . $updated->get_error_message()]);
+        }
+        
+        // Update meta fields
+        $fields = [
+            'project_state', 'project_city', 'project_status', 'client_user_id',
+            'solar_system_size_kw', 'client_address', 'client_phone_number',
+            'project_start_date', 'paid_amount', 'vendor_assignment_method'
+        ];
+        
+        foreach ($fields as $field) {
+            if (isset($data[$field])) {
+                update_post_meta($project_id, '_' . $field, sanitize_text_field($data[$field]));
+            }
+        }
+        
+        // Financial data
+        if (isset($data['total_project_cost'])) {
+            $total_cost = floatval($data['total_project_cost']);
+            update_post_meta($project_id, '_total_project_cost', $total_cost);
+            
+            // Recalculate profit if vendor payment exists
+            $vendor_paid = floatval(get_post_meta($project_id, '_vendor_paid_amount', true));
+            if ($vendor_paid > 0) {
+                $profit = $total_cost - $vendor_paid;
+                $margin = $total_cost > 0 ? ($profit / $total_cost) * 100 : 0;
+                update_post_meta($project_id, '_company_profit', $profit);
+                update_post_meta($project_id, '_profit_margin_percentage', $margin);
+            }
+        }
+        
+        // Update vendor assignment if changed
+        if (isset($data['vendor_assignment_method'])) {
+            $method = sanitize_text_field($data['vendor_assignment_method']);
+            update_post_meta($project_id, '_vendor_assignment_method', $method);
+            
+            if ($method === 'manual' && isset($data['assigned_vendor_id'])) {
+                update_post_meta($project_id, '_assigned_vendor_id', sanitize_text_field($data['assigned_vendor_id']));
+                
+                if (isset($data['paid_to_vendor']) && !empty($data['paid_to_vendor'])) {
+                    $vendor_paid = floatval($data['paid_to_vendor']);
+                    update_post_meta($project_id, '_vendor_paid_amount', $vendor_paid);
+                    
+                    $total_cost = floatval(get_post_meta($project_id, '_total_project_cost', true));
+                    $profit = $total_cost - $vendor_paid;
+                    $margin = $total_cost > 0 ? ($profit / $total_cost) * 100 : 0;
+                    update_post_meta($project_id, '_company_profit', $profit);
+                    update_post_meta($project_id, '_profit_margin_percentage', $margin);
+                }
+            }
+        }
+        
+        wp_send_json_success(['message' => 'Project updated successfully!', 'project_id' => $project_id]);
     }
     
     /**

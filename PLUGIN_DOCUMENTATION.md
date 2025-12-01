@@ -1,4 +1,4 @@
-# Kritim Solar Core Plugin - Complete Documentation
+# Krtrim Solar Core Plugin - Complete Documentation
 
 ## 📋 Table of Contents
 1. [Plugin Overview](#plugin-overview)
@@ -16,7 +16,7 @@
 
 ## 🎯 Plugin Overview
 
-**Plugin Name:** Kritim Solar Core  
+**Plugin Name:** Krtrim Solar Core  
 **Purpose:** Comprehensive solar project management system with vendor marketplace, bidding, and workflow tracking.
 
 ### Key Features:
@@ -294,7 +294,7 @@ In-app notification system
 ## 📁 Complete File Structure
 
 ```
-Kritim Solar Core/
+Krtrim Solar Core/
 │
 ├── unified-solar-dashboard.php          # Main plugin file
 │
@@ -649,7 +649,7 @@ DROP TABLE wp_solar_notifications;
 ---
 
 ## 📄 License
-This plugin is proprietary software developed for Kritim Solar.
+This plugin is proprietary software developed for Krtrim Solar.
 
 ---
 

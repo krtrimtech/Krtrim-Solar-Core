@@ -3,7 +3,7 @@
  * Admin Dashboard Widgets
  * 
  * Provides comprehensive widgets for WordPress admin dashboard
- * showing key metrics for the Kritim Solar Core plugin.
+ * showing key metrics for the Krtrim Solar Core plugin.
  */
 
 if (!defined('ABSPATH')) {

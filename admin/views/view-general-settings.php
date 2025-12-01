@@ -1,6 +1,6 @@
 <?php
 /**
- * Admin settings page for Kritim Solar Core.
+ * Admin settings page for Krtrim Solar Core.
  * Consolidates Vendor Registration and Notification settings.
  */
 

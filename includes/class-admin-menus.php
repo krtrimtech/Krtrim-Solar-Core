@@ -59,8 +59,8 @@ class SP_Admin_Menus {
 
         // Consolidated Settings Page
         add_options_page(
-            'Kritim Solar Core Settings',
-            'Kritim Solar Core',
+            'Krtrim Solar Core Settings',
+            'Krtrim Solar Core',
             'manage_options',
             'ksc-settings',
             [ $this, 'render_general_settings_page' ]
