@@ -37,8 +37,10 @@ class KSC_Admin_Manager_API extends KSC_API_Base {
         add_action('wp_ajax_update_vendor_status', [$this, 'update_vendor_status']);
         add_action('wp_ajax_update_vendor_details', [$this, 'update_vendor_details']);
         
+        
         // Bid management
         add_action('wp_ajax_award_project_to_vendor', [$this, 'award_project_to_vendor']);
+        add_action('wp_ajax_get_area_manager_bids', [$this, 'get_area_manager_bids']);
         
         // Reviews
         add_action('wp_ajax_get_area_manager_reviews', [$this, 'get_area_manager_reviews']);
@@ -1244,11 +1246,15 @@ class KSC_Admin_Manager_API extends KSC_API_Base {
         }
         
         $manager_id = isset($_POST['manager_id']) ? intval($_POST['manager_id']) : 0;
-        $states = isset($_POST['states']) && is_array($_POST['states']) ? $_POST['states'] : [];
-        $cities = isset($_POST['cities']) && is_array($_POST['cities']) ? $_POST['cities'] : [];
+        $state = isset($_POST['state']) ? sanitize_text_field($_POST['state']) : '';
+        $city = isset($_POST['city']) ? sanitize_text_field($_POST['city']) : '';
         
         if (!$manager_id) {
             wp_send_json_error(['message' => 'Manager ID required']);
+        }
+        
+        if (!$state || !$city) {
+            wp_send_json_error(['message' => 'Both state and city are required']);
         }
         
         $manager = get_userdata($manager_id);
@@ -1256,9 +1262,76 @@ class KSC_Admin_Manager_API extends KSC_API_Base {
             wp_send_json_error(['message' => 'Invalid area manager']);
         }
         
-        update_user_meta($manager_id, 'assigned_states', array_map('sanitize_text_field', $states));
-        update_user_meta($manager_id, 'assigned_cities', array_map('sanitize_text_field', $cities));
+        // Use singular meta keys: 'state' and 'city'
+        update_user_meta($manager_id, 'state', $state);
+        update_user_meta($manager_id, 'city', $city);
         
         wp_send_json_success(['message' => 'Location assigned successfully']);
+    }
+    
+    /**
+     * Get bids for area manager's projects
+     */
+    public function get_area_manager_bids() {
+        check_ajax_referer('get_projects_nonce', 'nonce');
+        
+        $manager = $this->verify_area_manager_role();
+        
+        global $wpdb;
+        $bids_table = $wpdb->prefix . 'project_bids';
+        
+        // Get manager's projects
+        $args = [
+            'post_type' => 'solar_project',
+            'posts_per_page' => -1,
+            'author' => $manager->ID,
+            'post_status' => 'publish'
+        ];
+        
+        $query = new WP_Query($args);
+        $projects_with_bids = [];
+        
+        if ($query->have_posts()) {
+            while ($query->have_posts()) {
+                $query->the_post();
+                $project_id = get_the_ID();
+                
+                // Get bids for this project
+                $bids = $wpdb->get_results($wpdb->prepare(
+                    "SELECT b.*, u.display_name as vendor_name, u.user_email as vendor_email
+                     FROM {$bids_table} b
+                     JOIN {$wpdb->users} u ON b.vendor_id = u.ID
+                     WHERE b.project_id = %d
+                     ORDER BY b.bid_amount ASC, b.created_at DESC",
+                    $project_id
+                ), ARRAY_A);
+                
+                // Only include projects that have bids
+                if (!empty($bids)) {
+                    $assigned_vendor_id = get_post_meta($project_id, '_assigned_vendor_id', true);
+                    $winning_bid_amount = get_post_meta($project_id, 'winning_bid_amount', true);
+                    
+                    $assigned_vendor_name = '';
+                    if ($assigned_vendor_id) {
+                        $vendor = get_userdata($assigned_vendor_id);
+                        $assigned_vendor_name = $vendor ? $vendor->display_name : '';
+                    }
+                    
+                    $projects_with_bids[] = [
+                        'id' => $project_id,
+                        'title' => get_the_title(),
+                        'project_state' => get_post_meta($project_id, '_project_state', true),
+                        'project_city' => get_post_meta($project_id, '_project_city', true),
+                        'assigned_vendor_id' => $assigned_vendor_id,
+                        'assigned_vendor_name' => $assigned_vendor_name,
+                        'winning_bid_amount' => $winning_bid_amount,
+                        'bids' => $bids
+                    ];
+                }
+            }
+            wp_reset_postdata();
+        }
+        
+        wp_send_json_success(['projects' => $projects_with_bids]);
     }
 }

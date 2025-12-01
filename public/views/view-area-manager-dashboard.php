@@ -295,7 +295,7 @@ function sp_area_manager_dashboard_shortcode() {
                     <div class="card">
                         <h3>Create New Solar Project</h3>
                         <form id="create-project-form">
-                            <?php wp_nonce_field('sp_create_project_nonce', 'sp_create_project_nonce_field'); ?>
+                            <?php wp_nonce_field('sp_create_project_nonce_field', 'sp_create_project_nonce'); ?>
                             <div class="form-group">
                                 <label for="project_title">Project Title</label>
                                 <input type="text" id="project_title" name="project_title" required>
@@ -306,8 +306,8 @@ function sp_area_manager_dashboard_shortcode() {
                                 <small style="color: #666;">Provide detailed information about the project that will be visible to vendors and clients.</small>
                             </div>
                             <?php
-                            $user_state = get_user_meta($user->ID, 'assigned_state', true);
-                            $user_city = get_user_meta($user->ID, 'assigned_city', true);
+                            $user_state = get_user_meta($user->ID, 'state', true);
+                            $user_city = get_user_meta($user->ID, 'city', true);
 
                             if ($user_state && $user_city) {
                                 // Area Manager with assigned location
@@ -430,96 +430,22 @@ function sp_area_manager_dashboard_shortcode() {
                     </div>
                 </section>
 
+
                 <!-- Bid Management Section -->
                 <section id="bid-management-section" class="section-content" style="display:none;">
-                    <h2>Bid Management</h2>
-                    <div class="card">
-                        <?php
-                        global $wpdb;
-                        $bids_table = $wpdb->prefix . 'project_bids';
-                        $projects_table = $wpdb->posts;
-                        $users_table = $wpdb->users;
-                        $postmeta_table = $wpdb->postmeta;
-                        
-                        // Query bids for projects owned by this Area Manager
-                        // We check both _created_by_area_manager meta AND post_author for backward compatibility
-                        $bids = $wpdb->get_results($wpdb->prepare(
-                            "SELECT b.*, p.post_title, p.ID as project_id, u.display_name as vendor_name, u.user_email 
-                            FROM {$bids_table} b 
-                            JOIN {$projects_table} p ON b.project_id = p.ID 
-                            JOIN {$users_table} u ON b.vendor_id = u.ID 
-                            LEFT JOIN {$postmeta_table} pm ON p.ID = pm.post_id AND pm.meta_key = '_created_by_area_manager'
-                            WHERE (pm.meta_value = %d OR p.post_author = %d)
-                            ORDER BY b.created_at DESC",
-                            $user->ID, $user->ID
-                        ));
-                        ?>
-                        
-                        <div class="table-responsive">
-                            <table class="modern-table">
-                                <thead>
-                                    <tr>
-                                        <th>Project</th>
-                                        <th>Vendor</th>
-                                        <th>Bid Amount</th>
-                                        <th>Date</th>
-                                        <th>Status</th>
-                                        <th>Action</th>
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                    <?php if (!empty($bids)) : ?>
-                                        <?php foreach ($bids as $bid) : ?>
-                                            <?php 
-                                            $project_status = get_post_meta($bid->project_id, 'project_status', true);
-                                            $assigned_vendor = get_post_meta($bid->project_id, '_assigned_vendor_id', true);
-                                            $is_winner = ($assigned_vendor == $bid->vendor_id);
-                                            ?>
-                                            <tr>
-                                                <td><strong><?php echo esc_html($bid->post_title); ?></strong></td>
-                                                <td>
-                                                    <?php echo esc_html($bid->vendor_name); ?><br>
-                                                    <small style="color:#666;"><?php echo esc_html($bid->user_email); ?></small>
-                                                </td>
-                                                <td><strong>₹<?php echo number_format($bid->bid_amount); ?></strong></td>
-                                                <td><?php echo date('M j, Y', strtotime($bid->created_at)); ?></td>
-                                                <td>
-                                                    <?php if ($is_winner): ?>
-                                                        <span class="badge badge-success">Winner</span>
-                                                    <?php elseif ($assigned_vendor): ?>
-                                                        <span class="badge badge-secondary">Lost</span>
-                                                    <?php else: ?>
-                                                        <span class="badge badge-warning">Pending</span>
-                                                    <?php endif; ?>
-                                                </td>
-                                                <td>
-                                                    <?php if (!$assigned_vendor): ?>
-                                                        <form method="post" style="display:inline;" onsubmit="return confirm('Are you sure you want to award this project to <?php echo esc_js($bid->vendor_name); ?>?');">
-                                                            <input type="hidden" name="action" value="am_award_bid">
-                                                            <input type="hidden" name="project_id" value="<?php echo $bid->project_id; ?>">
-                                                            <input type="hidden" name="vendor_id" value="<?php echo $bid->vendor_id; ?>">
-                                                            <input type="hidden" name="bid_amount" value="<?php echo $bid->bid_amount; ?>">
-                                                            <?php wp_nonce_field('am_award_bid_action', 'bid_nonce'); ?>
-                                                            <button type="submit" class="btn btn-sm btn-primary">Award</button>
-                                                        </form>
-                                                    <?php elseif ($is_winner): ?>
-                                                        <button class="btn btn-sm btn-disabled" disabled>Awarded</button>
-                                                    <?php else: ?>
-                                                        <button class="btn btn-sm btn-disabled" disabled>Closed</button>
-                                                    <?php endif; ?>
-                                                </td>
-                                            </tr>
-                                        <?php endforeach; ?>
-                                    <?php else : ?>
-                                        <tr>
-                                            <td colspan="6" style="text-align:center;">No bids found for your projects.</td>
-                                        </tr>
-                                    <?php endif; ?>
-                                </tbody>
-                            </table>
+                    <div class="section-header">
+                        <h2 class="section-title">Bid Management</h2>
+                        <p style="color: #666; margin-top: 8px;">View and award bids for your projects</p>
+                    </div>
+                    
+                    <div id="bid-management-container">
+                        <div class="loading-spinner">
+                            <div class="spinner"></div>
+                            <p>Loading bids...</p>
                         </div>
                     </div>
                 </section>
+
 
                 <!-- Leads Section -->
                 <section id="leads-section" class="section-content" style="display:none;">

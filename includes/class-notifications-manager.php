@@ -106,6 +106,7 @@ class SP_Notifications_Manager {
         );
 
         // Notify admins and managers
+        $notification_options = get_option('sp_notification_options');
         $admins = get_users(['role__in' => ['administrator', 'manager']]);
         foreach ($admins as $admin) {
             self::create_notification([
@@ -115,12 +116,14 @@ class SP_Notifications_Manager {
                 'type' => 'submission',
             ]);
             
-            // Send Email to Admin
-            $subject = 'New Vendor Submission: ' . $project->post_title;
-            $body = "<p>Hello " . $admin->display_name . ",</p>";
-            $body .= "<p>" . $message . "</p>";
-            $body .= "<p><a href='" . admin_url('admin.php?page=project-reviews&project=' . $project_id) . "'>Review Submission</a></p>";
-            wp_mail($admin->user_email, $subject, $body, ['Content-Type: text/html; charset=UTF-8']);
+            // Send Email to Admin (if enabled in settings)
+            if (isset($notification_options['email_submission_approved']) && $notification_options['email_submission_approved'] === '1') {
+                $subject = 'New Vendor Submission: ' . $project->post_title;
+                $body = "<p>Hello " . $admin->display_name . ",</p>";
+                $body .= "<p>" . $message . "</p>";
+                $body .= "<p><a href='" . admin_url('admin.php?page=project-reviews&project=' . $project_id) . "'>Review Submission</a></p>";
+                wp_mail($admin->user_email, $subject, $body, ['Content-Type: text/html; charset=UTF-8']);
+            }
         }
 
         // ✅ NOTIFY AREA MANAGER - Step Submitted
@@ -151,12 +154,14 @@ class SP_Notifications_Manager {
                     'type' => 'vendor_submission',
                 ]);
                 
-                // Send Email to Area Manager
-                $subject = 'New Vendor Submission in Your Area: ' . $project->post_title;
-                $body = "<p>Hello " . $area_manager->display_name . ",</p>";
-                $body .= "<p>" . $message . "</p>";
-                $body .= "<p><a href='" . admin_url('admin.php?page=project-reviews&project=' . $project_id) . "'>Review Submission</a></p>";
-                wp_mail($area_manager->user_email, $subject, $body, ['Content-Type: text/html; charset=UTF-8']);
+                // Send Email to Area Manager (if enabled in settings)
+                if (isset($notification_options['email_submission_approved']) && $notification_options['email_submission_approved'] === '1') {
+                    $subject = 'New Vendor Submission in Your Area: ' . $project->post_title;
+                    $body = "<p>Hello " . $area_manager->display_name . ",</p>";
+                    $body .= "<p>" . $message . "</p>";
+                    $body .= "<p><a href='" . admin_url('admin.php?page=project-reviews&project=' . $project_id) . "'>Review Submission</a></p>";
+                    wp_mail($area_manager->user_email, $subject, $body, ['Content-Type: text/html; charset=UTF-8']);
+                }
             }
         }
     }
@@ -190,6 +195,19 @@ class SP_Notifications_Manager {
                 'message' => $vendor_message,
                 'type' => 'step_' . $decision, // step_approved or step_rejected
             ]);
+            
+            // Send Email to Vendor (if enabled in settings)
+            $notification_options = get_option('sp_notification_options');
+            $setting_key = ($decision === 'approved') ? 'email_submission_approved' : 'email_submission_rejected';
+            
+            if (isset($notification_options[$setting_key]) && $notification_options[$setting_key] === '1') {
+                $vendor = get_userdata($vendor_id);
+                $subject = 'Project Step ' . ucfirst($decision) . ': ' . $project->post_title;
+                $body = "<p>Hello " . $vendor->display_name . ",</p>";
+                $body .= "<p>" . $vendor_message . "</p>";
+                $body .= "<p><a href='" . home_url('/vendor-dashboard/') . "'>View Project Details</a></p>";
+                wp_mail($vendor->user_email, $subject, $body, ['Content-Type: text/html; charset=UTF-8']);
+            }
         }
 
         // 2. Notify Client (Only on Approval)
@@ -207,6 +225,17 @@ class SP_Notifications_Manager {
                     'message' => $message,
                     'type' => 'step_approved',
                 ]);
+                
+                // Send Email to Client (if enabled in settings)
+                $notification_options = get_option('sp_notification_options');
+                if (isset($notification_options['email_submission_approved']) && $notification_options['email_submission_approved'] === '1') {
+                    $client = get_userdata($client_id);
+                    $subject = 'Project Progress Update: ' . $project->post_title;
+                    $body = "<p>Hello " . $client->display_name . ",</p>";
+                    $body .= "<p>" . $message . "</p>";
+                    $body .= "<p><a href='" . home_url('/solar-dashboard/') . "'>View Your Project</a></p>";
+                    wp_mail($client->user_email, $subject, $body, ['Content-Type: text/html; charset=UTF-8']);
+                }
             }
         }
     }

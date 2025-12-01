@@ -48,8 +48,8 @@ function sp_render_leaderboard_view() {
             'total_projects' => $total_projects,
             'paid_to_vendors' => $paid_to_vendors,
             'company_profit' => $company_profit,
-            'assigned_state' => get_user_meta($manager->ID, 'assigned_state', true),
-            'assigned_city' => get_user_meta($manager->ID, 'assigned_city', true),
+            'assigned_state' => get_user_meta($manager->ID, 'state', true),
+            'assigned_city' => get_user_meta($manager->ID, 'city', true),
         ];
 
         $chart_labels[] = $manager->display_name;
