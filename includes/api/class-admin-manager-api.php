@@ -269,9 +269,11 @@ class KSC_Admin_Manager_API extends KSC_API_Base {
             'project_start_date', 'paid_amount', 'vendor_assignment_method'
         ];
         
+        
         foreach ($fields as $field) {
             if (isset($data[$field])) {
-                update_post_meta($project_id, '_' . $field, sanitize_text_field($data[$field]));
+                $meta_key = ($field === 'project_status') ? 'project_status' : ('_' . $field);
+                update_post_meta($project_id, $meta_key, sanitize_text_field($data[$field]));
             }
         }
         
@@ -295,8 +297,10 @@ class KSC_Admin_Manager_API extends KSC_API_Base {
             $method = sanitize_text_field($data['vendor_assignment_method']);
             update_post_meta($project_id, '_vendor_assignment_method', $method);
             
-            if ($method === 'manual' && isset($data['assigned_vendor_id'])) {
+            if ($method === 'manual' && isset($data['assigned_vendor_id']) && !empty($data['assigned_vendor_id'])) {
                 update_post_meta($project_id, '_assigned_vendor_id', sanitize_text_field($data['assigned_vendor_id']));
+                // Auto-update status to 'assigned' when vendor is manually assigned
+                update_post_meta($project_id, 'project_status', 'assigned');
                 
                 if (isset($data['paid_to_vendor']) && !empty($data['paid_to_vendor'])) {
                     $vendor_paid = floatval($data['paid_to_vendor']);

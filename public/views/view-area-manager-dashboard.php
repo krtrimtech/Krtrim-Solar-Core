@@ -651,9 +651,6 @@ function sp_area_manager_dashboard_shortcode() {
     <!-- Toast Container -->
     <div class="toast-container" id="toast-container"></div>
 
-    <!-- Edit Project Modal -->
-    <?php include(plugin_dir_path(__FILE__) . 'partials/edit-project-modal.php'); ?>
-
     <?php
     return ob_get_clean();
 }

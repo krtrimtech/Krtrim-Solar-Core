@@ -37,7 +37,7 @@
     function populateProjectModal(data) {
         $('#modalProjectTitle').text(data.title || 'Project Details');
 
-        let projectHtml = '<div class="detail-item"><div class="detail-label">Status</div><div class="detail-value">' + (data.project_status || 'N/A') + '</div></div>';
+        let projectHtml = '<div class="detail-item"><div class="detail-label">Status</div><div class="detail-value">' + (data.status || 'N/A') + '</div></div>';
         projectHtml += '<div class="detail-item"><div class="detail-label">Location</div><div class="detail-value">' + (data.project_state || 'N/A') + ', ' + (data.project_city || 'N/A') + '</div></div>';
         projectHtml += '<div class="detail-item"><div class="detail-label">System Size</div><div class="detail-value">' + (data.solar_system_size_kw || 0) + ' kW</div></div>';
         projectHtml += '<div class="detail-item"><div class="detail-label">Start Date</div><div class="detail-value">' + (data.start_date || 'Not set') + '</div></div>';

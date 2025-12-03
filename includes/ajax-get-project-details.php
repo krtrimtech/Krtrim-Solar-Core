@@ -66,6 +66,16 @@ function sp_get_project_details() {
         }
     }
     
+    // Get vendor details
+    $vendor_id = get_post_meta($project_id, '_assigned_vendor_id', true);
+    $vendor_name = 'Not assigned';
+    if ($vendor_id) {
+        $vendor_user = get_userdata($vendor_id);
+        if ($vendor_user) {
+            $vendor_name = $vendor_user->display_name;
+        }
+    }
+    
     $data = [
         'id' => $project_id,
         'title' => get_the_title($project_id),
@@ -79,8 +89,8 @@ function sp_get_project_details() {
         'client_email' => $client_email,
         'client_phone_number' => $client_phone,
         'client_address' => $client_address,
-        'vendor_name' => get_post_meta($project_id, '_vendor_name', true) ?: 'Not assigned',
-        'vendor_paid_amount' => get_post_meta($project_id, '_paid_to_vendor', true) ?: '0',
+        'vendor_name' => $vendor_name,
+        'vendor_paid_amount' => get_post_meta($project_id, '_vendor_paid_amount', true) ?: '0',
         'company_profit' => get_post_meta($project_id, '_company_profit', true) ?: '0',
         'steps' => []
     ];
