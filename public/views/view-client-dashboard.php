@@ -38,25 +38,54 @@ function render_solar_client_dashboard() {
     
     $project_query = new WP_Query($args);
     
-    // Extract chart data immediately (before any display loops)
-    $chart_total_cost = 0;
-    $chart_paid = 0;
-    $chart_balance = 0;
+    // Aggregate data from ALL projects
+    $total_projects = 0;
+    $agg_total_cost = 0;
+    $agg_paid = 0;
+    $agg_balance = 0;
+    $agg_total_steps = 0;
+    $agg_completed_steps = 0;
+    $first_project_id = 0;
     
     if ($project_query->have_posts()) {
+        global $wpdb;
+        $steps_table = $wpdb->prefix . 'solar_process_steps';
+        
         while ($project_query->have_posts()) {
             $project_query->the_post();
             $temp_project_id = get_the_ID();
             
-            if ($temp_project_id > 0) {
-                $chart_total_cost = floatval(get_post_meta($temp_project_id, '_total_project_cost', true));
-                $chart_paid = floatval(get_post_meta($temp_project_id, '_paid_amount', true));
-                $chart_balance = $chart_total_cost - $chart_paid;
+            if ($first_project_id === 0) {
+                $first_project_id = $temp_project_id;
             }
-            break; // Only need first project
+            
+            $total_projects++;
+            $agg_total_cost += floatval(get_post_meta($temp_project_id, '_total_project_cost', true));
+            $agg_paid += floatval(get_post_meta($temp_project_id, '_paid_amount', true));
+            
+            // Get steps for this project
+            $steps = $wpdb->get_results($wpdb->prepare(
+                "SELECT * FROM {$steps_table} WHERE project_id = %d",
+                $temp_project_id
+            ));
+            
+            $agg_total_steps += count($steps);
+            foreach ($steps as $step) {
+                if ($step->admin_status == 'approved') {
+                    $agg_completed_steps++;
+                }
+            }
         }
-        wp_reset_postdata(); // Reset once, cleanly
+        wp_reset_postdata();
     }
+    
+    $agg_balance = $agg_total_cost - $agg_paid;
+    $agg_progress = ($agg_total_steps > 0) ? round(($agg_completed_steps / $agg_total_steps) * 100) : 0;
+    
+    // For chart data (use aggregated)
+    $chart_total_cost = $agg_total_cost;
+    $chart_paid = $agg_paid;
+    $chart_balance = $agg_balance;
     
     // Rewind query for display loops
     $project_query->rewind_posts();
@@ -304,75 +333,55 @@ function toggleProjectDetails(projectId) {
             <!-- DASHBOARD SECTION -->
             <div class="section-content" id="dashboard-section" style="display: block;">
                 <?php if ($project_query->have_posts()) : ?>
-                    <?php while ($project_query->have_posts()) : $project_query->the_post(); ?>
-                        <?php
-                        $project_id = get_the_ID();
-                        $project_status = get_post_meta($project_id, 'project_status', true);
-                        $solar_system_size = get_post_meta($project_id, '_solar_system_size_kw', true);
-                        $total_project_cost = floatval(get_post_meta($project_id, '_total_project_cost', true));
-                        $paid_amount = floatval(get_post_meta($project_id, '_paid_amount', true));
-                        $balance = $total_project_cost - $paid_amount;
-                        $client_address = get_post_meta($project_id, '_client_address', true);
-                        $client_phone = get_post_meta($project_id, '_client_phone_number', true);
-                        $project_start_date = get_post_meta($project_id, '_project_start_date', true);
-                        
-                        global $wpdb;
-                        $table = $wpdb->prefix . 'solar_process_steps';
-                        $steps = $wpdb->get_results($wpdb->prepare(
-                            "SELECT * FROM $table WHERE project_id = %d ORDER BY step_number ASC",
-                            $project_id
-                        ));
-                        
-                        $total_steps = count($steps);
-                        $completed_steps = 0;
-                        
-                        foreach ($steps as $step) {
-                            if ($step->admin_status == 'approved') {
-                                $completed_steps++;
-                            }
-                        }
-                        
-                        $progress_percentage = ($total_steps > 0) ? round(($completed_steps / $total_steps) * 100) : 0;
-                        ?>
-                        
-                        <!-- Stats Row -->
-                        <div class="stats-grid">
-                            <div class="stat-card">
-                                <div class="stat-header">
-                                    <span class="stat-label">Project Status</span>
-                                    <span class="stat-icon">⚡️</span>
-                                </div>
-                                <div class="stat-value"><?php echo ucfirst(str_replace('_', ' ', $project_status)); ?></div>
-                                <div class="stat-subtitle"><?php echo $project_status; ?></div>
-                            </div>
-                            
-                            <div class="stat-card">
-                                <div class="stat-header">
-                                    <span class="stat-label">System Size</span>
-                                    <span class="stat-icon">💡</span>
-                                </div>
-                                <div class="stat-value"><?php echo esc_html($solar_system_size ?: 'N/A'); ?> kW</div>
-                                <div class="stat-subtitle">Capacity</div>
-                            </div>
-                            
-                            <div class="stat-card">
-                                <div class="stat-header">
-                                    <span class="stat-label">Total Cost</span>
-                                    <span class="stat-icon">💰</span>
-                                </div>
-                                <div class="stat-value">₹<?php echo number_format($total_project_cost, 0); ?></div>
-                                <div class="stat-subtitle">Project Budget</div>
-                            </div>
-                            
-                            <div class="stat-card">
-                                <div class="stat-header">
-                                    <span class="stat-label">Progress</span>
-                                    <span class="stat-icon">✅</span>
-                                </div>
-                                <div class="stat-value"><?php echo $progress_percentage; ?>%</div>
-                                <div class="stat-subtitle"><?php echo $completed_steps; ?>/<?php echo $total_steps; ?> steps</div>
-                            </div>
+                
+                <!-- Aggregated Stats Row (shown once for all projects) -->
+                <div class="stats-grid">
+                    <div class="stat-card">
+                        <div class="stat-header">
+                            <span class="stat-label">Total Projects</span>
+                            <span class="stat-icon">📁</span>
                         </div>
+                        <div class="stat-value"><?php echo $total_projects; ?></div>
+                        <div class="stat-subtitle">Active solar installations</div>
+                    </div>
+                    
+                    <div class="stat-card">
+                        <div class="stat-header">
+                            <span class="stat-label">Total Investment</span>
+                            <span class="stat-icon">💰</span>
+                        </div>
+                        <div class="stat-value">₹<?php echo number_format($agg_total_cost, 0); ?></div>
+                        <div class="stat-subtitle">Total project value</div>
+                    </div>
+                    
+                    <div class="stat-card">
+                        <div class="stat-header">
+                            <span class="stat-label">Amount Paid</span>
+                            <span class="stat-icon">✅</span>
+                        </div>
+                        <div class="stat-value">₹<?php echo number_format($agg_paid, 0); ?></div>
+                        <div class="stat-subtitle">Total payments made</div>
+                    </div>
+                    
+                    <div class="stat-card">
+                        <div class="stat-header">
+                            <span class="stat-label">Overall Progress</span>
+                            <span class="stat-icon">📊</span>
+                        </div>
+                        <div class="stat-value"><?php echo $agg_progress; ?>%</div>
+                        <div class="stat-subtitle"><?php echo $agg_completed_steps; ?>/<?php echo $agg_total_steps; ?> total steps</div>
+                    </div>
+                </div>
+                
+                <?php
+                // Get first project details for overview display
+                if ($first_project_id > 0) {
+                    $project_id = $first_project_id;
+                    $client_address = get_post_meta($project_id, '_client_address', true);
+                    $client_phone = get_post_meta($project_id, '_client_phone_number', true);
+                    $project_start_date = get_post_meta($project_id, '_project_start_date', true);
+                }
+                ?>
                         
                         <!-- Main Content Grid -->
                         <div class="content-grid">
@@ -389,27 +398,27 @@ function toggleProjectDetails(projectId) {
                                     <div class="progress-container">
                                         <div class="progress-circle">
                                             <div class="circle-content">
-                                                <div class="circle-value"><?php echo $progress_percentage; ?>%</div>
+                                                <div class="circle-value"><?php echo $agg_progress; ?>%</div>
                                                 <div class="circle-label">Complete</div>
                                             </div>
                                             <svg viewBox="0 0 100 100">
                                                 <circle cx="50" cy="50" r="45" class="progress-bg"></circle>
-                                                <circle cx="50" cy="50" r="45" class="progress-fill" style="--percentage: <?php echo $progress_percentage; ?>"></circle>
+                                                <circle cx="50" cy="50" r="45" class="progress-fill" style="--percentage: <?php echo $agg_progress; ?>"></circle>
                                             </svg>
                                         </div>
                                         
                                         <div class="progress-details">
                                             <div class="detail-item">
                                                 <span class="detail-label">Completed</span>
-                                                <span class="detail-value"><?php echo $completed_steps; ?> steps</span>
+                                                <span class="detail-value"><?php echo $agg_completed_steps; ?> steps</span>
                                             </div>
                                             <div class="detail-item">
                                                 <span class="detail-label">Remaining</span>
-                                                <span class="detail-value"><?php echo ($total_steps - $completed_steps); ?> steps</span>
+                                                <span class="detail-value"><?php echo ($agg_total_steps - $agg_completed_steps); ?> steps</span>
                                             </div>
                                             <div class="detail-item">
                                                 <span class="detail-label">Total Steps</span>
-                                                <span class="detail-value"><?php echo $total_steps; ?></span>
+                                                <span class="detail-value"><?php echo $agg_total_steps; ?></span>
                                             </div>
                                         </div>
                                     </div>
@@ -428,7 +437,7 @@ function toggleProjectDetails(projectId) {
                                             <div class="payment-icon" style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);">💸</div>
                                             <div class="payment-content">
                                                 <div class="payment-label">Total Cost</div>
-                                                <div class="payment-amount">₹<?php echo number_format($total_project_cost, 0); ?></div>
+                                                <div class="payment-amount">₹<?php echo number_format($agg_total_cost, 0); ?></div>
                                             </div>
                                         </div>
                                         
@@ -436,7 +445,7 @@ function toggleProjectDetails(projectId) {
                                             <div class="payment-icon" style="background: linear-gradient(135deg, #28a745 0%, #20c997 100%);">✅</div>
                                             <div class="payment-content">
                                                 <div class="payment-label">Amount Paid</div>
-                                                <div class="payment-amount">₹<?php echo number_format($paid_amount, 0); ?></div>
+                                                <div class="payment-amount">₹<?php echo number_format($agg_paid, 0); ?></div>
                                             </div>
                                         </div>
                                         
@@ -444,7 +453,7 @@ function toggleProjectDetails(projectId) {
                                             <div class="payment-icon" style="background: linear-gradient(135deg, #ffc107 0%, #ff9800 100%);">⏳</div>
                                             <div class="payment-content">
                                                 <div class="payment-label">Balance Due</div>
-                                                <div class="payment-amount">₹<?php echo number_format($balance, 0); ?></div>
+                                                <div class="payment-amount">₹<?php echo number_format($agg_balance, 0); ?></div>
                                             </div>
                                         </div>
                                     </div>
@@ -485,63 +494,10 @@ function toggleProjectDetails(projectId) {
                             </div>
                             
                             <?php
-                            // Get vendor information
-                            $vendor_user_id = get_post_meta($project_id, '_vendor_user_id', true);
-                            $vendor_info = null;
-                            if ($vendor_user_id) {
-                                $vendor_info = get_userdata($vendor_user_id);
-                            }
-                            
-                            // Get area manager (project author)
-                            $area_manager_id = get_post_field('post_author', $project_id);
+                            // Get area manager (project author) - clients should only contact area manager
+                            $area_manager_id = get_post_field('post_author', $first_project_id);
                             $area_manager = get_userdata($area_manager_id);
                             ?>
-                            
-                            <!-- Assigned Vendor Card -->
-                            <?php if ($vendor_info): ?>
-                            <div class="card vendor-card">
-                                <div class="card-header">
-                                    <h3>👷 Assigned Vendor</h3>
-                                </div>
-                                <div class="vendor-info-content">
-                                    <div class="vendor-avatar">
-                                        <img src="<?php echo esc_url(get_avatar_url($vendor_info->ID, ['size' => 80])); ?>" alt="<?php echo esc_attr($vendor_info->display_name); ?>">
-                                    </div>
-                                    <div class="vendor-details">
-                                        <h4><?php echo esc_html($vendor_info->display_name); ?></h4>
-                                        <p class="vendor-email">
-                                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                                                <path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"></path>
-                                                <polyline points="22,6 12,13 2,6"></polyline>
-                                            </svg>
-                                            <?php echo esc_html($vendor_info->user_email); ?>
-                                        </p>
-                                        <?php 
-                                        $vendor_phone = get_user_meta($vendor_info->ID, 'phone_number', true);
-                                        if ($vendor_phone): 
-                                        ?>
-                                        <p class="vendor-phone">
-                                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                                                <path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"></path>
-                                            </svg>
-                                            <?php echo esc_html($vendor_phone); ?>
-                                        </p>
-                                        <?php endif; ?>
-                                    </div>
-                                </div>
-                            </div>
-                            <?php else: ?>
-                            <div class="card vendor-card vendor-card-empty">
-                                <div class="card-header">
-                                    <h3>👷 Vendor Assignment</h3>
-                                </div>
-                                <div class="vendor-empty-state">
-                                    <div class="empty-icon">⏳</div>
-                                    <p>No vendor assigned yet</p>
-                                    <small>Your area manager will assign a vendor soon</small>
-                                </div>
-                            </div>
-                            <?php endif; ?>
                             
                             <!-- Area Manager Contact Card -->
                             <?php if ($area_manager): ?>
@@ -593,7 +549,6 @@ function toggleProjectDetails(projectId) {
                             <?php endif; ?>
                         </div>
                     </div>
-                <?php endwhile; ?>
                 <?php else : ?>
                     <div class="no-projects">
                         <div class="empty-icon">📦</div>
