@@ -173,7 +173,8 @@ class KSC_Admin_Manager_API extends KSC_API_Base {
         
         foreach ($fields as $field) {
             if (isset($data[$field])) {
-                update_post_meta($project_id, '_' . $field, sanitize_text_field($data[$field]));
+                $meta_key = ($field === 'project_status') ? 'project_status' : ('_' . $field);
+        update_post_meta($project_id, $meta_key, sanitize_text_field($data[$field]));
             }
         }
         
