@@ -741,6 +741,7 @@ class KSC_Admin_Manager_API extends KSC_API_Base {
             'paid_amount' => get_post_meta($project_id, '_paid_amount', true),
             'vendor_paid_amount' => get_post_meta($project_id, '_vendor_paid_amount', true),
             'assigned_vendor_id' => get_post_meta($project_id, '_assigned_vendor_id', true),
+            'vendor_assignment_method' => get_post_meta($project_id, '_vendor_assignment_method', true),
             'project_start_date' => get_post_meta($project_id, '_project_start_date', true),
         ];
         
