@@ -157,8 +157,6 @@
     }
 
     // Make showToast globally available
-    window.showToast = showToast;
-
     // --- Initialize AJAX URL and nonces FIRST (before any functions use them) ---
     const ajaxUrl = (typeof sp_area_dashboard_vars !== 'undefined') ? sp_area_dashboard_vars.ajax_url : '';
 
@@ -169,6 +167,68 @@
 
     const createProjectNonce = sp_area_dashboard_vars.create_project_nonce;
     const projectDetailsNonce = sp_area_dashboard_vars.project_details_nonce;
+
+    // --- Notification System ---
+    function loadNotifications() {
+        $.ajax({
+            url: ajaxUrl,
+            type: 'POST',
+            data: {
+                action: 'get_user_notifications'
+            },
+            success: function (response) {
+                if (response.success) {
+                    const notifications = response.data || [];
+                    const notifList = $('#notif-list');
+                    const notifCount = $('#notif-count');
+                    
+                    if (notifications.length > 0) {
+                        let html = '';
+                        notifications.forEach(n => {
+                            const borderColor = n.type === 'approved' ? '#28a745' : n.type === 'rejected' ? '#dc3545' : '#007bff';
+                            const bgColor = n.type === 'approved' ? '#f8fff9' : n.type === 'rejected' ? '#fff5f5' : '#f0f7ff';
+                            
+                            html += `<div class="notification-item" style="padding:12px;position:relative; border-radius:8px; border-left:4px solid ${borderColor}; background:${bgColor}; margin-bottom:10px;">`;
+                            html += `<div style="font-weight:600; color:#333;">${n.icon || '🔔'} ${n.title}</div>`;
+                            html += `<div style="font-size:12px; color:#666; margin-top:4px;">${n.message}</div>`;
+                            if (n.time_ago) {
+                                html += `<div style="font-size:10px; color:#999; margin-top:4px;">${n.time_ago}</div>`;
+                            }
+                            html += `</div>`;
+                        });
+                        notifList.html(html);
+                        notifCount.text(notifications.length).show();
+                    } else {
+                        notifList.html('<p style="text-align:center; color:#999; padding: 20px; margin: 0;">No new notifications</p>');
+                        notifCount.hide();
+                    }
+                } else {
+                    $('#notif-list').html('<p style="color:#dc3545; text-align:center; padding: 20px; margin:0;">Error loading notifications</p>');
+                }
+            },
+            error: function () {
+                $('#notif-list').html('<p style="color:#dc3545; text-align:center; padding: 20px; margin:0;">Error loading notifications</p>');
+            }
+        });
+    }
+
+    // Toggle notification panel
+    $(document).on('click', '#notification-toggle', function() {
+        $('#notification-panel').toggleClass('open');
+    });
+
+    // Close notification panel
+    $(document).on('click', '#close-notification-panel', function() {
+        $('#notification-panel').removeClass('open');
+    });
+
+    // Load notifications on page load
+    loadNotifications();
+    // Refresh every 30 seconds
+    setInterval(loadNotifications, 30000);
+
+    // --- End Notification System ---
+
     const reviewSubmissionNonce = sp_area_dashboard_vars.review_submission_nonce;
     const awardBidNonce = sp_area_dashboard_vars.award_bid_nonce;
 

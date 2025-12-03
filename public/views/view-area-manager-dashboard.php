@@ -109,7 +109,7 @@ function sp_area_manager_dashboard_shortcode() {
                 <div class="header-right">
                     <button class="notification-badge" id="notification-toggle" title="Notifications">
                         🔔
-                        <span class="badge-count" id="notification-count" style="display:none;">0</span>
+                        <span class="badge-count" id="notif-count" style="display:none;">0</span>
                     </button>
                 </div>
             </header>
@@ -608,7 +608,7 @@ function sp_area_manager_dashboard_shortcode() {
             <h3>Notifications</h3>
             <button class="close-btn" id="close-notification-panel">×</button>
         </div>
-        <div class="notification-list" id="notification-list">
+        <div class="notification-list" id="notif-list">
             <p style="text-align: center; color: #999; padding: 20px;">Loading notifications...</p>
         </div>
     </div>
