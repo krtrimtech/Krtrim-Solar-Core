@@ -268,8 +268,10 @@ class KSC_Public_API {
      * Create Razorpay order for vendor registration payment
      */
     public function create_razorpay_order() {
-        error_log('KSC_Public_API: create_razorpay_order() called');
+        error_log('=== KSC_Public_API: create_razorpay_order() START ===');
         error_log('KSC_Public_API: POST data: ' . print_r($_POST, true));
+        error_log('KSC_Public_API: User logged in: ' . (is_user_logged_in() ? 'YES' : 'NO'));
+        error_log('KSC_Public_API: Current user ID: ' . get_current_user_id());
         
         check_ajax_referer('vendor_registration_nonce', 'nonce');
         error_log('KSC_Public_API: Nonce verified');
@@ -314,6 +316,7 @@ class KSC_Public_API {
             
             if ($result['success'] && isset($result['data']['id'])) {
                 wp_send_json_success([
+                    'key' => $key_id,  // Razorpay public key for frontend
                     'order_id' => $result['data']['id'],
                     'amount' => $amount_in_paise,
                     'currency' => 'INR'

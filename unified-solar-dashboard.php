@@ -292,6 +292,7 @@ final class Krtrim_Solar_Core {
                 'get_earnings_chart_data_nonce' => wp_create_nonce( 'get_earnings_chart_data_nonce' ),
                 'client_comments_url' => rest_url( 'solar/v1/client-comments' ),
                 'vendor_notifications_url' => rest_url( 'solar/v1/vendor-notifications/' ),
+                'vendor_coverage_nonce' => wp_create_nonce( 'vendor_registration_nonce' ),  // For vendor coverage payment
             ]);
         }
 

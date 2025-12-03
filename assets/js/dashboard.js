@@ -579,7 +579,7 @@ jQuery(document).ready(function ($) {
             type: 'POST',
             data: {
                 action: 'create_razorpay_order',
-                nonce: REST_API_NONCE,
+                nonce: ksc_dashboard_vars.vendor_coverage_nonce,  // Fixed: use correct nonce
                 amount: totalAmount,
                 currency: 'INR'
             },
@@ -617,7 +617,7 @@ jQuery(document).ready(function ($) {
             type: 'POST',
             data: {
                 action: 'add_vendor_coverage',
-                nonce: REST_API_NONCE,
+                nonce: ksc_dashboard_vars.vendor_coverage_nonce,  // Fixed: use correct nonce
                 payment_response: JSON.stringify(paymentResponse),
                 states: states,
                 cities: cities,
