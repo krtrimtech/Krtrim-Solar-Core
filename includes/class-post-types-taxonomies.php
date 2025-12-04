@@ -12,6 +12,12 @@ class SP_Post_Types_Taxonomies {
         add_action( 'init', [ $this, 'register_solar_lead_cpt' ] );
         add_action( 'init', [ $this, 'register_taxonomies' ] );
         add_action( 'add_meta_boxes', [ $this, 'add_bids_meta_box' ] );
+
+        // Admin Columns & Filters
+        add_filter( 'manage_solar_project_posts_columns', [ $this, 'add_custom_columns' ] );
+        add_action( 'manage_solar_project_posts_custom_column', [ $this, 'render_custom_columns' ], 10, 2 );
+        add_action( 'restrict_manage_posts', [ $this, 'add_status_filter' ] );
+        add_filter( 'parse_query', [ $this, 'filter_projects_by_status' ] );
     }
 
     /**
@@ -234,5 +240,114 @@ class SP_Post_Types_Taxonomies {
             }
         </style>';
         wp_nonce_field('award_bid_nonce', 'award_bid_nonce_field');
+    }
+
+    /**
+     * Add custom columns to Solar Project list.
+     */
+    public function add_custom_columns($columns) {
+        $new_columns = [];
+        foreach ($columns as $key => $value) {
+            $new_columns[$key] = $value;
+            if ($key === 'title') {
+                $new_columns['project_status'] = 'Status';
+                $new_columns['assigned_vendor'] = 'Assigned Vendor';
+                $new_columns['client_name'] = 'Client';
+                $new_columns['project_cost'] = 'Total Cost';
+            }
+        }
+        return $new_columns;
+    }
+
+    /**
+     * Populate custom columns for Solar Project list.
+     */
+    public function render_custom_columns($column, $post_id) {
+        switch ($column) {
+            case 'project_status':
+                $status = get_post_meta($post_id, 'project_status', true);
+                if ($status) {
+                    $colors = [
+                        'pending' => '#ffc107', // Yellow
+                        'assigned' => '#17a2b8', // Cyan
+                        'in_progress' => '#007bff', // Blue
+                        'completed' => '#28a745', // Green
+                        'on_hold' => '#6c757d', // Grey
+                        'cancelled' => '#dc3545' // Red
+                    ];
+                    $color = isset($colors[$status]) ? $colors[$status] : '#6c757d';
+                    echo sprintf('<span style="background: %s; color: #fff; padding: 3px 8px; border-radius: 3px; font-size: 11px; font-weight: 600;">%s</span>', $color, ucfirst(str_replace('_', ' ', $status)));
+                } else {
+                    echo '<span style="color: #999;">-</span>';
+                }
+                break;
+
+            case 'assigned_vendor':
+                $vendor_id = get_post_meta($post_id, '_assigned_vendor_id', true);
+                if ($vendor_id) {
+                    $vendor = get_userdata($vendor_id);
+                    echo $vendor ? esc_html($vendor->display_name) : '<span style="color: #999;">Unknown</span>';
+                } else {
+                    echo '<span style="color: #999;">Unassigned</span>';
+                }
+                break;
+
+            case 'client_name':
+                $client_id = get_post_meta($post_id, '_client_user_id', true);
+                if ($client_id) {
+                    $client = get_userdata($client_id);
+                    echo $client ? esc_html($client->display_name) : '<span style="color: #999;">Unknown</span>';
+                } else {
+                    echo '<span style="color: #999;">-</span>';
+                }
+                break;
+
+            case 'project_cost':
+                $cost = get_post_meta($post_id, '_total_project_cost', true);
+                echo $cost ? '₹' . number_format($cost) : '<span style="color: #999;">-</span>';
+                break;
+        }
+    }
+
+    /**
+     * Add "Filter by Status" dropdown to Solar Project list.
+     */
+    public function add_status_filter($post_type) {
+        if ($post_type !== 'solar_project') {
+            return;
+        }
+
+        $current_status = isset($_GET['project_status_filter']) ? $_GET['project_status_filter'] : '';
+        $statuses = [
+            'pending' => 'Pending',
+            'assigned' => 'Assigned',
+            'in_progress' => 'In Progress',
+            'completed' => 'Completed',
+            'on_hold' => 'On Hold',
+            'cancelled' => 'Cancelled'
+        ];
+
+        echo '<select name="project_status_filter">';
+        echo '<option value="">All Statuses</option>';
+        foreach ($statuses as $key => $label) {
+            printf(
+                '<option value="%s" %s>%s</option>',
+                $key,
+                selected($current_status, $key, false),
+                $label
+            );
+        }
+        echo '</select>';
+    }
+
+    /**
+     * Handle the status filter query.
+     */
+    public function filter_projects_by_status($query) {
+        global $pagenow;
+        if ($pagenow === 'edit.php' && isset($_GET['post_type']) && $_GET['post_type'] === 'solar_project' && isset($_GET['project_status_filter']) && $_GET['project_status_filter'] !== '') {
+            $query->set('meta_key', 'project_status');
+            $query->set('meta_value', $_GET['project_status_filter']);
+        }
     }
 }

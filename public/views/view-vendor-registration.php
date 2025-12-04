@@ -9,20 +9,8 @@ if ( ! defined( 'ABSPATH' ) ) {
 }
 
 function sp_vendor_registration_form_shortcode() {
-    // Enqueue scripts and styles
-    wp_enqueue_script('razorpay-checkout', 'https://checkout.razorpay.com/v1/checkout.js', [], null, true);
-    wp_enqueue_script('unified-dashboard-scripts');
-    wp_enqueue_style('unified-dashboard-styles');
-
-    // Localize script to pass data
-    $options = get_option('sp_vendor_options');
-    wp_localize_script('unified-dashboard-scripts', 'vendor_reg_vars', [
-        'ajax_url' => admin_url('admin-ajax.php'),
-        'razorpay_key_id' => $options['razorpay_key_id'] ?? '',
-        'per_state_fee' => $options['per_state_fee'] ?? 500,
-        'per_city_fee' => $options['per_city_fee'] ?? 100,
-        'nonce' => wp_create_nonce('vendor_registration_nonce'),
-    ]);
+    // Script enqueuing is now handled in unified-solar-dashboard.php
+    // based on shortcode detection
 
     ob_start();
     ?>
@@ -50,7 +38,15 @@ function sp_vendor_registration_form_shortcode() {
             </div>
             <div class="form-group">
                 <label for="vreg-password">Password *</label>
-                <input type="password" id="vreg-password" required>
+                <div class="password-wrapper">
+                    <input type="password" id="vreg-password" required>
+                    <button type="button" class="toggle-password" id="toggle-vreg-password" aria-label="Toggle password visibility">
+                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="eye-icon">
+                            <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path>
+                            <circle cx="12" cy="12" r="3"></circle>
+                        </svg>
+                    </button>
+                </div>
             </div>
             <button id="vreg-step1-next" class="btn btn-primary">Next</button>
         </div>
@@ -82,4 +78,5 @@ function sp_vendor_registration_form_shortcode() {
     <?php
     return ob_get_clean();
 }
-add_shortcode('vendor_registration_form', 'sp_vendor_registration_form_shortcode');
+
+// Shortcode registration moved to unified-solar-dashboard.php to avoid duplicate registration

@@ -31,6 +31,42 @@ function sp_area_manager_dashboard_shortcode() {
 
     $user = wp_get_current_user();
 
+    // Handle Award Bid Action (Frontend)
+    if (isset($_POST['action']) && $_POST['action'] === 'am_award_bid' && isset($_POST['bid_nonce']) && wp_verify_nonce($_POST['bid_nonce'], 'am_award_bid_action')) {
+        $project_id = intval($_POST['project_id']);
+        $vendor_id = intval($_POST['vendor_id']);
+        $bid_amount = floatval($_POST['bid_amount']);
+        
+        // Verify Project Ownership (Security)
+        $project_owner = get_post_meta($project_id, '_created_by_area_manager', true);
+        // Fallback to post_author if meta not set
+        if (!$project_owner) {
+            $project = get_post($project_id);
+            $project_owner = $project->post_author;
+        }
+
+        if ($project_owner == $user->ID || current_user_can('administrator')) {
+             update_post_meta($project_id, 'winning_vendor_id', $vendor_id);
+            update_post_meta($project_id, 'winning_bid_amount', $bid_amount);
+            update_post_meta($project_id, '_assigned_vendor_id', $vendor_id);
+            update_post_meta($project_id, '_total_project_cost', $bid_amount);
+            update_post_meta($project_id, 'project_status', 'assigned');
+            
+            // Notify Vendor
+            $winning_vendor = get_userdata($vendor_id);
+            $project_title = get_the_title($project_id);
+            if ($winning_vendor) {
+                $subject = 'Congratulations! You Won the Bid for Project: ' . $project_title;
+                $message = "Congratulations! Your bid of ₹" . number_format($bid_amount, 2) . " for project '" . $project_title . "' has been accepted.";
+                wp_mail($winning_vendor->user_email, $subject, $message);
+            }
+            
+            echo '<div class="alert alert-success" style="margin: 20px;">Project awarded successfully!</div>';
+        } else {
+             echo '<div class="alert alert-danger" style="margin: 20px;">Permission denied. You do not own this project.</div>';
+        }
+    }
+
     ob_start();
     ?>
     <div id="areaManagerDashboard" class="modern-solar-dashboard area-manager-dashboard">
@@ -51,7 +87,7 @@ function sp_area_manager_dashboard_shortcode() {
                 <a href="javascript:void(0)" class="nav-item" data-section="projects"><span>🏗️</span> Projects</a>
                 <a href="javascript:void(0)" class="nav-item" data-section="create-project"><span>➕</span> Create Project</a>
                 <a href="javascript:void(0)" class="nav-item" data-section="project-reviews"><span>📝</span> Project Reviews</a>
-                <a href="javascript:void(0)" class="nav-item" data-section="vendor-approvals"><span>👍</span> Vendor Approvals</a>
+                <a href="javascript:void(0)" class="nav-item" data-section="bid-management"><span>🔨</span> Bid Management</a>
 
                 <a href="javascript:void(0)" class="nav-item" data-section="leads"><span>👥</span> Leads</a>
                 <a href="javascript:void(0)" class="nav-item" data-section="my-clients"><span>users</span> My Clients</a>
@@ -73,7 +109,7 @@ function sp_area_manager_dashboard_shortcode() {
                 <div class="header-right">
                     <button class="notification-badge" id="notification-toggle" title="Notifications">
                         🔔
-                        <span class="badge-count" id="notification-count" style="display:none;">0</span>
+                        <span class="badge-count" id="notif-count" style="display:none;">0</span>
                     </button>
                 </div>
             </header>
@@ -96,6 +132,20 @@ function sp_area_manager_dashboard_shortcode() {
                                 <span>Total Revenue</span>
                             </div>
                         </div>
+                        <div class="stat-card stat-success">
+                            <div class="stat-icon">✅</div>
+                            <div class="stat-details">
+                                <h3 id="client-payments-stat">₹0</h3>
+                                <span>Client Payments Collected</span>
+                            </div>
+                        </div>
+                        <div class="stat-card stat-warning">
+                            <div class="stat-icon">⏳</div>
+                            <div class="stat-details">
+                                <h3 id="outstanding-balance-stat">₹0</h3>
+                                <span>Outstanding Balance</span>
+                            </div>
+                        </div>
                         <div class="stat-card">
                             <div class="stat-icon">💸</div>
                             <div class="stat-details">
@@ -115,6 +165,13 @@ function sp_area_manager_dashboard_shortcode() {
                             <div class="stat-details">
                                 <h3 id="profit-margin-stat">0%</h3>
                                 <span>Profit Margin</span>
+                            </div>
+                        </div>
+                        <div class="stat-card">
+                            <div class="stat-icon">📊</div>
+                            <div class="stat-details">
+                                <h3 id="collection-rate-stat">0%</h3>
+                                <span>Collection Rate</span>
                             </div>
                         </div>
                         <div class="stat-card">
@@ -238,10 +295,15 @@ function sp_area_manager_dashboard_shortcode() {
                     <div class="card">
                         <h3>Create New Solar Project</h3>
                         <form id="create-project-form">
-                            <?php wp_nonce_field('sp_create_project_nonce', 'sp_create_project_nonce_field'); ?>
+                            <?php wp_nonce_field('sp_create_project_nonce_field', 'sp_create_project_nonce'); ?>
                             <div class="form-group">
                                 <label for="project_title">Project Title</label>
                                 <input type="text" id="project_title" name="project_title" required>
+                            </div>
+                            <div class="form-group">
+                                <label for="project_description">Project Description</label>
+                                <textarea id="project_description" name="project_description" rows="5" placeholder="Enter detailed information about the project, requirements, specifications, etc."></textarea>
+                                <small style="color: #666;">Provide detailed information about the project that will be visible to vendors and clients.</small>
                             </div>
                             <?php
                             $user_state = get_user_meta($user->ID, 'state', true);
@@ -304,6 +366,12 @@ function sp_area_manager_dashboard_shortcode() {
                             </div>
                             
                             <div class="form-group">
+                                <label for="paid_amount">Amount Paid by Client (₹)</label>
+                                <input type="number" id="paid_amount" name="paid_amount" step="0.01" min="0" style="width: 100%;" placeholder="Token/advance received">
+                                <small style="color: #666;">Optional: Amount already received from client (token money, advance, etc.)</small>
+                            </div>
+                            
+                            <div class="form-group">
                                 <label for="solar_system_size_kw">Solar System Size (kW)</label>
                                 <input type="number" id="solar_system_size_kw" name="solar_system_size_kw" step="0.1" required>
                             </div>
@@ -334,15 +402,46 @@ function sp_area_manager_dashboard_shortcode() {
                             </div>
                             <div class="form-group vendor-manual-fields">
                                 <label for="assigned_vendor_id">Assign Vendor</label>
-                                <?php
-                                wp_dropdown_users( array(
-                                    'role' => 'solar_vendor',
-                                    'name' => 'assigned_vendor_id',
-                                    'show_option_none' => 'Select Vendor',
-                                    'meta_key' => '_created_by_area_manager',
-                                    'meta_value' => get_current_user_id(),
-                                ) );
-                                ?>
+                                <select name="assigned_vendor_id" id="assigned_vendor_id">
+                                    <option value="">Select Vendor</option>
+                                    <?php
+                                    // Get area manager's assigned city
+                                    $manager_city = get_user_meta(get_current_user_id(), 'city', true);
+                                    
+                                    // Get all vendors
+                                    $all_vendors = get_users(array('role' => 'solar_vendor'));
+                                    
+                                    // Filter vendors who have coverage for this specific city
+                                    foreach ($all_vendors as $vendor) {
+                                        $purchased_cities = get_user_meta($vendor->ID, 'purchased_cities', true) ?: array();
+                                        
+                                        // Check if vendor has purchased this specific city
+                                        $has_city_coverage = false;
+                                        if (is_array($purchased_cities)) {
+                                            foreach ($purchased_cities as $city_obj) {
+                                                // Handle both array and string formats
+                                                $city_name = '';
+                                                if (is_array($city_obj) && isset($city_obj['city'])) {
+                                                    $city_name = $city_obj['city'];
+                                                } elseif (is_string($city_obj)) {
+                                                    $city_name = $city_obj;
+                                                }
+                                                
+                                                if ($city_name === $manager_city) {
+                                                    $has_city_coverage = true;
+                                                    break;
+                                                }
+                                            }
+                                        }
+                                        
+                                        // Only show vendor if they have coverage for this city
+                                        if ($has_city_coverage) {
+                                            echo '<option value="' . esc_attr($vendor->ID) . '">' . esc_html($vendor->display_name) . '</option>';
+                                        }
+                                    }
+                                    ?>
+                                </select>
+                                <small style="color: #666;">Only vendors with coverage for <?php echo esc_html($manager_city); ?> are shown</small>
                             </div>
                             <div class="form-group vendor-manual-fields">
                                 <label for="paid_to_vendor">Amount to be Paid to Vendor</label>
@@ -362,13 +461,22 @@ function sp_area_manager_dashboard_shortcode() {
                     </div>
                 </section>
 
-                <!-- Vendor Approvals Section -->
-                <section id="vendor-approvals-section" class="section-content" style="display:none;">
-                    <h2>Vendor Approvals</h2>
-                    <div id="vendor-approvals-container">
-                        <p>Loading vendor approvals...</p>
+
+                <!-- Bid Management Section -->
+                <section id="bid-management-section" class="section-content" style="display:none;">
+                    <div class="section-header">
+                        <h2 class="section-title">Bid Management</h2>
+                        <p style="color: #666; margin-top: 8px;">View and award bids for your projects</p>
+                    </div>
+                    
+                    <div id="bid-management-container">
+                        <div class="loading-spinner">
+                            <div class="spinner"></div>
+                            <p>Loading bids...</p>
+                        </div>
                     </div>
                 </section>
+
 
                 <!-- Leads Section -->
                 <section id="leads-section" class="section-content" style="display:none;">
@@ -531,7 +639,7 @@ function sp_area_manager_dashboard_shortcode() {
             <h3>Notifications</h3>
             <button class="close-btn" id="close-notification-panel">×</button>
         </div>
-        <div class="notification-list" id="notification-list">
+        <div class="notification-list" id="notif-list">
             <p style="text-align: center; color: #999; padding: 20px;">Loading notifications...</p>
         </div>
     </div>
@@ -577,4 +685,5 @@ function sp_area_manager_dashboard_shortcode() {
     <?php
     return ob_get_clean();
 }
-add_shortcode('area_manager_dashboard', 'sp_area_manager_dashboard_shortcode');
+
+// Shortcode registration moved to unified-solar-dashboard.php to avoid duplicate registration

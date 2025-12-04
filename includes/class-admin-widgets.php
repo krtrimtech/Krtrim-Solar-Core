@@ -3,7 +3,7 @@
  * Admin Dashboard Widgets
  * 
  * Provides comprehensive widgets for WordPress admin dashboard
- * showing key metrics for the Kritim Solar Core plugin.
+ * showing key metrics for the Krtrim Solar Core plugin.
  */
 
 if (!defined('ABSPATH')) {
@@ -359,16 +359,23 @@ class SP_Admin_Widgets {
     private function get_financial_stats() {
         global $wpdb;
         
+        // Only count published (active) projects, exclude trashed/deleted
         $revenue = $wpdb->get_var("
-            SELECT SUM(meta_value) 
-            FROM {$wpdb->postmeta} 
-            WHERE meta_key = '_total_project_cost'
+            SELECT SUM(pm.meta_value) 
+            FROM {$wpdb->postmeta} pm
+            INNER JOIN {$wpdb->posts} p ON pm.post_id = p.ID
+            WHERE pm.meta_key = '_total_project_cost'
+            AND p.post_type = 'solar_project'
+            AND p.post_status = 'publish'
         ");
         
         $costs = $wpdb->get_var("
-            SELECT SUM(meta_value) 
-            FROM {$wpdb->postmeta} 
-            WHERE meta_key = '_vendor_paid_amount'
+            SELECT SUM(pm.meta_value) 
+            FROM {$wpdb->postmeta} pm
+            INNER JOIN {$wpdb->posts} p ON pm.post_id = p.ID
+            WHERE pm.meta_key = '_paid_to_vendor'
+            AND p.post_type = 'solar_project'
+            AND p.post_status = 'publish'
         ");
         
         $profit = $revenue - $costs;
@@ -443,7 +450,7 @@ class SP_Admin_Widgets {
             'post_type' => 'solar_project',
             'posts_per_page' => 2,
             'meta_query' => [
-                ['key' => '_project_status', 'value' => 'completed']
+                ['key' => 'project_status', 'value' => 'completed']
             ]
         ]);
 
@@ -455,12 +462,53 @@ class SP_Admin_Widgets {
             ];
         }
 
+        // ✅ RECENT BIDS (last 7 days)
+        global $wpdb;
+        $bids_table = $wpdb->prefix . 'project_bids';
+        $recent_bids = $wpdb->get_results(
+            "SELECT b.*, p.post_title, u.display_name 
+            FROM {$bids_table} b 
+            JOIN {$wpdb->posts} p ON b.project_id = p.ID 
+            JOIN {$wpdb->users} u ON b.vendor_id = u.ID 
+            WHERE b.created_at >= DATE_SUB(NOW(), INTERVAL 7 DAY)
+            ORDER BY b.created_at DESC 
+            LIMIT 3"
+        );
+
+        foreach ($recent_bids as $bid) {
+            $activities[] = [
+                'icon' => '🎯',
+                'text' => sprintf('Bid by %s on %s - ₹%s', $bid->display_name, $bid->post_title, number_format($bid->bid_amount, 0)),
+                'time' => strtotime($bid->created_at)
+            ];
+        }
+
+        // ✅ RECENT STEP SUBMISSIONS (last 7 days)
+        $steps_table = $wpdb->prefix . 'solar_process_steps';
+        $recent_steps = $wpdb->get_results(
+            "SELECT s.*, p.post_title 
+            FROM {$steps_table} s 
+            JOIN {$wpdb->posts} p ON s.project_id = p.ID 
+            WHERE s.updated_at >= DATE_SUB(NOW(), INTERVAL 7 DAY)
+            AND s.admin_status = 'under_review'
+            ORDER BY s.updated_at DESC 
+            LIMIT 5"
+        );
+
+        foreach ($recent_steps as $step) {
+            $activities[] = [
+                'icon' => '📤',
+                'text' => sprintf('Step submitted: %s for %s', $step->step_name, $step->post_title),
+                'time' => strtotime($step->updated_at)
+            ];
+        }
+
         // Sort by time
         usort($activities, function($a, $b) {
             return $b['time'] - $a['time'];
         });
 
-        return array_slice($activities, 0, 5);
+        return array_slice($activities, 0, 8); // Increased limit to show more variety
     }
 
     private function get_quick_stats() {
@@ -494,7 +542,7 @@ class SP_Admin_Widgets {
         $unassigned = get_posts([
             'post_type' => 'solar_project',
             'meta_query' => [
-                ['key' => '_project_status', 'value' => 'pending']
+                ['key' => 'project_status', 'value' => 'pending']
             ],
             'fields' => 'ids'
         ]);
@@ -511,7 +559,7 @@ class SP_Admin_Widgets {
         $count = get_posts([
             'post_type' => 'solar_project',
             'meta_query' => [
-                ['key' => '_project_status', 'value' => $status]
+                ['key' => 'project_status', 'value' => $status]
             ],
             'fields' => 'ids'
         ]);

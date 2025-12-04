@@ -36,8 +36,8 @@ function sp_render_leaderboard_view() {
 
         foreach ($projects as $project) {
             $paid = get_post_meta($project->ID, '_paid_to_vendor', true) ?: 0;
-            $winning_bid = get_post_meta($project->ID, '_winning_bid_amount', true) ?: 0;
-            $profit = $winning_bid - $paid;
+            $total_cost = get_post_meta($project->ID, '_total_project_cost', true) ?: 0;
+            $profit = $total_cost - $paid;
             $paid_to_vendors += $paid;
             $company_profit += $profit;
         }
@@ -48,8 +48,8 @@ function sp_render_leaderboard_view() {
             'total_projects' => $total_projects,
             'paid_to_vendors' => $paid_to_vendors,
             'company_profit' => $company_profit,
-            'assigned_state' => get_user_meta($manager->ID, 'assigned_state', true),
-            'assigned_city' => get_user_meta($manager->ID, 'assigned_city', true),
+            'assigned_state' => get_user_meta($manager->ID, 'state', true),
+            'assigned_city' => get_user_meta($manager->ID, 'city', true),
         ];
 
         $chart_labels[] = $manager->display_name;
@@ -274,7 +274,7 @@ function sp_render_single_manager_view($manager_id) {
     $vendors = [];
 
     foreach ($projects as $project) {
-        $status = get_post_meta($project->ID, '_project_status', true) ?: 'pending';
+        $status = get_post_meta($project->ID, 'project_status', true) ?: 'pending';
         if (isset($stats[$status])) {
             $stats[$status]++;
         }
@@ -304,20 +304,20 @@ function sp_render_single_manager_view($manager_id) {
             </div>
             <div class="detail-card">
                 <h3>Actions</h3>
-                <button class="button" disabled>Generate Report</button>
-                <button class="button" disabled>Share via Email</button>
-                <button class="button" disabled>Share via WhatsApp</button>
+                <button class="button button-primary manager-report-btn" data-action="generate" data-manager-id="<?php echo $manager_id; ?>">📄 Generate Report</button>
+                <button class="button manager-report-btn" data-action="email" data-manager-id="<?php echo $manager_id; ?>">📧 Share via Email</button>
+                <button class="button manager-report-btn" data-action="whatsapp" data-manager-id="<?php echo $manager_id; ?>">📱 Share via WhatsApp</button>
             </div>
             <div class="detail-card wide">
                 <h3>Associated Clients</h3>
                 <ul>
-                    <?php foreach($clients as $client) { if($client) echo '<li>' . esc_html($client->display_name) . ' (' . esc_html($client->user_email) . ')</li>'; } ?>
+                    <?php foreach($clients as $client) { if($client) echo '<li><a href="' . admin_url('user-edit.php?user_id=' . $client->ID) . '">' . esc_html($client->display_name) . '</a> (' . esc_html($client->user_email) . ')</li>'; } ?>
                 </ul>
             </div>
             <div class="detail-card wide">
                 <h3>Associated Vendors</h3>
                 <ul>
-                    <?php foreach($vendors as $vendor) { if($vendor) echo '<li>' . esc_html($vendor->display_name) . ' (' . esc_html($vendor->user_email) . ')</li>'; } ?>
+                    <?php foreach($vendors as $vendor) { if($vendor) echo '<li><a href="' . admin_url('user-edit.php?user_id=' . $vendor->ID) . '">' . esc_html($vendor->display_name) . '</a> (' . esc_html($vendor->user_email) . ')</li>'; } ?>
                 </ul>
             </div>
         </div>
@@ -327,5 +327,116 @@ function sp_render_single_manager_view($manager_id) {
         .detail-card { background: #fff; padding: 20px; border: 1px solid #ddd; }
         .detail-card.wide { grid-column: span 2; }
     </style>
+    <script>
+        function handleWhatsAppRedirect(whatsapp_data) {
+            if (whatsapp_data && whatsapp_data.phone && whatsapp_data.message) {
+                const url = `https://wa.me/${whatsapp_data.phone}?text=${whatsapp_data.message}`;
+                window.open(url, '_blank');
+            }
+        }
+
+        jQuery(document).ready(function($) {
+            $('.manager-report-btn').on('click', function() {
+                const button = $(this);
+                const action = button.data('action');
+                const managerId = button.data('manager-id');
+                const originalText = button.text();
+
+                if (action === 'generate') {
+                    // Generate Report - Download as text summary
+                    $.ajax({
+                        url: ajaxurl,
+                        type: 'POST',
+                        data: {
+                            action: 'generate_manager_report',
+                            manager_id: managerId,
+                            nonce: '<?php echo wp_create_nonce("manager_report_nonce"); ?>'
+                        },
+                        beforeSend: function() {
+                            button.prop('disabled', true).text('⏳ Generating...');
+                        },
+                        success: function(response) {
+                            if (response.success) {
+                                // Create downloadable text file
+                                const blob = new Blob([response.data.report_text], { type: 'text/plain' });
+                                const url = window.URL.createObjectURL(blob);
+                                const a = document.createElement('a');
+                                a.href = url;
+                                a.download = response.data.filename;
+                                document.body.appendChild(a);
+                                a.click();
+                                window.URL.revokeObjectURL(url);
+                                document.body.removeChild(a);
+                                alert('✅ Report generated successfully!');
+                            } else {
+                                alert('❌ Error: ' + response.data.message);
+                            }
+                            button.prop('disabled', false).text(originalText);
+                        },
+                        error: function() {
+                            alert('❌ An error occurred.');
+                            button.prop('disabled', false).text(originalText);
+                        }
+                    });
+                } else if (action === 'email') {
+                    // Share via Email
+                    const email = prompt('Enter email address to send report:');
+                    if (!email) return;
+
+                    $.ajax({
+                        url: ajaxurl,
+                        type: 'POST',
+                        data: {
+                            action: 'email_manager_report',
+                            manager_id: managerId,
+                            email: email,
+                            nonce: '<?php echo wp_create_nonce("manager_report_nonce"); ?>'
+                        },
+                        beforeSend: function() {
+                            button.prop('disabled', true).text('⏳ Sending...');
+                        },
+                        success: function(response) {
+                            if (response.success) {
+                                alert('✅ ' + response.data.message);
+                            } else {
+                                alert('❌ Error: ' + response.data.message);
+                            }
+                            button.prop('disabled', false).text(originalText);
+                        },
+                        error: function() {
+                            alert('❌ An error occurred.');
+                            button.prop('disabled', false).text(originalText);
+                        }
+                    });
+                } else if (action === 'whatsapp') {
+                    // Share via WhatsApp
+                    $.ajax({
+                        url: ajaxurl,
+                        type: 'POST',
+                        data: {
+                            action: 'whatsapp_manager_report',
+                            manager_id: managerId,
+                            nonce: '<?php echo wp_create_nonce("manager_report_nonce"); ?>'
+                        },
+                        beforeSend: function() {
+                            button.prop('disabled', true).text('⏳ Preparing...');
+                        },
+                        success: function(response) {
+                            if (response.success && response.data.whatsapp_data) {
+                                handleWhatsAppRedirect(response.data.whatsapp_data);
+                            } else {
+                                alert('❌ Error: ' + (response.data.message || 'Manager phone number not found'));
+                            }
+                            button.prop('disabled', false).text(originalText);
+                        },
+                        error: function() {
+                            alert('❌ An error occurred.');
+                            button.prop('disabled', false).text(originalText);
+                        }
+                    });
+                }
+            });
+        });
+    </script>
     <?php
 }

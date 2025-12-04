@@ -1,6 +1,6 @@
 <?php
 /**
- * Admin settings page for Kritim Solar Core.
+ * Admin settings page for Krtrim Solar Core.
  * Consolidates Vendor Registration and Notification settings.
  */
 
@@ -9,25 +9,70 @@ function sp_render_general_settings_page() {
     $active_tab = isset($_GET['tab']) ? $_GET['tab'] : 'vendor_registration';
     ?>
     <div class="wrap">
-        <h1>Kritim Solar Core Settings</h1>
+        <h1>Krtrim Solar Core Settings</h1>
         <h2 class="nav-tab-wrapper">
             <a href="?page=ksc-settings&tab=vendor_registration" class="nav-tab <?php echo $active_tab == 'vendor_registration' ? 'nav-tab-active' : ''; ?>">Vendor Registration</a>
             <a href="?page=ksc-settings&tab=notifications" class="nav-tab <?php echo $active_tab == 'notifications' ? 'nav-tab-active' : ''; ?>">Notifications</a>
             <a href="?page=ksc-settings&tab=project_settings" class="nav-tab <?php echo $active_tab == 'project_settings' ? 'nav-tab-active' : ''; ?>">Project Settings</a>
+            <a href="?page=ksc-settings&tab=about" class="nav-tab <?php echo $active_tab == 'about' ? 'nav-tab-active' : ''; ?>">About & Support</a>
         </h2>
         <form method="post" action="options.php">
             <?php
             if ($active_tab == 'vendor_registration') {
                 settings_fields('sp_vendor_settings_group');
                 do_settings_sections('vendor-registration-settings');
+                submit_button();
             } elseif ($active_tab == 'project_settings') {
                 settings_fields('sp_project_settings_group');
                 do_settings_sections('project-settings');
-            } else {
+                submit_button();
+            } elseif ($active_tab == 'notifications') {
                 settings_fields('sp_notification_settings_group');
                 do_settings_sections('notification-settings');
+                submit_button();
+            } elseif ($active_tab == 'about') {
+                ?>
+                <div class="card" style="max-width: 800px; margin-top: 20px; padding: 20px;">
+                    <h2>About Krtrim Solar Core</h2>
+                    <p><strong>Krtrim Solar Core</strong> is a comprehensive project management and bidding platform for solar companies. It creates a unified dashboard for "Solar Clients", "Solar Vendors", and "Area Managers".</p>
+                    
+                    <hr>
+                    
+                    <h3>🔗 Important Links</h3>
+                    <ul style="list-style: disc; margin-left: 20px; line-height: 2;">
+                        <li><strong>Website:</strong> <a href="https://www.krtrim.tech/" target="_blank">https://www.krtrim.tech/</a></li>
+                        <li><strong>GitHub Repository:</strong> <a href="https://github.com/krtrimtech/Krtrim-Solar-Core" target="_blank">https://github.com/krtrimtech/Krtrim-Solar-Core</a></li>
+                        <li><strong>Documentation:</strong> <a href="https://github.com/krtrimtech/Krtrim-Solar-Core/wiki" target="_blank">View Documentation</a></li>
+                        <li><strong>Report Issues:</strong> <a href="https://github.com/krtrimtech/Krtrim-Solar-Core/issues" target="_blank">GitHub Issues</a></li>
+                    </ul>
+                    
+                    <hr>
+                    
+                    <h3>💖 Support Development</h3>
+                    <p>This plugin is free and open source. If you find it useful, please consider supporting its development:</p>
+                    
+                    <div style="display: flex; gap: 20px; flex-wrap: wrap; margin-top: 15px;">
+                        <a href="https://github.com/sponsors/shyanukant" target="_blank" class="button button-primary button-hero">
+                            ❤️ Sponsor on GitHub
+                        </a>
+                    </div>
+                    
+                    <div style="margin-top: 20px; background: #f0f6fc; padding: 15px; border-radius: 6px; border: 1px solid #d0d7de;">
+                        <p style="margin: 0;"><strong>UPI ID for Donations:</strong> <code>shyanukant@upi</code></p>
+                    </div>
+                    
+                    <hr>
+                    
+                    <h3>📞 Contact</h3>
+                    <p><strong>Email:</strong> <a href="mailto:contact@krtrim.tech">contact@krtrim.tech</a></p>
+                    
+                    <div style="margin-top: 30px; text-align: center; color: #666;">
+                        <p>Made with ❤️ by <a href="https://www.krtrim.tech" target="_blank">Krtrim Tech</a></p>
+                        <p><em>Version 1.0.0</em></p>
+                    </div>
+                </div>
+                <?php
             }
-            submit_button();
             ?>
         </form>
     </div>
@@ -247,7 +292,6 @@ function sp_register_general_settings() {
         'sp_project_section'
     );
 }
-add_action('admin_init', 'sp_register_general_settings');
 
 // Enqueue media uploader
 function sp_enqueue_admin_media_scripts($hook) {
@@ -256,7 +300,12 @@ function sp_enqueue_admin_media_scripts($hook) {
     }
     wp_enqueue_media();
 }
-add_action('admin_enqueue_scripts', 'sp_enqueue_admin_media_scripts');
+
+// Only register hooks when in admin area to prevent output during activation
+if (is_admin()) {
+    add_action('admin_init', 'sp_register_general_settings');
+    add_action('admin_enqueue_scripts', 'sp_enqueue_admin_media_scripts');
+}
 
 // --- Callbacks ---
 

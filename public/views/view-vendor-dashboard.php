@@ -1,9 +1,24 @@
 <?php
+// Prevent caching of dynamic vendor dashboard
+if (!headers_sent()) {
+    header('Cache-Control: no-cache, no-store, must-revalidate, max-age=0');
+    header('Pragma: no-cache');
+    header('Expires: 0');
+    
+    // LiteSpeed Cache specific directive
+    if (defined('LSCWP_V')) {
+        do_action('litespeed_control_set_nocache', 'vendor dashboard is user-specific and dynamic');
+    }
+}
 
 function render_solar_vendor_dashboard() {
     $current_user = wp_get_current_user();
     $vendor_id = get_current_user_id();
     $view_project_id = isset($_GET['view_project']) ? intval($_GET['view_project']) : 0;
+    
+    // Get vendor coverage data (needed for both display and JavaScript)
+    $purchased_states = get_user_meta($vendor_id, 'purchased_states', true) ?: [];
+    $purchased_cities = get_user_meta($vendor_id, 'purchased_cities', true) ?: [];
     
     $args = array(
         'post_type' => 'solar_project',
@@ -12,7 +27,7 @@ function render_solar_vendor_dashboard() {
         'meta_query' => array(
             'relation' => 'AND',
             array(
-                'key' => 'assigned_vendor_id',
+                'key' => '_assigned_vendor_id',
                 'value' => $vendor_id,
             ),
             array(
@@ -34,7 +49,7 @@ function render_solar_vendor_dashboard() {
             $vendor_projects->the_post();
             $paid_to_vendor = floatval(get_post_meta(get_the_ID(), '_paid_to_vendor', true));
             $total_received += $paid_to_vendor;
-            $project_status = get_post_meta(get_the_ID(), '_project_status', true);
+            $project_status = get_post_meta(get_the_ID(), 'project_status', true);
             if ($project_status === 'in_progress') {
                 $total_working++;
             } elseif ($project_status === 'completed') {
@@ -78,6 +93,10 @@ function render_solar_vendor_dashboard() {
                 <a href="#" class="nav-item" data-section="timeline" onclick="switchVendorSection(event, 'timeline')">
                     <span class="icon">🔄</span>
                     <span>Work Timeline</span>
+                </a>
+                <a href="#" class="nav-item" data-section="profile" onclick="switchVendorSection(event, 'profile')">
+                    <span class="icon">👤</span>
+                    <span>Profile & Coverage</span>
                 </a>
             </nav>
             
@@ -153,7 +172,7 @@ function render_solar_vendor_dashboard() {
                                 <span class="stat-icon">✅</span>
                             </div>
                             <div class="stat-value"><?php echo $total_completed; ?></div>
-                            <div class="stat-subtitle">Finished</div>
+                            <div class="stat-subtitle">Projects Done</div>
                         </div>
                         
                         <div class="stat-card">
@@ -182,7 +201,7 @@ function render_solar_vendor_dashboard() {
                             <!-- Summary Card -->
                             <div class="card">
                                 <div class="card-header">
-                                    <h3>📊 Overview</h3>
+                                    <h3>📊 Quick Stats</h3>
                                 </div>
                                 <div class="overview-items">
                                     <div class="overview-item">
@@ -232,7 +251,7 @@ function render_solar_vendor_dashboard() {
                         <?php
                         $project = get_post($view_project_id);
                         if ($project && $project->post_type === 'solar_project') :
-                            $assigned_vendor = get_post_meta($view_project_id, 'assigned_vendor_id', true);
+                            $assigned_vendor = get_post_meta($view_project_id, '_assigned_vendor_id', true);
                             
                             $has_access = false;
                             if (is_array($assigned_vendor)) {
@@ -256,7 +275,7 @@ function render_solar_vendor_dashboard() {
                                 $client_id = get_post_meta($view_project_id, '_client_user_id', true);
                                 $paid_to_vendor = floatval(get_post_meta($view_project_id, '_paid_to_vendor', true));
                                 $system_size = get_post_meta($view_project_id, '_solar_system_size_kw', true);
-                                $status = get_post_meta($view_project_id, '_project_status', true);
+                                $status = get_post_meta($view_project_id, 'project_status', true);
                                 $total_cost = get_post_meta($view_project_id, '_total_project_cost', true);
                                 $client_address = get_post_meta($view_project_id, '_client_address', true);
                                 $client_phone = get_post_meta($view_project_id, '_client_phone_number', true);
@@ -369,8 +388,9 @@ function render_solar_vendor_dashboard() {
                                                         <?php 
                                                         if ($is_locked) echo 'Locked until previous step approved';
                                                         elseif ($step->admin_status === 'approved') echo '✅ Approved';
-                                                        elseif ($step->admin_status === 'rejected') echo '❌ Rejected';
-                                                        else echo '⏳ Pending review';
+                                                        elseif ($step->admin_status === 'rejected') echo '❌ Rejected - Resubmit Required';
+                                                        elseif ($step->admin_status === 'under_review') echo '🔍 Under Review';
+                                                        else echo '⏳ Pending - Upload proof';
                                                         ?>
                                                     </div>
                                                 </div>
@@ -383,7 +403,7 @@ function render_solar_vendor_dashboard() {
                                                 else echo '#ffc107';
                                                 ?>
                                             ">
-                                                <?php if ($is_locked) echo 'Locked'; else echo ucfirst($step->admin_status); ?>
+                                                <?php if ($is_locked) echo 'Locked'; elseif ($step->admin_status === 'under_review') echo 'Under Review'; else echo ucfirst(str_replace('_', ' ', $step->admin_status)); ?>
                                             </span>
                                         </div>
 
@@ -392,7 +412,7 @@ function render_solar_vendor_dashboard() {
                                             <?php if (!$is_locked) : ?>
                                                 
                                                 <!-- SHOW SUBMITTED WORK -->
-                                                <?php if ($step->image_url && ($step->admin_status === 'pending' || $step->admin_status === 'rejected')) : ?>
+                                                <?php if ($step->image_url && in_array($step->admin_status, ['under_review', 'approved', 'rejected'])) : ?>
                                                     <div style="background: #f0f7ff; padding: 15px; border-radius: 8px; border-left: 4px solid #007bff; margin-bottom: 15px;">
                                                         <strong>📂 Your Submission</strong>
                                                         <div style="margin-top: 10px;">
@@ -407,10 +427,10 @@ function render_solar_vendor_dashboard() {
                                                                 </div>
                                                             <?php endif; ?>
                                                             
-                                                            <?php if ($step->admin_status === 'pending') : ?>
+                                                            <?php if ($step->admin_status === 'under_review') : ?>
                                                                 <div style="background: #fff3cd; color: #856404; padding: 12px; border-radius: 6px; margin-top: 10px; border-left: 4px solid #ffc107;">
-                                                                    ⏳ <strong>Waiting for Admin Review</strong><br>
-                                                                    <small>Your submission is under review. Please wait for admin approval or rejection.</small>
+                                                                    🔍 <strong>Under Review</strong><br>
+                                                                    <small>Your submission is being reviewed by admin. Please wait for approval or rejection.</small>
                                                                 </div>
                                                             <?php elseif ($step->admin_status === 'rejected') : ?>
                                                                 <div style="background: #fff5f5; color: #721c24; padding: 12px; border-radius: 6px; margin-top: 10px; border-left: 4px solid #dc3545;">
@@ -418,15 +438,27 @@ function render_solar_vendor_dashboard() {
                                                                     <strong>Reason:</strong> <?php echo esc_html($step->admin_comment); ?><br>
                                                                     <small style="margin-top: 8px; display: block;">You can re-submit below</small>
                                                                 </div>
+                                                            <?php elseif ($step->admin_status === 'approved') : ?>
+                                                                <div style="background: #d4edda; color: #155724; padding: 12px; border-radius: 6px; margin-top: 10px; border-left: 4px solid #28a745;">
+                                                                    ✅ <strong>Approved</strong><br>
+                                                                    <?php if ($step->admin_comment) : ?>
+                                                                        <strong>Admin Note:</strong> <?php echo esc_html($step->admin_comment); ?><br>
+                                                                    <?php endif; ?>
+                                                                    <small>This step has been approved!</small>
+                                                                </div>
                                                             <?php endif; ?>
                                                         </div>
                                                     </div>
                                                 <?php endif; ?>
                                                 
-                                                <!-- UPLOAD FORM -->
+                                                <!-- UPLOAD FORM - Show only for pending (not submitted) or rejected -->
                                                 <?php if ($step->admin_status === 'rejected' || ($step->admin_status === 'pending' && !$step->image_url)) : ?>
                                                     <form class="ajax-upload-form" data-step-id="<?php echo $step->id; ?>" data-project-id="<?php echo $view_project_id; ?>" style="margin-top: 15px; padding-top: 15px; border-top: 1px solid #f0f0f0;">
                                                         <?php wp_nonce_field('solar_upload_' . $step->id, 'solar_nonce'); ?>
+                                                        
+                                                        <!-- Hidden fields for JS FormData to pick up -->
+                                                        <input type="hidden" name="step_id" value="<?php echo $step->id; ?>">
+                                                        <input type="hidden" name="project_id" value="<?php echo $view_project_id; ?>">
 
                                                         <div class="form-group">
                                                             <label>Upload Image *</label>
@@ -477,7 +509,7 @@ function render_solar_vendor_dashboard() {
                             while ($vendor_projects->have_posts()) : $vendor_projects->the_post();
                                 $project_id = get_the_ID();
                                 $paid_to_vendor = floatval(get_post_meta($project_id, '_paid_to_vendor', true));
-                                $status = get_post_meta($project_id, '_project_status', true);
+                                $status = get_post_meta($project_id, 'project_status', true);
                                 $system_size = get_post_meta($project_id, '_solar_system_size_kw', true);
                                 $client_id = get_post_meta($project_id, '_client_user_id', true);
                                 if (is_object($client_id)) $client_id = $client_id->ID;
@@ -579,9 +611,182 @@ function render_solar_vendor_dashboard() {
                     <?php endif; ?>
                     <?php wp_reset_postdata(); ?>
                 </div>
+
+                <!-- PROFILE & COVERAGE SECTION -->
+                <div class="section-content" id="profile-section" style="display: none;">
+                    <div class="profile-grid" style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px;">
+                        
+                        <!-- Profile Settings -->
+                        <div class="card" style="background: white; padding: 20px; border-radius: 10px; box-shadow: 0 2px 10px rgba(0,0,0,0.05);">
+                            <h3>Profile Settings</h3>
+                            <form id="vendor-profile-form">
+                                <p>
+                                    <label>Company Name</label><br>
+                                    <input type="text" id="profile-company" class="form-control" value="<?php echo esc_attr(get_user_meta($vendor_id, 'company_name', true)); ?>" required style="width:100%; padding:8px; margin-top:5px;">
+                                </p>
+                                <p>
+                                    <label>Phone</label><br>
+                                    <input type="text" id="profile-phone" class="form-control" value="<?php echo esc_attr(get_user_meta($vendor_id, 'phone', true)); ?>" required style="width:100%; padding:8px; margin-top:5px;">
+                                </p>
+                                <button type="submit" class="button button-primary" style="margin-top:10px;">Update Profile</button>
+                            </form>
+                        </div>
+
+                        <!-- Current Coverage -->
+                        <div class="card" style="background: white; padding: 20px; border-radius: 10px; box-shadow: 0 2px 10px rgba(0,0,0,0.05);">
+                            <h3>My Coverage Area</h3>
+                            <div>
+                                <strong>States (<?php echo count($purchased_states); ?>):</strong>
+                                <div style="display: flex; flex-wrap: wrap; gap: 5px; margin-top: 5px;">
+                                    <?php foreach($purchased_states as $state_obj): ?>
+                                        <?php
+                                        // Handle both array/object and string formats
+                                        $state_name = '';
+                                        if (is_array($state_obj) && isset($state_obj['state'])) {
+                                            $state_name = $state_obj['state'];  // Object format from registration
+                                        } elseif (is_string($state_obj)) {
+                                            $state_name = $state_obj;  // String format from admin/dashboard
+                                        }
+                                        ?>
+                                        <?php if ($state_name): ?>
+                                            <span style="background: #eef2f7; padding: 4px 8px; border-radius: 4px; font-size: 12px;">
+                                                <?php echo esc_html($state_name); ?>
+                                            </span>
+                                        <?php endif; ?>
+                                    <?php endforeach; ?>
+                                </div>
+                            </div>
+                            <div>
+                                <strong>Cities (<?php echo count($purchased_cities); ?>):</strong>
+                                <div style="display: flex; flex-wrap: wrap; gap: 5px; margin-top: 5px;">
+                                    <?php foreach($purchased_cities as $city_obj): ?>
+                                        <?php
+                                        // Handle both array/object and string formats
+                                        $city_name = '';
+                                        if (is_array($city_obj) && isset($city_obj['city'])) {
+                                            $city_name = $city_obj['city'];  // Object format from registration
+                                        } elseif (is_string($city_obj)) {
+                                            $city_name = $city_obj;  // String format from admin/dashboard
+                                        }
+                                        ?>
+                                        <?php if ($city_name): ?>
+                                            <span style="background: #eef2f7; padding: 4px 8px; border-radius: 4px; font-size: 12px;">
+                                                <?php echo esc_html($city_name); ?>
+                                            </span>
+                                        <?php endif; ?>
+                                    <?php endforeach; ?>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Add Coverage -->
+                        <div class="card" style="grid-column: 1 / -1; background: white; padding: 25px; border-radius: 12px; box-shadow: 0 4px 20px rgba(0,0,0,0.08);">
+                            <h3 style="margin-bottom: 5px;">Expand Coverage Area</h3>
+                            <p style="color: #666; font-size: 14px; margin-bottom: 20px;">Grow your business by adding more states or specific cities.</p>
+                            
+                            <div class="coverage-expansion-grid" style="display: grid; grid-template-columns: 1.5fr 1fr; gap: 30px;">
+                                
+                                <!-- Left: Selection -->
+                                <div class="selection-panel">
+                                    
+                                    <!-- Step 1: Select State -->
+                                    <div class="form-group" style="margin-bottom: 20px;">
+                                        <label style="display: block; font-weight: 600; margin-bottom: 8px;">1. Select State</label>
+                                        <select id="coverage-state-select" class="form-control" style="width: 100%; padding: 10px; border-radius: 6px; border: 1px solid #ddd;">
+                                            <option value="">-- Choose a State --</option>
+                                            <!-- Populated via JS -->
+                                        </select>
+                                    </div>
+
+                                    <!-- Step 2: State Options (Hidden by default) -->
+                                    <div id="state-options-container" style="display: none; margin-bottom: 20px; padding: 15px; background: #f8f9fa; border-radius: 8px; border: 1px solid #eee;">
+                                        <div id="owned-state-msg" style="display: none; color: #28a745; font-weight: 600; margin-bottom: 5px;">
+                                            ✅ You already own this state.
+                                        </div>
+                                        <div id="new-state-msg" style="color: #007bff; font-weight: 600; margin-bottom: 5px;">
+                                            ℹ️ State Fee: ₹500 (One-time)
+                                        </div>
+                                        <small style="color: #666;">Includes access to all cities in this state.</small>
+                                    </div>
+
+                                    <!-- Step 3: City Selection -->
+                                    <div id="city-selection-container" style="display: none;">
+                                        <label style="display: block; font-weight: 600; margin-bottom: 8px;">2. Select Specific Cities (Optional)</label>
+                                        <div id="city-checkboxes" style="display: grid; grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: 10px; max-height: 300px; overflow-y: auto; padding: 10px; border: 1px solid #eee; border-radius: 6px;">
+                                            <!-- Populated via JS -->
+                                        </div>
+                                        <small style="display: block; margin-top: 5px; color: #888;">Cities are ₹100 each.</small>
+                                    </div>
+
+                                </div>
+
+                                <!-- Right: Summary/Cart -->
+                                <div class="summary-panel" style="background: #f8f9fa; padding: 20px; border-radius: 10px; border: 1px solid #eee; height: fit-content;">
+                                    <h4 style="margin-top: 0; border-bottom: 1px solid #ddd; padding-bottom: 10px;">Order Summary</h4>
+                                    
+                                    <div id="cart-items" style="min-height: 100px; margin-bottom: 20px;">
+                                        <p style="color: #999; text-align: center; margin-top: 30px;">No items selected</p>
+                                    </div>
+
+                                    <div style="border-top: 1px solid #ddd; padding-top: 15px; margin-top: auto;">
+                                        <div style="display: flex; justify-content: space-between; margin-bottom: 15px; font-size: 18px; font-weight: 700;">
+                                            <span>Total</span>
+                                            <span id="cart-total">₹0</span>
+                                        </div>
+                                        <button id="pay-add-coverage-btn" class="button button-primary" style="width: 100%; padding: 12px; font-size: 16px; background: linear-gradient(135deg, #007bff, #0056b3); border: none;" disabled>
+                                            Pay & Add Coverage
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <!-- Logout Button -->
+                        <div class="card" style="background: white; padding: 20px; border-radius: 10px; box-shadow: 0 2px 10px rgba(0,0,0,0.05); text-align: center;">
+                            <a href="<?php echo wp_logout_url(home_url()); ?>" class="logout-btn-simple" style="display: inline-block; padding: 10px 30px; background: #dc3545; color: #fff; text-decoration: none; border-radius: 6px; font-weight: 500; font-size: 14px; transition: background 0.3s;">
+                                🚪 Logout
+                            </a>
+                        </div>
+
+                    </div>
+                </div>
             </div>
         </main>
+        
+        <!-- Mobile Bottom Navigation (visible only on mobile < 768px) -->
+        <nav class="mobile-bottom-nav">
+            <a href="#" class="nav-btn active" data-section="dashboard" onclick="switchVendorSection(event, 'dashboard')">
+                <span class="nav-icon">📊</span>
+                <span class="nav-label">Home</span>
+            </a>
+            <a href="#" class="nav-btn" data-section="projects" onclick="switchVendorSection(event, 'projects')">
+                <span class="nav-icon">📂</span>
+                <span class="nav-label">Projects</span>
+            </a>
+            <a href="#" class="nav-btn" data-section="timeline" onclick="switchVendorSection(event, 'timeline')">
+                <span class="nav-icon">🔄</span>
+                <span class="nav-label">Work</span>
+            </a>
+            <a href="#" class="nav-btn" data-section="profile" onclick="switchVendorSection(event, 'profile')">
+                <span class="nav-icon">👤</span>
+                <span class="nav-label">Profile</span>
+            </a>
+        </nav>
     </div>
+    
+    <!-- Razorpay Script -->
+    <script src="https://checkout.razorpay.com/v1/checkout.js"></script>
+    
+    <script>
+    // Pass PHP data to JS
+    var vendorCoverage = {
+        ownedStates: <?php echo json_encode($purchased_states); ?>,
+        ownedCities: <?php echo json_encode($purchased_cities); ?>,
+        userEmail: '<?php echo esc_js($current_user->user_email); ?>',
+        userName: '<?php echo esc_js($current_user->display_name); ?>',
+        userPhone: '<?php echo esc_js(get_user_meta($vendor_id, 'phone', true)); ?>'
+    };
+    </script>
 
     <!-- Image Modal -->
     <div id="imageModal" class="image-modal" onclick="closeImageModal()">

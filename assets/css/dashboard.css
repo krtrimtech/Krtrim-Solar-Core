@@ -614,12 +614,23 @@ body {
 }
 
 .btn-view-card {
-    background: #007bff;
-    color: white;
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    background: linear-gradient(135deg, #f7bb72 0%, #f39b2f 100%);
+    color: #ffffff;
+    padding: 12px 24px;
+    border-radius: 8px;
+    text-decoration: none;
+    font-weight: 600;
+    font-size: 14px;
+    transition: all 0.3s ease;
+    width: 100%;
+    justify-content: center;
 }
 
 .btn-view-card:hover {
-    background: #0056b3;
+    background: linear-gradient(135deg, #f39b2f 0%, #f7bb72 100%);
     transform: translateY(-2px);
 }
 
@@ -870,7 +881,7 @@ body {
 }
 
 .btn-primary {
-    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    background: linear-gradient(135deg, #667eea 0%, #03162e 100%);
     color: white;
 }
 
@@ -1976,5 +1987,495 @@ body {
 
     .mobile-profile-info h4 {
         font-size: 17px;
+    }
+}
+
+/* Coverage Filter Styles */
+.coverage-filter-group {
+    padding: 15px;
+    background: #f8f9fa;
+    border-radius: 8px;
+    border-left: 4px solid #667eea;
+    margin-top: 10px;
+}
+
+.coverage-filter-label {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    cursor: pointer;
+    font-weight: 600;
+    color: #333;
+}
+
+.coverage-filter-label input[type="checkbox"] {
+    width: 18px;
+    height: 18px;
+    cursor: pointer;
+    accent-color: #667eea;
+}
+
+.coverage-filter-label span {
+    font-size: 14px;
+}
+
+.filter-description {
+    font-size: 12px;
+    color: #666;
+    margin: 8px 0 0 28px;
+    line-height: 1.4;
+}
+
+/* Coverage Badges */
+.coverage-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    padding: 4px 10px;
+    border-radius: 20px;
+    font-size: 11px;
+    font-weight: 600;
+    margin-left: 8px;
+}
+
+.coverage-badge.in-coverage {
+    background: #d4edda;
+    color: #155724;
+    border: 1px solid #c3e6cb;
+}
+
+.coverage-badge.outside-coverage {
+    background: #fff3cd;
+    color: #856404;
+    border: 1px solid #ffeeba;
+}
+
+.coverage-badge .icon {
+    font-size: 12px;
+}
+
+/* Project card coverage badge */
+.project-card .coverage-badge {
+    margin-top: 8px;
+    margin-left: 0;
+}
+
+/* ========================================
+   UNIFIED PROJECT CARD DESIGN
+   Used for: Marketplace Cards & Related Projects
+   ======================================== */
+
+/* Beautiful Project Cards */
+.project-card {
+    background: #ffffff;
+    border-radius: 16px;
+    overflow: hidden;
+    box-shadow: 0 8px 16px rgba(0, 0, 0, 0.08);
+    transition: all 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+    position: relative;
+    display: flex;
+    flex-direction: column;
+}
+
+.project-card::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: 4px;
+    background: linear-gradient(135deg, #f39b2f 0%, #f7bb72 100%);
+    transform: scaleX(0);
+    transform-origin: left;
+    transition: transform 0.4s ease;
+}
+
+.project-card:hover::before {
+    transform: scaleX(1);
+}
+
+.project-card:hover {
+    transform: translateY(-8px) scale(1.02);
+    box-shadow: 0 16px 32px rgba(243, 155, 47, 0.2);
+}
+
+/* Card Image Section */
+.project-card-image {
+    position: relative;
+    height: 220px;
+    overflow: hidden;
+    background: linear-gradient(135deg, #f39b2f 0%, #f6a35f 50%, #f7bb72 100%);
+}
+
+.project-card-image img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    transition: transform 0.6s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+}
+
+.project-card:hover .project-card-image img {
+    transform: scale(1.1) rotate(2deg);
+}
+
+/* Card Badge */
+.project-card-badge {
+    position: absolute;
+    top: 16px;
+    right: 16px;
+    background: rgba(255, 255, 255, 0.98);
+    backdrop-filter: blur(10px);
+    color: #667eea;
+    padding: 8px 16px;
+    border-radius: 24px;
+    font-size: 13px;
+    font-weight: 700;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+    animation: pulse 2s infinite;
+}
+
+@keyframes pulse {
+
+    0%,
+    100% {
+        transform: scale(1);
+    }
+
+    50% {
+        transform: scale(1.05);
+    }
+}
+
+.project-card-badge svg {
+    animation: spin 4s linear infinite;
+}
+
+@keyframes spin {
+    from {
+        transform: rotate(0deg);
+    }
+
+    to {
+        transform: rotate(360deg);
+    }
+}
+
+/* Card Content */
+.project-card-content {
+    padding: 24px;
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+}
+
+.project-card-title {
+    font-size: 20px;
+    font-weight: 700;
+    color: #1a202c;
+    margin: 0 0 18px 0;
+    line-height: 1.4;
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+}
+
+.project-card-content h3 {
+    font-size: 20px;
+    font-weight: 700;
+    color: #1a202c;
+    margin: 0 0 18px 0;
+    line-height: 1.4;
+}
+
+/* Card Details */
+.project-card-details {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    margin-bottom: 24px;
+    flex: 1;
+}
+
+.project-detail-item {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    color: #4a5568;
+    font-size: 14px;
+    padding: 8px 12px;
+    background: #f7fafc;
+    border-radius: 8px;
+    transition: all 0.3s ease;
+}
+
+.project-detail-item:hover {
+    background: #edf2f7;
+    transform: translateX(4px);
+}
+
+.project-detail-item svg {
+    color: #667eea;
+    flex-shrink: 0;
+}
+
+/* Legacy project-info support (for marketplace cards) */
+.project-info {
+    font-size: 14px;
+    color: #4a5568;
+    margin: 8px 0;
+    padding: 8px 12px;
+    background: #f7fafc;
+    border-radius: 8px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+/* Card Action Button */
+.project-card-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 10px;
+    background: linear-gradient(135deg, #f7bb72 0%, #f39b2f 100%);
+    color: #ffffff;
+    padding: 14px 28px;
+    border-radius: 10px;
+    text-decoration: none;
+    font-weight: 700;
+    font-size: 15px;
+    transition: all 0.3s ease;
+    width: 100%;
+    box-shadow: 0 4px 12px rgba(243, 155, 47, 0.3);
+    border: none;
+    cursor: pointer;
+}
+
+.project-card-btn:hover {
+    background: linear-gradient(135deg, #f39b2f 0%, #f7bb72 100%);
+    transform: translateY(-2px);
+    box-shadow: 0 6px 20px rgba(243, 155, 47, 0.4);
+    color: #ffffff;
+}
+
+.project-card-btn svg {
+    transition: transform 0.3s ease;
+}
+
+.project-card-btn:hover svg {
+    transform: translateX(6px);
+}
+
+/* Legacy button support */
+.btn-view-card {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    background: linear-gradient(135deg, #f7bb72 0%, #f39b2f 100%);
+    color: #ffffff;
+    padding: 12px 24px;
+    border-radius: 8px;
+    text-decoration: none;
+    font-weight: 600;
+    font-size: 14px;
+    transition: all 0.3s ease;
+    width: 100%;
+    justify-content: center;
+    border: none;
+    cursor: pointer;
+}
+
+.btn-view-card:hover {
+    background: linear-gradient(135deg, #f39b2f 0%, #f7bb72 100%);
+    transform: translateY(-2px);
+}
+
+/* Card Footer (for old marketplace card format) */
+.project-card-footer {
+    padding: 15px 20px;
+    border-top: 1px solid #f0f0f0;
+    background: #fff;
+}
+
+/* Related Projects Grid */
+.related-projects-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+    gap: 28px;
+    margin-bottom: 40px;
+}
+
+@media (max-width: 768px) {
+    .related-projects-grid {
+        grid-template-columns: 1fr;
+    }
+
+    .project-card-image {
+        height: 180px;
+    }
+}
+/* ========================================
+   MOBILE BOTTOM NAVIGATION
+   ======================================== */
+
+@media (max-width: 767px) {
+    /* Mobile Bottom Navigation Bar */
+    .mobile-bottom-nav {
+        position: fixed;
+        bottom: 0;
+        left: 0;
+        right: 0;
+        height: 60px;
+        background: #fff;
+        box-shadow: 0 -2px 10px rgba(0,0,0,0.1);
+        display: flex;
+        justify-content: space-around;
+        align-items: center;
+        z-index: 1000;
+        padding: 0 10px;
+        border-top: 1px solid #e0e0e0;
+    }
+    
+    .mobile-bottom-nav .nav-btn {
+        flex: 1;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        gap: 4px;
+        padding: 8px 4px;
+        text-decoration: none;
+        color: #666;
+        transition: all 0.3s ease;
+        border-radius: 8px;
+        min-width: 60px;
+    }
+    
+    .mobile-bottom-nav .nav-btn:active {
+        background: #f5f5f5;
+        transform: scale(0.95);
+    }
+    
+    .mobile-bottom-nav .nav-btn.active {
+        color: #007bff;
+        font-weight: 600;
+    }
+    
+    .mobile-bottom-nav .nav-icon {
+        font-size: 24px;
+        line-height: 1;
+    }
+    
+    .mobile-bottom-nav .nav-label {
+        font-size: 11px;
+        line-height: 1;
+        white-space: nowrap;
+    }
+    
+    /* Add bottom padding to main content to prevent overlap */
+    .dashboard-main {
+        padding-bottom: 80px !important;
+    }
+    
+    /* Hide desktop elements on mobile */
+    .dashboard-sidebar,
+    .sidebar-toggle-mobile,
+    .mobile-sidebar-toggle-floating {
+        display: none !important;
+    }
+    
+    /* Ensure dashboard takes full width on mobile */
+    .modern-solar-dashboard,
+    .modern-vendor-dashboard {
+        flex-direction: column;
+    }
+    
+    .dashboard-main {
+        width: 100%;
+        max-width: 100%;
+    }
+}
+    
+    /* Mobile Logout Button (below bottom nav) */
+
+/* ===================================
+   VENDOR PROFILE MOBILE RESPONSIVENESS
+   =================================== */
+
+/* Logout button hover effect */
+.logout-btn-simple:hover {
+    background: #c82333 !important;
+    transform: scale(1.02);
+}
+
+/* Mobile responsiveness for vendor profile */
+@media (max-width: 767px) {
+    /* Make coverage expansion grid stack vertically on mobile */
+    .coverage-expansion-grid {
+        grid-template-columns: 1fr !important;
+        gap: 20px !important;
+    }
+    
+    /* Reduce card padding on mobile */
+    #profile-section .card {
+        padding: 15px !important;
+    }
+    
+    /* Make city checkboxes grid more compact on mobile */
+    #city-checkboxes {
+        grid-template-columns: repeat(auto-fill, minmax(100px, 1fr)) !important;
+        font-size: 13px;
+    }
+    
+    /* Summary panel adjustments */
+    .summary-panel {
+        padding: 15px !important;
+    }
+    
+    /* Form inputs full width on mobile */
+    #profile-section input[type="text"],
+    #profile-section select {
+        width: 100% !important;
+        font-size: 16px; /* Prevent zoom on iOS */
+    }
+    
+    /* Smaller headings on mobile */
+    #profile-section h3 {
+        font-size: 18px;
+    }
+    
+    #profile-section h4 {
+        font-size: 16px;
+    }
+    
+    /* Logout button full width on mobile */
+    .logout-btn-simple {
+        display: block !important;
+        width: 100%;
+        text-align: center;
+    }
+}
+
+/* Extra small devices (320px - 480px) */
+@media (max-width: 480px) {
+    /* Even more compact city checkboxes */
+    #city-checkboxes {
+        grid-template-columns: 1fr 1fr !important;
+        gap: 8px !important;
+    }
+    
+    /* Reduce coverage card padding */
+    .coverage-expansion-grid {
+        gap: 15px !important;
+    }
+    
+    /* Stack form groups */
+    .form-group {
+        margin-bottom: 15px !important;
     }
 }

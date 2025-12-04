@@ -39,6 +39,15 @@ function switchVendorSection(event, section) {
     document.querySelectorAll('.nav-item').forEach(el => el.classList.remove('active'));
     document.querySelector('[data-section="' + section + '"]').classList.add('active');
 
+    // Update mobile bottom nav active state
+    document.querySelectorAll('.mobile-bottom-nav .nav-btn').forEach(btn => {
+        btn.classList.remove('active');
+    });
+    const activeBottomBtn = document.querySelector('.mobile-bottom-nav .nav-btn[data-section="' + section + '"]');
+    if (activeBottomBtn) {
+        activeBottomBtn.classList.add('active');
+    }
+
     const titles = {
         'dashboard': 'Dashboard',
         'projects': 'Projects',
@@ -229,7 +238,7 @@ document.addEventListener('DOMContentLoaded', function () {
         setInterval(() => loadNotifications(vendorApiUrl), 10000);
 
         function loadEarningsChart() {
-            $.ajax({
+            jQuery.ajax({
                 url: ksc_dashboard_vars.admin_ajax_url,
                 type: 'POST',
                 data: {
@@ -343,4 +352,294 @@ document.addEventListener('DOMContentLoaded', function () {
                 });
         });
     }
+});
+// --- Vendor Profile & Coverage Logic ---
+
+jQuery(document).ready(function ($) {
+
+    // 1. Profile Update
+    $('#vendor-profile-form').on('submit', function (e) {
+        e.preventDefault();
+        const btn = $(this).find('button[type="submit"]');
+
+        $.ajax({
+            url: ksc_dashboard_vars.admin_ajax_url,
+            type: 'POST',
+            data: {
+                action: 'update_vendor_profile',
+                nonce: REST_API_NONCE, // Using REST nonce as general nonce for now, or add specific one
+                company_name: $('#profile-company').val(),
+                phone: $('#profile-phone').val()
+            },
+            beforeSend: function () {
+                btn.prop('disabled', true).text('Updating...');
+            },
+            success: function (response) {
+                if (response.success) {
+                    alert('Profile updated successfully!');
+                } else {
+                    alert('Error: ' + response.data.message);
+                }
+                btn.prop('disabled', false).text('Update Profile');
+            },
+            error: function () {
+                alert('An error occurred.');
+                btn.prop('disabled', false).text('Update Profile');
+            }
+        });
+    });
+
+    // 2. Coverage Logic
+    let coverageData = null;
+    const STATE_PRICE = 500;
+    const CITY_PRICE = 100;
+
+    // Load coverage data when Profile section is opened
+    window.loadCoverageData = function () {
+        if (coverageData) {
+            console.log('Coverage data already loaded', coverageData);
+            return; // Already loaded
+        }
+
+        console.log('Loading coverage data from server...');
+        $.ajax({
+            url: ksc_dashboard_vars.admin_ajax_url,
+            type: 'GET',
+            data: { action: 'get_coverage_areas' },
+            success: function (response) {
+                console.log('Coverage areas response:', response);
+                if (response.success) {
+                    coverageData = response.data;
+                    console.log('Coverage data loaded:', coverageData);
+                    initializeCoverageSelection();
+                } else {
+                    console.error('Coverage areas error:', response.data);
+                }
+            },
+            error: function (xhr, status, error) {
+                console.error('AJAX error loading coverage:', error, xhr);
+            }
+        });
+    };
+
+    // Hook into section switch to load data
+    const originalSwitchVendorSection = window.switchVendorSection;
+    window.switchVendorSection = function (event, section) {
+        originalSwitchVendorSection(event, section);
+        if (section === 'profile') {
+            loadCoverageData();
+        }
+    };
+
+    function initializeCoverageSelection() {
+        console.log('initializeCoverageSelection called');
+        console.log('coverageData:', coverageData);
+        console.log('vendorCoverage:', typeof vendorCoverage !== 'undefined' ? vendorCoverage : 'UNDEFINED');
+
+        if (!coverageData || typeof vendorCoverage === 'undefined') {
+            console.error('Missing data - coverageData:', coverageData, 'vendorCoverage:', typeof vendorCoverage);
+            return;
+        }
+
+        const stateSelect = $('#coverage-state-select');
+        console.log('State select element:', stateSelect.length);
+        stateSelect.empty().append(new Option('-- Choose a State --', ''));
+
+        // Populate ALL States
+        coverageData.forEach(function (stateObj) {
+            stateSelect.append(new Option(stateObj.state, stateObj.state));
+        });
+
+        console.log('States populated:', coverageData.length);
+
+        // Handle State Selection
+        stateSelect.on('change', handleStateChange);
+
+        // Handle Buy State Checkbox
+        $('#buy-state-checkbox').on('change', updateCartSummary);
+    }
+
+    function handleStateChange() {
+        const selectedState = $(this).val();
+        const citySelectionContainer = $('#city-selection-container');
+        const cityCheckboxes = $('#city-checkboxes');
+        const ownedStateMsg = $('#owned-state-msg');
+
+        // Reset UI
+        cityCheckboxes.empty();
+
+        // Hide state options container as we removed the checkbox
+        $('#state-options-container').hide();
+
+        if (!selectedState) {
+            citySelectionContainer.hide();
+            updateCartSummary();
+            return;
+        }
+
+        citySelectionContainer.show();
+
+        // Check if State is Owned
+        const isOwned = vendorCoverage.ownedStates.includes(selectedState);
+
+        if (isOwned) {
+            ownedStateMsg.show();
+            // If owned, we don't charge for state, just show message
+            $('#state-options-container').show();
+            $('#buy-state-option').hide();
+        } else {
+            ownedStateMsg.hide();
+            // If not owned, we charge 500 automatically
+        }
+
+        // Populate Cities
+        const stateObj = coverageData.find(s => s.state === selectedState);
+        if (stateObj && stateObj.districts) {
+            stateObj.districts.forEach(city => {
+                // Only show cities NOT owned
+                if (!vendorCoverage.ownedCities.includes(city)) {
+                    const checkboxId = `city-${city.replace(/\s+/g, '-')}`;
+                    const cityHtml = `
+                        <label class="custom-checkbox" style="display: flex; align-items: center; cursor: pointer; font-size: 13px;">
+                            <input type="checkbox" class="city-checkbox" value="${city}" style="width: 16px; height: 16px; margin-right: 8px;">
+                            ${city}
+                        </label>
+                    `;
+                    cityCheckboxes.append(cityHtml);
+                }
+            });
+        }
+
+        if (cityCheckboxes.children().length === 0) {
+            cityCheckboxes.html('<p style="color:#999; grid-column:1/-1;">All cities in this state are already owned.</p>');
+        }
+
+        // Attach event listeners to new checkboxes
+        $('.city-checkbox').on('change', updateCartSummary);
+
+        updateCartSummary();
+    }
+
+    function updateCartSummary() {
+        const selectedState = $('#coverage-state-select').val();
+        const isOwned = vendorCoverage.ownedStates.includes(selectedState);
+
+        const selectedCities = [];
+        $('.city-checkbox:checked').each(function () {
+            selectedCities.push($(this).val());
+        });
+
+        const cartItemsContainer = $('#cart-items');
+        cartItemsContainer.empty();
+
+        let total = 0;
+
+        // Mandatory State Fee if not owned
+        if (selectedState && !isOwned) {
+            total += STATE_PRICE;
+            cartItemsContainer.append(`
+                <div style="display: flex; justify-content: space-between; margin-bottom: 8px; font-size: 14px;">
+                    <span>State Fee: <strong>${selectedState}</strong></span>
+                    <span>₹${STATE_PRICE}</span>
+                </div>
+            `);
+        }
+
+        if (selectedCities.length > 0) {
+            const citiesCost = selectedCities.length * CITY_PRICE;
+            total += citiesCost;
+            cartItemsContainer.append(`
+                <div style="display: flex; justify-content: space-between; margin-bottom: 8px; font-size: 14px;">
+                    <span>Cities (${selectedCities.length})</span>
+                    <span>₹${citiesCost}</span>
+                </div>
+                <div style="font-size: 12px; color: #666; margin-left: 10px; margin-bottom: 10px;">
+                    ${selectedCities.join(', ')}
+                </div>
+            `);
+        }
+
+        if (total === 0) {
+            cartItemsContainer.html('<p style="color: #999; text-align: center; margin-top: 30px;">No items selected</p>');
+        }
+
+        $('#cart-total').text('₹' + total);
+        $('#pay-add-coverage-btn').prop('disabled', total === 0);
+    }
+
+    // 3. Payment & Add Coverage
+    $('#pay-add-coverage-btn').on('click', function () {
+        const selectedState = $('#coverage-state-select').val();
+        const isOwned = vendorCoverage.ownedStates.includes(selectedState);
+        const states = (selectedState && !isOwned) ? [selectedState] : [];
+        const cities = [];
+        $('.city-checkbox:checked').each(function () {
+            cities.push($(this).val());
+        });
+
+        const totalAmount = (states.length * STATE_PRICE) + (cities.length * CITY_PRICE);
+
+        if (totalAmount === 0) return;
+
+        // Create Order
+        $.ajax({
+            url: ksc_dashboard_vars.admin_ajax_url,
+            type: 'POST',
+            data: {
+                action: 'create_razorpay_order',
+                nonce: ksc_dashboard_vars.vendor_coverage_nonce,  // Fixed: use correct nonce
+                amount: totalAmount,
+                currency: 'INR'
+            },
+            success: function (response) {
+                if (response.success) {
+                    const options = {
+                        key: response.data.key,
+                        amount: response.data.amount,
+                        currency: response.data.currency,
+                        order_id: response.data.order_id,
+                        name: 'Solar Marketplace',
+                        description: 'Add Coverage Area',
+                        handler: function (paymentResponse) {
+                            verifyAndAddCoverage(paymentResponse, states, cities, totalAmount);
+                        },
+                        prefill: {
+                            name: vendorCoverage.userName,
+                            email: vendorCoverage.userEmail,
+                            contact: vendorCoverage.userPhone
+                        },
+                        theme: { color: "#3399cc" }
+                    };
+                    const rzp = new Razorpay(options);
+                    rzp.open();
+                } else {
+                    alert('Error creating order: ' + response.data.message);
+                }
+            }
+        });
+    });
+
+    function verifyAndAddCoverage(paymentResponse, states, cities, amount) {
+        $.ajax({
+            url: ksc_dashboard_vars.admin_ajax_url,
+            type: 'POST',
+            data: {
+                action: 'add_vendor_coverage',
+                nonce: ksc_dashboard_vars.vendor_coverage_nonce,  // Fixed: use correct nonce
+                payment_response: JSON.stringify(paymentResponse),
+                states: states,
+                cities: cities,
+                amount: amount
+            },
+            success: function (response) {
+                if (response.success) {
+                    alert('Coverage added successfully!');
+                    location.reload();
+                } else {
+                    alert('Error: ' + response.data.message);
+                }
+            }
+        });
+    }
+
 });

@@ -76,11 +76,15 @@ jQuery(document).ready(function ($) {
 
         spinner.show();
 
+        const coverageCheckbox = $('#coverage-only-filter');
+        const coverageOnly = coverageCheckbox.length ? coverageCheckbox.is(':checked') : false;
+
         const data = {
             action: 'filter_marketplace_projects',
             nonce: marketplace_vars.nonce,
             state: stateSelect.val(),
-            city: citySelect.val()
+            city: citySelect.val(),
+            coverage_only: coverageOnly ? '1' : '0'
         };
 
         console.log('📤 Sending AJAX request with data:', data);
@@ -103,8 +107,8 @@ jQuery(document).ready(function ($) {
 
                 spinner.hide();
                 if (response.success) {
-                    // Remove existing project items but keep spinner
-                    container.find('.project-item').remove();
+                    // Remove existing project items and messages
+                    container.find('.project-card').remove();
                     container.find('.no-projects').remove();
 
                     if (response.data.html) {

@@ -1,9 +1,0 @@
-function closeImageModal() {
-    const modal = document.getElementById('imageModal');
-    if (modal) {
-        modal.style.display = 'none';
-    }
-}
-</script>
-<?php
-}

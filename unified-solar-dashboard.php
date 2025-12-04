@@ -57,25 +57,33 @@ final class Krtrim_Solar_Core {
 		require_once $this->dir_path . 'includes/class-user-profile-fields.php';
 		require_once $this->dir_path . 'includes/class-process-steps-manager.php';
 		require_once $this->dir_path . 'includes/class-notifications-manager.php';
+		require_once $this->dir_path . 'includes/class-error-logger.php';
+		
+		// Admin view files (required by SP_Admin_Menus class)
 		require_once $this->dir_path . 'admin/views/view-vendor-approval.php';
 		require_once $this->dir_path . 'admin/views/view-project-reviews.php';
+		require_once $this->dir_path . 'admin/views/view-bid-management.php';
 		require_once $this->dir_path . 'admin/views/view-general-settings.php';
 		require_once $this->dir_path . 'admin/views/view-team-analysis.php';
+		require_once $this->dir_path . 'admin/views/view-process-step-template.php';
+		
+		// Public view files (for shortcodes)
 		require_once $this->dir_path . 'public/views/view-client-dashboard.php';
 		require_once $this->dir_path . 'public/views/view-vendor-dashboard.php';
 		require_once $this->dir_path . 'public/views/view-area-manager-dashboard.php';
 		require_once $this->dir_path . 'public/views/view-marketplace.php';
 		require_once $this->dir_path . 'public/views/view-vendor-registration.php';
+		require_once $this->dir_path . 'public/views/view-vendor-status.php';
 	}
 
 	private function init_hooks() {
 		new SP_Post_Types_Taxonomies();
 		new SP_Admin_Menus();
-		new SP_API_Handlers();
 		new SP_Admin_Widgets();
 		new SP_User_Profile_Fields();
 		new SP_Process_Steps_Manager();
 		new SP_Notifications_Manager();
+		new SP_API_Handlers(); // Must be AFTER Process Steps and Notifications managers
 
 		register_activation_hook( $this->file, [ $this, 'activate' ] );
 
@@ -86,8 +94,7 @@ final class Krtrim_Solar_Core {
 		add_shortcode( 'area_manager_dashboard', 'sp_area_manager_dashboard_shortcode' );
 		add_shortcode( 'vendor_registration_form', 'sp_vendor_registration_form_shortcode' );
 		add_shortcode( 'solar_project_marketplace', 'sp_project_marketplace_shortcode' );
-		
-		add_shortcode( 'solar_project_marketplace', 'sp_project_marketplace_shortcode' );
+		add_shortcode( 'vendor_status_dashboard', 'sp_vendor_status_dashboard_shortcode' );
 		
 		add_filter( 'template_include', [ $this, 'template_include_single_project' ] );
 		add_filter( 'plugin_action_links_' . plugin_basename( $this->file ), [ $this, 'add_plugin_action_links' ] );
@@ -96,6 +103,14 @@ final class Krtrim_Solar_Core {
         add_filter( 'login_redirect', [ $this, 'custom_login_redirect' ], 10, 3 );
         add_action( 'admin_init', [ $this, 'restrict_wp_admin_access' ] );
         add_filter( 'logout_redirect', [ $this, 'custom_logout_redirect' ] );
+        
+        // Note: Default featured image filters removed - methods were not implemented
+        // add_filter('post_thumbnail_html', [$this, 'filter_default_project_image'], 10, 5);
+        // add_filter('post_thumbnail_url', [$this, 'filter_default_project_image_url'], 10, 2);
+        
+		
+		// Cascade delete: Clean up related data when project is deleted
+		add_action('before_delete_post', [$this, 'cleanup_project_data'], 10, 2);
 	}
 
     /**
@@ -113,7 +128,14 @@ final class Krtrim_Solar_Core {
             }
             // Solar Vendor
             if ( in_array( 'solar_vendor', $user->roles ) ) {
-                return home_url( '/solar-dashboard/' );
+                // Check if vendor is approved
+                $account_approved = get_user_meta( $user->ID, 'account_approved', true );
+                if ( $account_approved === 'yes' ) {
+                    return home_url( '/solar-dashboard/' );
+                } else {
+                    // Send to status page if not approved
+                    return home_url( '/vendor-status/' );
+                }
             }
             // Manager (generic)
             if ( in_array( 'manager', $user->roles ) ) {
@@ -164,6 +186,83 @@ final class Krtrim_Solar_Core {
         return wp_login_url();
     }
 
+    /**
+     * Cascade delete: Clean up related data when a solar project is deleted
+     * Removes orphaned records from custom tables
+     */
+    public function cleanup_project_data($post_id, $post) {
+        // Only proceed if this is a solar_project post type
+        if (!$post || $post->post_type !== 'solar_project') {
+            return;
+        }
+
+        global $wpdb;
+
+        // Delete all bids for this project
+        $bids_table = $wpdb->prefix . 'project_bids';
+        $deleted_bids = $wpdb->delete($bids_table, ['project_id' => $post_id], ['%d']);
+        
+        // Delete all process steps for this project
+        $steps_table = $wpdb->prefix . 'solar_process_steps';
+        $deleted_steps = $wpdb->delete($steps_table, ['project_id' => $post_id], ['%d']);
+        
+        // Delete all notifications for this project
+        $notifications_table = $wpdb->prefix . 'solar_notifications';
+        $deleted_notifications = $wpdb->delete($notifications_table, ['project_id' => $post_id], ['%d']);
+
+        // Log cleanup for debugging (optional)
+        if (defined('WP_DEBUG') && WP_DEBUG) {
+            error_log(sprintf(
+                'Solar Project #%d deleted. Cleaned up: %d bids, %d steps, %d notifications',
+                $post_id,
+                $deleted_bids === false ? 0 : $deleted_bids,
+                $deleted_steps === false ? 0 : $deleted_steps,
+                $deleted_notifications === false ? 0 : $deleted_notifications
+            ));
+        }
+    }
+
+
+    /**
+     * Provide default featured image HTML for solar projects when no featured image is set
+     * Works everywhere: Elementor loops, archives, standard templates
+     */
+    public function default_project_thumbnail_html( $html, $post_id, $post_thumbnail_id, $size, $attr ) {
+        if ( get_post_type( $post_id ) === 'solar_project' && empty( $html ) ) {
+            $default_image = get_option( 'ksc_default_project_image', '' );
+            $default_url = $default_image ?: 'https://via.placeholder.com/400x250/667eea/ffffff?text=Solar+Project';
+            
+            $attr_string = '';
+            if ( is_array( $attr ) ) {
+                foreach ( $attr as $name => $value ) {
+                    $attr_string .= sprintf( ' %s="%s"', esc_attr( $name ), esc_attr( $value ) );
+                }
+            }
+            
+            $html = sprintf(
+                '<img src="%s" alt="%s" class="attachment-%s size-%s wp-post-image"%s>',
+                esc_url( $default_url ),
+                esc_attr( get_the_title( $post_id ) ),
+                esc_attr( $size ),
+                esc_attr( $size ),
+                $attr_string
+            );
+        }
+        return $html;
+    }
+
+    /**
+     * Provide default featured image URL for solar projects when no featured image is set
+     * Works everywhere: Elementor loops, get_the_post_thumbnail_url(), etc.
+     */
+    public function default_project_thumbnail_url( $url, $post_id, $size ) {
+        if ( get_post_type( $post_id ) === 'solar_project' && empty( $url ) ) {
+            $default_image = get_option( 'ksc_default_project_image', '' );
+            $url = $default_image ?: 'https://via.placeholder.com/400x250/667eea/ffffff?text=Solar+Project';
+        }
+        return $url;
+    }
+
 	public function add_plugin_action_links( $links ) {
 		$settings_link = '<a href="options-general.php?page=ksc-settings">Settings</a>';
 		$links[] = $settings_link;
@@ -172,6 +271,11 @@ final class Krtrim_Solar_Core {
 
 	public function activate() {
 		sp_create_plugin_essentials();
+		
+		// Create error log table
+		require_once $this->dir_path . 'includes/class-error-logger.php';
+		KSC_Error_Logger::create_table();
+		
 		flush_rewrite_rules();
 	}
 
@@ -189,6 +293,7 @@ final class Krtrim_Solar_Core {
                 'get_earnings_chart_data_nonce' => wp_create_nonce( 'get_earnings_chart_data_nonce' ),
                 'client_comments_url' => rest_url( 'solar/v1/client-comments' ),
                 'vendor_notifications_url' => rest_url( 'solar/v1/vendor-notifications/' ),
+                'vendor_coverage_nonce' => wp_create_nonce( 'vendor_registration_nonce' ),  // For vendor coverage payment
             ]);
         }
 
@@ -231,10 +336,11 @@ final class Krtrim_Solar_Core {
             wp_enqueue_style('password-field-css', $this->dir_url . 'assets/css/password-field.css', [], '1.0.0');
             wp_enqueue_script( 'chart-js', 'https://cdn.jsdelivr.net/npm/chart.js', [], '3.7.0', true );
             wp_enqueue_script('project-modal-js', $this->dir_url . 'assets/js/project-modal.js', ['jquery'], '1.0.0', true);
-			wp_enqueue_script( 'area-manager-dashboard-js', $this->dir_url . 'assets/js/area-manager-dashboard.js', [ 'jquery', 'chart-js' ], '1.0.3', true );
+			wp_enqueue_script( 'area-manager-dashboard-js', $this->dir_url . 'assets/js/area-manager-dashboard.js', [ 'jquery', 'chart-js' ], '1.0.6', true );
 			wp_localize_script('area-manager-dashboard-js', 'sp_area_dashboard_vars', [
 				'ajax_url' => admin_url('admin-ajax.php'),
 				'create_project_nonce' => wp_create_nonce('sp_create_project_nonce_field'),
+				'update_project_nonce' => wp_create_nonce('sp_update_project_nonce'),
 				'project_details_nonce' => wp_create_nonce('sp_project_details_nonce'),
 				'review_submission_nonce' => wp_create_nonce('sp_review_nonce'),
 				'award_bid_nonce' => wp_create_nonce('award_bid_nonce'),
@@ -253,21 +359,61 @@ final class Krtrim_Solar_Core {
 			]);
 		}
 
-		
-		// TEMPORARY: Load marketplace JS on ALL pages to test
-		// TODO: Revert to conditional loading after testing
-		wp_enqueue_script('marketplace-js', $this->dir_url . 'assets/js/marketplace.js', ['jquery'], time(), true); // Using time() to prevent cache
-
-		$json_file = $this->dir_path . 'assets/data/indian-states-cities.json';
-		if (file_exists($json_file)) {
-			$states_cities = json_decode(file_get_contents($json_file), true);
+		// ✅ VENDOR REGISTRATION PAGE
+		if ( is_a( $post, 'WP_Post' ) && has_shortcode( $post->post_content, 'vendor_registration_form' ) ) {
+			// Enqueue styles
+			wp_enqueue_style('vendor-registration-css', $this->dir_url . 'assets/css/vendor-registration.css', [], '1.0.0');
 			
-			wp_localize_script('marketplace-js', 'marketplace_vars', [
+			// Enqueue Razorpay
+			wp_enqueue_script('razorpay-checkout', 'https://checkout.razorpay.com/v1/checkout.js', [], null, true);
+			
+			// Enqueue custom vendor registration script
+			wp_enqueue_script(
+				'vendor-registration-js',
+				$this->dir_url . 'assets/js/vendor-registration.js',
+				['jquery'],
+				'1.0.0',
+				true
+			);
+
+			// Get vendor options and determine correct Razorpay key
+			$options = get_option('sp_vendor_options');
+			$mode = isset($options['razorpay_mode']) ? $options['razorpay_mode'] : 'test';
+			
+			// Select correct key based on mode
+			if ($mode === 'live') {
+				$razorpay_key = isset($options['razorpay_live_key_id']) ? $options['razorpay_live_key_id'] : '';
+			} else {
+				$razorpay_key = isset($options['razorpay_test_key_id']) ? $options['razorpay_test_key_id'] : '';
+			}
+
+			// Localize script with config
+			wp_localize_script('vendor-registration-js', 'vendor_reg_vars', [
 				'ajax_url' => admin_url('admin-ajax.php'),
-				'nonce' => wp_create_nonce('filter_projects_nonce'),
-				'states_cities' => isset($states_cities['states']) ? $states_cities['states'] : [],
+				'razorpay_key_id' => $razorpay_key,
+				'per_state_fee' => isset($options['per_state_fee']) ? $options['per_state_fee'] : 500,
+				'per_city_fee' => isset($options['per_city_fee']) ? $options['per_city_fee'] : 100,
+				'nonce' => wp_create_nonce('vendor_registration_nonce'),
 			]);
 		}
+
+		// Load marketplace JS only on marketplace pages
+		global $post;
+		if ( is_a( $post, 'WP_Post' ) && ( has_shortcode( $post->post_content, 'solar_project_marketplace' ) || is_page( 'project-marketplace' ) ) ) {
+			wp_enqueue_script('marketplace-js', $this->dir_url . 'assets/js/marketplace.js', ['jquery'], $this->version, true);
+			
+			$json_file = $this->dir_path . 'assets/data/indian-states-cities.json';
+			if (file_exists($json_file)) {
+				$states_cities = json_decode(file_get_contents($json_file), true);
+				
+				wp_localize_script('marketplace-js', 'marketplace_vars', [
+					'ajax_url' => admin_url('admin-ajax.php'),
+					'nonce' => wp_create_nonce('filter_projects_nonce'),
+					'states_cities' => isset($states_cities['states']) ? $states_cities['states'] : [],
+				]);
+			}
+		}
+
 
 		// Load bid submission JS on single project pages
 		if (is_singular('solar_project')) {
@@ -289,8 +435,54 @@ final class Krtrim_Solar_Core {
 	}
 
 	public function enqueue_admin_scripts( $hook ) {
-		// Admin widgets already loaded above, skip duplicate
-		// wp_enqueue_style( 'ksc-admin-styles', $this->dir_url . 'assets/css/admin.css', [], $this->version );
+		// Enqueue admin styles
+		wp_enqueue_style( 'sp-admin-styles', $this->dir_url . 'assets/css/admin-styles.css', [], $this->version );
+
+		// Enqueue jQuery UI sortable for Process Step Template page
+		if ( isset($_GET['page']) && $_GET['page'] === 'process-step-template' ) {
+			wp_enqueue_script( 'jquery-ui-sortable' );
+		}
+
+		// Enqueue Chart.js for Team Analysis page
+		if ( $hook === 'toplevel_page_team-analysis' ) {
+			wp_enqueue_script(
+				'chartjs',
+				'https://cdn.jsdelivr.net/npm/chart.js@3.9.1/dist/chart.min.js',
+				[],
+				'3.9.1',
+				true
+			);
+		}
+
+		// Enqueue admin scripts for bid management
+		if ( $hook === 'solar_project_page_bid-management' ) {
+			wp_enqueue_script(
+				'sp-bid-management',
+				$this->dir_url . 'assets/js/bid-management.js',
+				[ 'jquery' ],
+				$this->version,
+				true
+			);
+			wp_localize_script(
+				'sp-bid-management',
+				'spBidManagement',
+				[
+					'ajaxurl' => admin_url( 'admin-ajax.php' ),
+					'nonce'   => wp_create_nonce( 'award_bid_nonce' ),
+				]
+			);
+		}
+
+		// Enqueue Project Reviews JS
+		if ( $hook === 'toplevel_page_project-reviews' ) {
+			wp_enqueue_script(
+				'sp-project-reviews',
+				$this->dir_url . 'assets/js/project-reviews.js',
+				[ 'jquery' ],
+				$this->version,
+				true
+			);
+		}
 		
 		// Only load admin.js if it exists
 		if ( file_exists( $this->dir_path . 'assets/js/admin.js' ) ) {
@@ -354,11 +546,31 @@ function sp_create_plugin_essentials() {
 	require_once ABSPATH . 'wp-admin/includes/upgrade.php';
 
 	$bids_table_name = $wpdb->prefix . 'project_bids';
-	$sql_bids        = "CREATE TABLE $bids_table_name ( id mediumint(9) NOT NULL AUTO_INCREMENT, project_id bigint(20) NOT NULL, vendor_id bigint(20) NOT NULL, bid_amount decimal(10, 2) NOT NULL, bid_type varchar(10) NOT NULL DEFAULT 'open', bid_details text, created_at datetime DEFAULT '0000-00-00 00:00:00' NOT NULL, PRIMARY KEY  (id) ) $charset_collate;";
+	$sql_bids = "CREATE TABLE $bids_table_name (
+		id mediumint(9) NOT NULL AUTO_INCREMENT,
+		project_id bigint(20) NOT NULL,
+		vendor_id bigint(20) NOT NULL,
+		bid_amount decimal(10, 2) NOT NULL,
+		bid_type varchar(10) NOT NULL DEFAULT 'open',
+		bid_details text,
+		created_at datetime NOT NULL DEFAULT CURRENT_TIMESTAMP,
+		PRIMARY KEY  (id)
+	) $charset_collate;";
 	dbDelta( $sql_bids );
 
 	$payments_table_name = $wpdb->prefix . 'solar_vendor_payments';
-	$sql_payments        = "CREATE TABLE $payments_table_name ( id mediumint(9) NOT NULL AUTO_INCREMENT, vendor_id bigint(20) NOT NULL, razorpay_payment_id varchar(255) NOT NULL, razorpay_order_id varchar(255) NOT NULL, amount decimal(10, 2) NOT NULL, states_purchased text, cities_purchased text, payment_status varchar(50) NOT NULL, payment_date datetime DEFAULT '0000-00-00 00:00:00' NOT NULL, PRIMARY KEY  (id) ) $charset_collate;";
+	$sql_payments = "CREATE TABLE $payments_table_name (
+		id mediumint(9) NOT NULL AUTO_INCREMENT,
+		vendor_id bigint(20) NOT NULL,
+		razorpay_payment_id varchar(255) NOT NULL,
+		razorpay_order_id varchar(255) NOT NULL,
+		amount decimal(10, 2) NOT NULL,
+		states_purchased text,
+		cities_purchased text,
+		payment_status varchar(50) NOT NULL,
+		payment_date datetime NOT NULL DEFAULT CURRENT_TIMESTAMP,
+		PRIMARY KEY  (id)
+	) $charset_collate;";
 	dbDelta( $sql_payments );
 
 	$table_process = $wpdb->prefix . 'solar_process_steps';
@@ -433,7 +645,8 @@ function sp_create_plugin_essentials() {
 		['title' => 'Dashboard', 'slug' => 'solar-dashboard', 'content' => '[unified_solar_dashboard]'],
 		['title' => 'Area Manager Dashboard', 'slug' => 'area-manager-dashboard', 'content' => '[area_manager_dashboard]'],
 		['title' => 'Vendor Registration', 'slug' => 'vendor-registration', 'content' => '[vendor_registration_form]'],
-		['title' => 'Project Marketplace', 'slug' => 'project-marketplace', 'content' => '[solar_project_marketplace]']
+		['title' => 'Project Marketplace', 'slug' => 'project-marketplace', 'content' => '[solar_project_marketplace]'],
+		['title' => 'Vendor Status', 'slug' => 'vendor-status', 'content' => '[vendor_status_dashboard]']
 	];
 
 	foreach ( $pages_to_create as $page ) {
