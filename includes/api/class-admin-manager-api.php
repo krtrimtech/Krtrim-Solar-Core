@@ -1181,12 +1181,39 @@ class KSC_Admin_Manager_API extends KSC_API_Base {
         
         $manager = $this->verify_area_manager_role();
         
+        $status = isset($_POST['status']) ? sanitize_text_field($_POST['status']) : '';
+        $search = isset($_POST['search']) ? sanitize_text_field($_POST['search']) : '';
+        $lead_type = isset($_POST['lead_type']) ? sanitize_text_field($_POST['lead_type']) : '';
+        
         $args = [
             'post_type' => 'solar_lead',
             'posts_per_page' => -1,
             'author' => $manager->ID,
             'post_status' => 'any'
         ];
+        
+        // Add meta query for status filter
+        $meta_query = [];
+        if (!empty($status)) {
+            $meta_query[] = [
+                'key' => '_lead_status',
+                'value' => $status,
+            ];
+        }
+        if (!empty($lead_type)) {
+            $meta_query[] = [
+                'key' => '_lead_type',
+                'value' => $lead_type,
+            ];
+        }
+        if (!empty($meta_query)) {
+            $args['meta_query'] = $meta_query;
+        }
+        
+        // Add search
+        if (!empty($search)) {
+            $args['s'] = $search;
+        }
         
         $query = new WP_Query($args);
         $leads = [];
@@ -1202,7 +1229,13 @@ class KSC_Admin_Manager_API extends KSC_API_Base {
                     'phone' => get_post_meta($lead_id, '_lead_phone', true),
                     'email' => get_post_meta($lead_id, '_lead_email', true),
                     'status' => get_post_meta($lead_id, '_lead_status', true) ?: 'new',
+                    'lead_type' => get_post_meta($lead_id, '_lead_type', true) ?: 'solar_project',
+                    'project_type' => get_post_meta($lead_id, '_lead_project_type', true),
+                    'system_size' => get_post_meta($lead_id, '_lead_system_size', true),
+                    'source' => get_post_meta($lead_id, '_lead_source', true),
+                    'address' => get_post_meta($lead_id, '_lead_address', true),
                     'notes' => get_the_content(),
+                    'created_date' => get_the_date('Y-m-d'),
                 ];
             }
             wp_reset_postdata();
@@ -1215,15 +1248,20 @@ class KSC_Admin_Manager_API extends KSC_API_Base {
      * Create new lead
      */
     public function create_solar_lead() {
-        check_ajax_referer('create_lead_nonce', 'nonce');
+        check_ajax_referer('sp_lead_nonce', 'lead_nonce');
         
         $manager = $this->verify_area_manager_role();
         
-        $name = isset($_POST['name']) ? sanitize_text_field($_POST['name']) : '';
-        $phone = isset($_POST['phone']) ? sanitize_text_field($_POST['phone']) : '';
-        $email = isset($_POST['email']) ? sanitize_email($_POST['email']) : '';
-        $status = isset($_POST['status']) ? sanitize_text_field($_POST['status']) : 'new';
-        $notes = isset($_POST['notes']) ? sanitize_textarea_field($_POST['notes']) : '';
+        $name = isset($_POST['lead_name']) ? sanitize_text_field($_POST['lead_name']) : '';
+        $phone = isset($_POST['lead_phone']) ? sanitize_text_field($_POST['lead_phone']) : '';
+        $email = isset($_POST['lead_email']) ? sanitize_email($_POST['lead_email']) : '';
+        $status = isset($_POST['lead_status']) ? sanitize_text_field($_POST['lead_status']) : 'new';
+        $notes = isset($_POST['lead_notes']) ? sanitize_textarea_field($_POST['lead_notes']) : '';
+        $lead_type = isset($_POST['lead_type']) ? sanitize_text_field($_POST['lead_type']) : 'solar_project';
+        $project_type = isset($_POST['lead_project_type']) ? sanitize_text_field($_POST['lead_project_type']) : '';
+        $system_size = isset($_POST['lead_system_size']) ? floatval($_POST['lead_system_size']) : 0;
+        $source = isset($_POST['lead_source']) ? sanitize_text_field($_POST['lead_source']) : '';
+        $address = isset($_POST['lead_address']) ? sanitize_textarea_field($_POST['lead_address']) : '';
         
         if (empty($name)) {
             wp_send_json_error(['message' => 'Lead name is required']);
@@ -1244,6 +1282,11 @@ class KSC_Admin_Manager_API extends KSC_API_Base {
         update_post_meta($lead_id, '_lead_phone', $phone);
         update_post_meta($lead_id, '_lead_email', $email);
         update_post_meta($lead_id, '_lead_status', $status);
+        update_post_meta($lead_id, '_lead_type', $lead_type);
+        update_post_meta($lead_id, '_lead_project_type', $project_type);
+        update_post_meta($lead_id, '_lead_system_size', $system_size);
+        update_post_meta($lead_id, '_lead_source', $source);
+        update_post_meta($lead_id, '_lead_address', $address);
         
         wp_send_json_success(['message' => 'Lead created successfully', 'lead_id' => $lead_id]);
     }

@@ -92,6 +92,9 @@ function sp_area_manager_dashboard_shortcode() {
                 <a href="javascript:void(0)" class="nav-item" data-section="leads"><span>👥</span> Leads</a>
                 <a href="javascript:void(0)" class="nav-item" data-section="my-clients"><span>users</span> My Clients</a>
                 <a href="javascript:void(0)" class="nav-item" data-section="create-client"><span>👨‍👩‍👧‍👦</span> Create Paid Client</a>
+                
+                <a href="javascript:void(0)" class="nav-item" data-section="manage-cleaners"><span>🧹</span> Manage Cleaners</a>
+                <a href="javascript:void(0)" class="nav-item" data-section="cleaning-services"><span>🧼</span> Cleaning Services</a>
             </nav>
             <div class="sidebar-profile">
                 <div class="profile-info">
@@ -493,6 +496,108 @@ function sp_area_manager_dashboard_shortcode() {
                     <div class="card">
                         <div id="my-clients-container">
                             <p>Loading clients...</p>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- Manage Cleaners Section -->
+                <section id="manage-cleaners-section" class="section-content" style="display:none;">
+                    <div class="section-header">
+                        <h2 class="section-title">Manage Cleaners</h2>
+                    </div>
+                    
+                    <!-- Add Cleaner Form -->
+                    <div class="card modern-form">
+                        <h3>🧹 Add New Cleaner</h3>
+                        <form id="create-cleaner-form" enctype="multipart/form-data">
+                            <?php wp_nonce_field('ksc_cleaner_nonce', 'cleaner_nonce'); ?>
+                            <div class="form-row">
+                                <div class="form-group">
+                                    <label for="cleaner_name">Full Name *</label>
+                                    <input type="text" id="cleaner_name" name="cleaner_name" required>
+                                </div>
+                                <div class="form-group">
+                                    <label for="cleaner_phone">Phone Number *</label>
+                                    <input type="text" id="cleaner_phone" name="cleaner_phone" required>
+                                </div>
+                            </div>
+                            <div class="form-row">
+                                <div class="form-group">
+                                    <label for="cleaner_email">Email</label>
+                                    <input type="email" id="cleaner_email" name="cleaner_email">
+                                </div>
+                                <div class="form-group">
+                                    <label for="cleaner_aadhaar">Aadhaar Number *</label>
+                                    <input type="text" id="cleaner_aadhaar" name="cleaner_aadhaar" maxlength="12" pattern="[0-9]{12}" required placeholder="12-digit Aadhaar">
+                                </div>
+                            </div>
+                            <div class="form-row">
+                                <div class="form-group">
+                                    <label for="cleaner_photo">Photo *</label>
+                                    <input type="file" id="cleaner_photo" name="cleaner_photo" accept="image/*" required>
+                                    <p class="description">Passport size photo for customer identification</p>
+                                </div>
+                                <div class="form-group">
+                                    <label for="cleaner_aadhaar_image">Aadhaar Card Image *</label>
+                                    <input type="file" id="cleaner_aadhaar_image" name="cleaner_aadhaar_image" accept="image/*" required>
+                                    <p class="description">Upload front side of Aadhaar card</p>
+                                </div>
+                            </div>
+                            <div class="form-group">
+                                <label for="cleaner_address">Address</label>
+                                <textarea id="cleaner_address" name="cleaner_address" rows="2"></textarea>
+                            </div>
+                            <button type="submit" class="btn btn-primary">➕ Create Cleaner Account</button>
+                            <div id="create-cleaner-feedback" style="margin-top:15px;"></div>
+                        </form>
+                    </div>
+
+                    <!-- Cleaners List -->
+                    <div class="card" style="margin-top: 20px;">
+                        <h3>Your Cleaners</h3>
+                        <div id="cleaners-list-container">
+                            <p>Loading cleaners...</p>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- Cleaning Services Section -->
+                <section id="cleaning-services-section" class="section-content" style="display:none;">
+                    <div class="section-header">
+                        <h2 class="section-title">Cleaning Services</h2>
+                        <div class="section-actions">
+                            <div class="search-box">
+                                <input type="text" id="cleaning-search" placeholder="Search services..." />
+                                <span class="search-icon">🔍</span>
+                            </div>
+                            <select id="filter-cleaning-status" style="padding: 10px; border: 2px solid var(--border-color); border-radius: 8px;">
+                                <option value="">All Status</option>
+                                <option value="pending">Pending</option>
+                                <option value="scheduled">Scheduled</option>
+                                <option value="completed">Completed</option>
+                            </select>
+                        </div>
+                    </div>
+                    
+                    <!-- Cleaning Bookings Table -->
+                    <div class="card">
+                        <div class="table-responsive">
+                            <table class="data-table" id="cleaning-services-table">
+                                <thead>
+                                    <tr>
+                                        <th>Customer</th>
+                                        <th>Phone</th>
+                                        <th>Plan</th>
+                                        <th>Visits</th>
+                                        <th>Next Visit</th>
+                                        <th>Status</th>
+                                        <th>Actions</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="cleaning-services-tbody">
+                                    <tr><td colspan="7">Loading cleaning services...</td></tr>
+                                </tbody>
+                            </table>
                         </div>
                     </div>
                 </section>

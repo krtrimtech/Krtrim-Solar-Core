@@ -71,6 +71,11 @@ class KSC_Lead_Component {
                         <input type="text" id="lead-search" placeholder="Search leads..." />
                         <span class="search-icon">🔍</span>
                     </div>
+                    <select id="filter-lead-type" class="lead-filter-select">
+                        <option value="">All Types</option>
+                        <option value="solar_project">☀️ Solar Projects</option>
+                        <option value="cleaning_service">🧹 Cleaning Services</option>
+                    </select>
                     <select id="filter-lead-status" class="lead-filter-select">
                         <option value="">All Status</option>
                         <?php foreach ($statuses as $key => $status): ?>
@@ -89,15 +94,15 @@ class KSC_Lead_Component {
                     <thead>
                         <tr>
                             <th>Name</th>
+                            <th>Type</th>
                             <th>Phone</th>
-                            <th>Email</th>
                             <th>Status</th>
                             <th>Follow-ups</th>
                             <th>Actions</th>
                         </tr>
                     </thead>
                     <tbody id="leads-table-body">
-                        <tr><td colspan="6" class="loading-cell">Loading leads...</td></tr>
+                        <tr><td colspan="7" class="loading-cell">Loading leads...</td></tr>
                     </tbody>
                 </table>
             </div>
@@ -115,6 +120,42 @@ class KSC_Lead_Component {
                 <h3>➕ Add New Lead</h3>
                 <form id="create-lead-form">
                     <?php wp_nonce_field('sp_lead_nonce', 'lead_nonce'); ?>
+                    
+                    <!-- Lead Type Selection -->
+                    <div class="form-group">
+                        <label>Lead Type *</label>
+                        <div class="lead-type-options" style="display: flex; gap: 15px; margin-top: 8px;">
+                            <label class="lead-type-option" style="flex: 1; padding: 15px; border: 2px solid #e0e0e0; border-radius: 8px; cursor: pointer; text-align: center;">
+                                <input type="radio" name="lead_type" value="solar_project" checked style="display: none;">
+                                <span style="font-size: 24px;">☀️</span>
+                                <div style="margin-top: 5px; font-weight: 500;">Solar Project</div>
+                            </label>
+                            <label class="lead-type-option" style="flex: 1; padding: 15px; border: 2px solid #e0e0e0; border-radius: 8px; cursor: pointer; text-align: center;">
+                                <input type="radio" name="lead_type" value="cleaning_service" style="display: none;">
+                                <span style="font-size: 24px;">🧹</span>
+                                <div style="margin-top: 5px; font-weight: 500;">Cleaning Service</div>
+                            </label>
+                        </div>
+                    </div>
+
+                    <!-- Project Type (shown only for solar_project) -->
+                    <div class="form-group" id="project-type-group">
+                        <label for="lead_project_type">Project Type</label>
+                        <select id="lead_project_type" name="lead_project_type">
+                            <option value="residential">🏠 Residential</option>
+                            <option value="commercial">🏢 Commercial</option>
+                            <option value="industrial">🏭 Industrial</option>
+                            <option value="agricultural">🌾 Agricultural</option>
+                            <option value="government">🏛️ Government</option>
+                        </select>
+                    </div>
+
+                    <!-- System Size (shown for cleaning_service) -->
+                    <div class="form-group" id="system-size-group" style="display: none;">
+                        <label for="lead_system_size">System Size (kW) - for pricing</label>
+                        <input type="number" id="lead_system_size" name="lead_system_size" min="1" max="500" placeholder="e.g., 5">
+                    </div>
+
                     <div class="form-row">
                         <div class="form-group">
                             <label for="lead_name">Name *</label>

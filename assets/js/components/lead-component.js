@@ -142,11 +142,31 @@
                 navigateToCreateClient(leadData);
             }
         });
+
+        // Lead Type Toggle - show/hide conditional fields
+        $(document).on('change', 'input[name="lead_type"]', function () {
+            const leadType = $(this).val();
+            if (leadType === 'solar_project') {
+                $('#project-type-group').show();
+                $('#system-size-group').hide();
+            } else {
+                $('#project-type-group').hide();
+                $('#system-size-group').show();
+            }
+            // Update visual selection
+            $('.lead-type-option').css('border-color', '#e0e0e0');
+            $(this).closest('.lead-type-option').css('border-color', '#4f46e5');
+        });
+
+        // Lead Type Filter
+        $(document).on('change', '#filter-lead-type', function () {
+            loadLeads($('#filter-lead-status').val(), $('#lead-search').val(), $(this).val());
+        });
     }
 
     // Load leads from server
-    function loadLeads(status = '', search = '') {
-        $('#leads-table-body').html('<tr><td colspan="6" class="loading-cell">Loading leads...</td></tr>');
+    function loadLeads(status = '', search = '', leadType = '') {
+        $('#leads-table-body').html('<tr><td colspan="7" class="loading-cell">Loading leads...</td></tr>');
         $('#leads-cards-mobile').html('<p>Loading leads...</p>');
 
         const action = dashboardType === 'area_manager' ? 'get_area_manager_leads' : 'get_sales_manager_leads';
@@ -157,7 +177,8 @@
             data: {
                 action: action,
                 status: status,
-                search: search
+                search: search,
+                lead_type: leadType
             },
             success: function (response) {
                 if (response.success) {
@@ -205,6 +226,8 @@
         leads.forEach(lead => {
             const statusStyle = statusColors[lead.status] || statusColors['new'];
             const followupCount = lead.followups ? lead.followups.length : (lead.followup_count || 0);
+            const leadTypeIcon = lead.lead_type === 'cleaning_service' ? '🧹' : '☀️';
+            const leadTypeLabel = lead.lead_type === 'cleaning_service' ? 'Cleaning' : 'Solar';
 
             // Table row
             tableHtml += `
@@ -213,9 +236,11 @@
                         <strong>${escapeHtml(lead.name)}</strong>
                     </td>
                     <td>
+                        <span title="${leadTypeLabel}">${leadTypeIcon} ${leadTypeLabel}</span>
+                    </td>
+                    <td>
                         <a href="tel:${lead.phone}" class="lead-quick-action">${escapeHtml(lead.phone)}</a>
                     </td>
-                    <td>${lead.email ? escapeHtml(lead.email) : '-'}</td>
                     <td>
                         <span class="lead-status-badge" style="background:${statusStyle.bg}; color:${statusStyle.color};">
                             ${formatStatus(lead.status)}

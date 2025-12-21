@@ -267,6 +267,10 @@ function toggleProjectDetails(projectId) {
                 <span class="icon">🔄</span>
                 <span>Timeline</span>
             </a>
+            <a href="#" class="nav-item" data-section="cleaning" onclick="switchSection(event, 'cleaning')">
+                <span class="icon">🧹</span>
+                <span>Cleaning</span>
+            </a>
         </nav>
         
         <!-- User Profile -->
@@ -803,6 +807,166 @@ function toggleProjectDetails(projectId) {
                     <?php endwhile; ?>
                 <?php endif; ?>
                 <?php wp_reset_postdata(); ?>
+            </div>
+            
+            <!-- CLEANING SECTION -->
+            <div class="section-content" id="cleaning-section" style="display: none;">
+                <?php
+                // Get cleaning services for current client
+                $cleaning_services = get_posts([
+                    'post_type' => 'cleaning_service',
+                    'posts_per_page' => -1,
+                    'meta_query' => [
+                        [
+                            'key' => '_customer_user_id',
+                            'value' => $client_id,
+                        ],
+                    ],
+                ]);
+                
+                if (!empty($cleaning_services)) :
+                    foreach ($cleaning_services as $service) :
+                        $service_id = $service->ID;
+                        $plan_type = get_post_meta($service_id, '_plan_type', true);
+                        $system_size = get_post_meta($service_id, '_system_size_kw', true);
+                        $visits_total = intval(get_post_meta($service_id, '_visits_total', true));
+                        $visits_used = intval(get_post_meta($service_id, '_visits_used', true));
+                        $visits_remaining = $visits_total - $visits_used;
+                        $payment_status = get_post_meta($service_id, '_payment_status', true);
+                        $total_amount = get_post_meta($service_id, '_total_amount', true);
+                        
+                        $plan_labels = [
+                            'one_time' => 'One-Time',
+                            'monthly' => 'Monthly',
+                            '6_month' => '6-Month Plan',
+                            'yearly' => 'Yearly Plan'
+                        ];
+                        
+                        // Get next scheduled visit
+                        $next_visit = get_posts([
+                            'post_type' => 'cleaning_visit',
+                            'numberposts' => 1,
+                            'meta_query' => [
+                                ['key' => '_service_id', 'value' => $service_id],
+                                ['key' => '_status', 'value' => 'scheduled'],
+                            ],
+                            'meta_key' => '_scheduled_date',
+                            'orderby' => 'meta_value',
+                            'order' => 'ASC',
+                        ]);
+                        
+                        // Get completed visits
+                        $completed_visits = get_posts([
+                            'post_type' => 'cleaning_visit',
+                            'numberposts' => 10,
+                            'meta_query' => [
+                                ['key' => '_service_id', 'value' => $service_id],
+                                ['key' => '_status', 'value' => 'completed'],
+                            ],
+                            'meta_key' => '_scheduled_date',
+                            'orderby' => 'meta_value',
+                            'order' => 'DESC',
+                        ]);
+                ?>
+                
+                <!-- Membership Card -->
+                <div class="card" style="margin-bottom: 20px; border-left: 4px solid #10b981;">
+                    <div class="card-header" style="display: flex; justify-content: space-between; align-items: center;">
+                        <h3 style="margin: 0;">🧹 Solar Panel Cleaning</h3>
+                        <span style="background: <?php echo $payment_status === 'paid' ? '#d1fae5' : '#fef3c7'; ?>; color: <?php echo $payment_status === 'paid' ? '#047857' : '#b45309'; ?>; padding: 6px 12px; border-radius: 20px; font-size: 12px; font-weight: 600;">
+                            <?php echo $payment_status === 'paid' ? '✅ Active' : '⏳ Pending Payment'; ?>
+                        </span>
+                    </div>
+                    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 20px; margin-top: 20px;">
+                        <div style="text-align: center; padding: 15px; background: #f8fafc; border-radius: 10px;">
+                            <div style="font-size: 28px; font-weight: 700; color: #4f46e5;"><?php echo $visits_remaining; ?></div>
+                            <div style="font-size: 13px; color: #6b7280;">Visits Remaining</div>
+                        </div>
+                        <div style="text-align: center; padding: 15px; background: #f8fafc; border-radius: 10px;">
+                            <div style="font-size: 28px; font-weight: 700; color: #10b981;"><?php echo $visits_used; ?></div>
+                            <div style="font-size: 13px; color: #6b7280;">Visits Completed</div>
+                        </div>
+                        <div style="text-align: center; padding: 15px; background: #f8fafc; border-radius: 10px;">
+                            <div style="font-size: 18px; font-weight: 600; color: #333;"><?php echo $plan_labels[$plan_type] ?? $plan_type; ?></div>
+                            <div style="font-size: 13px; color: #6b7280;">Plan Type</div>
+                        </div>
+                        <div style="text-align: center; padding: 15px; background: #f8fafc; border-radius: 10px;">
+                            <div style="font-size: 18px; font-weight: 600; color: #333;"><?php echo $system_size; ?> kW</div>
+                            <div style="font-size: 13px; color: #6b7280;">System Size</div>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Next Scheduled Visit -->
+                <?php if (!empty($next_visit)) : 
+                    $nv = $next_visit[0];
+                    $nv_date = get_post_meta($nv->ID, '_scheduled_date', true);
+                    $nv_time = get_post_meta($nv->ID, '_scheduled_time', true) ?: '09:00';
+                ?>
+                <div class="card" style="margin-bottom: 20px; background: linear-gradient(135deg, #fffbeb 0%, white 100%); border-left: 4px solid #f59e0b;">
+                    <div class="card-header">
+                        <h3 style="margin: 0;">📅 Next Scheduled Visit</h3>
+                    </div>
+                    <div style="display: flex; align-items: center; gap: 20px; margin-top: 15px; flex-wrap: wrap;">
+                        <div style="font-size: 24px; font-weight: 700; color: #d97706;">
+                            <?php echo date('d M Y', strtotime($nv_date)); ?>
+                        </div>
+                        <div style="font-size: 18px; color: #666;">
+                            ⏰ <?php echo $nv_time; ?>
+                        </div>
+                    </div>
+                    <p style="margin-top: 12px; color: #6b7280; font-size: 14px;">
+                        Please ensure access to your solar panels on this date. Our cleaner will arrive during the scheduled time.
+                    </p>
+                </div>
+                <?php endif; ?>
+                
+                <!-- Completed Visits History -->
+                <?php if (!empty($completed_visits)) : ?>
+                <div class="card">
+                    <div class="card-header">
+                        <h3 style="margin: 0;">✅ Visit History</h3>
+                    </div>
+                    <div style="margin-top: 15px;">
+                        <?php foreach ($completed_visits as $cv) : 
+                            $cv_date = get_post_meta($cv->ID, '_scheduled_date', true);
+                            $cv_photo = get_post_meta($cv->ID, '_completion_photo', true);
+                            $cv_notes = get_post_meta($cv->ID, '_completion_notes', true);
+                        ?>
+                        <div style="display: flex; gap: 15px; padding: 15px; border-bottom: 1px solid #f0f0f0; align-items: center;">
+                            <?php if ($cv_photo) : ?>
+                            <img src="<?php echo esc_url($cv_photo); ?>" alt="Completion Photo" 
+                                 style="width: 80px; height: 60px; object-fit: cover; border-radius: 8px; cursor: pointer;"
+                                 onclick="openImageModal(this.src)">
+                            <?php else : ?>
+                            <div style="width: 80px; height: 60px; background: #f0f0f0; border-radius: 8px; display: flex; align-items: center; justify-content: center; color: #999;">📷</div>
+                            <?php endif; ?>
+                            <div style="flex: 1;">
+                                <div style="font-weight: 600; color: #333;"><?php echo date('d M Y', strtotime($cv_date)); ?></div>
+                                <?php if ($cv_notes) : ?>
+                                <div style="font-size: 13px; color: #6b7280; margin-top: 4px;"><?php echo esc_html($cv_notes); ?></div>
+                                <?php endif; ?>
+                            </div>
+                            <span style="background: #d1fae5; color: #047857; padding: 4px 10px; border-radius: 20px; font-size: 11px;">Completed</span>
+                        </div>
+                        <?php endforeach; ?>
+                    </div>
+                </div>
+                <?php endif; ?>
+                
+                <?php endforeach; ?>
+                <?php else : ?>
+                <div style="text-align: center; padding: 60px 20px; color: #6b7280;">
+                    <div style="font-size: 64px; margin-bottom: 20px;">🧹</div>
+                    <h2 style="color: #333; margin-bottom: 10px;">No Cleaning Service</h2>
+                    <p>You don't have an active solar panel cleaning subscription.</p>
+                    <p style="margin-top: 20px;">
+                        <a href="<?php echo home_url('/cleaning-booking/'); ?>" style="display: inline-block; padding: 12px 24px; background: linear-gradient(135deg, #10b981 0%, #059669 100%); color: white; text-decoration: none; border-radius: 8px; font-weight: 600;">
+                            🧹 Book Cleaning Service
+                        </a>
+                    </p>
+                </div>
+                <?php endif; ?>
             </div>
         </div>
     </main>

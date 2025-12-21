@@ -14,6 +14,7 @@ function sp_render_general_settings_page() {
             <a href="?page=ksc-settings&tab=vendor_registration" class="nav-tab <?php echo $active_tab == 'vendor_registration' ? 'nav-tab-active' : ''; ?>">Vendor Registration</a>
             <a href="?page=ksc-settings&tab=notifications" class="nav-tab <?php echo $active_tab == 'notifications' ? 'nav-tab-active' : ''; ?>">Notifications</a>
             <a href="?page=ksc-settings&tab=project_settings" class="nav-tab <?php echo $active_tab == 'project_settings' ? 'nav-tab-active' : ''; ?>">Project Settings</a>
+            <a href="?page=ksc-settings&tab=cleaning_service" class="nav-tab <?php echo $active_tab == 'cleaning_service' ? 'nav-tab-active' : ''; ?>">Cleaning Service</a>
             <a href="?page=ksc-settings&tab=about" class="nav-tab <?php echo $active_tab == 'about' ? 'nav-tab-active' : ''; ?>">About & Support</a>
         </h2>
         <form method="post" action="options.php">
@@ -29,6 +30,10 @@ function sp_render_general_settings_page() {
             } elseif ($active_tab == 'notifications') {
                 settings_fields('sp_notification_settings_group');
                 do_settings_sections('notification-settings');
+                submit_button();
+            } elseif ($active_tab == 'cleaning_service') {
+                settings_fields('ksc_cleaning_settings_group');
+                do_settings_sections('cleaning-service-settings');
                 submit_button();
             } elseif ($active_tab == 'about') {
                 ?>
@@ -274,6 +279,46 @@ function sp_register_general_settings() {
         'sp_whatsapp_section'
     );
 
+    // Cleaning Service Notifications Section
+    add_settings_section(
+        'sp_cleaning_notifications_section',
+        '🧹 Cleaning Service Notifications',
+        'sp_cleaning_notifications_section_callback',
+        'notification-settings'
+    );
+
+    add_settings_field(
+        'cleaning_preservice_reminder',
+        'Pre-Service Reminder (1 Day Before)',
+        'sp_cleaning_preservice_reminder_callback',
+        'notification-settings',
+        'sp_cleaning_notifications_section'
+    );
+
+    add_settings_field(
+        'cleaning_assignment_notification',
+        'Cleaner Assignment Notification',
+        'sp_cleaning_assignment_notification_callback',
+        'notification-settings',
+        'sp_cleaning_notifications_section'
+    );
+
+    add_settings_field(
+        'cleaning_postservice_review',
+        'Post-Service Review Request',
+        'sp_cleaning_postservice_review_callback',
+        'notification-settings',
+        'sp_cleaning_notifications_section'
+    );
+
+    add_settings_field(
+        'cleaning_whatsapp_enabled',
+        'Enable WhatsApp for Cleaning',
+        'sp_cleaning_whatsapp_enabled_callback',
+        'notification-settings',
+        'sp_cleaning_notifications_section'
+    );
+
     // --- Project Settings ---
     register_setting('sp_project_settings_group', 'ksc_default_project_image');
 
@@ -290,6 +335,40 @@ function sp_register_general_settings() {
         'sp_default_project_image_callback',
         'project-settings',
         'sp_project_section'
+    );
+
+    // --- Cleaning Service Settings ---
+    register_setting('ksc_cleaning_settings_group', 'ksc_cleaning_options');
+
+    add_settings_section(
+        'ksc_cleaning_pricing_section',
+        'Cleaning Service Pricing',
+        'ksc_cleaning_pricing_section_callback',
+        'cleaning-service-settings'
+    );
+
+    add_settings_field(
+        'cleaning_price_per_kw',
+        'Price per kW (₹)',
+        'ksc_cleaning_price_per_kw_callback',
+        'cleaning-service-settings',
+        'ksc_cleaning_pricing_section'
+    );
+
+    add_settings_field(
+        'cleaning_6month_discount',
+        '6-Month Plan Discount (%)',
+        'ksc_cleaning_6month_discount_callback',
+        'cleaning-service-settings',
+        'ksc_cleaning_pricing_section'
+    );
+
+    add_settings_field(
+        'cleaning_yearly_discount',
+        'Yearly Plan Discount (%)',
+        'ksc_cleaning_yearly_discount_callback',
+        'cleaning-service-settings',
+        'ksc_cleaning_pricing_section'
     );
 }
 
@@ -460,4 +539,63 @@ function sp_whatsapp_submission_rejected_callback() {
     $options = get_option('sp_notification_options');
     $checked = isset($options['whatsapp_submission_rejected']) ? 'checked' : '';
     echo "<input type='checkbox' name='sp_notification_options[whatsapp_submission_rejected]' value='1' $checked />";
+}
+
+// --- Cleaning Notification Callbacks ---
+function sp_cleaning_notifications_section_callback() { 
+    echo 'Configure notifications for solar panel cleaning services. These notifications are sent to cleaners and customers.'; 
+}
+
+function sp_cleaning_preservice_reminder_callback() {
+    $options = get_option('sp_notification_options');
+    $checked = isset($options['cleaning_preservice_reminder']) ? 'checked' : '';
+    echo "<input type='checkbox' name='sp_notification_options[cleaning_preservice_reminder]' value='1' $checked />";
+    echo "<p class='description'>Send reminder notifications 1 day before scheduled cleaning (to cleaner and customer)</p>";
+}
+
+function sp_cleaning_assignment_notification_callback() {
+    $options = get_option('sp_notification_options');
+    $checked = isset($options['cleaning_assignment_notification']) ? 'checked' : '';
+    echo "<input type='checkbox' name='sp_notification_options[cleaning_assignment_notification]' value='1' $checked />";
+    echo "<p class='description'>Notify cleaner when a new cleaning visit is assigned to them</p>";
+}
+
+function sp_cleaning_postservice_review_callback() {
+    $options = get_option('sp_notification_options');
+    $checked = isset($options['cleaning_postservice_review']) ? 'checked' : '';
+    echo "<input type='checkbox' name='sp_notification_options[cleaning_postservice_review]' value='1' $checked />";
+    echo "<p class='description'>Send review request to customer 2 hours after cleaning is completed</p>";
+}
+
+function sp_cleaning_whatsapp_enabled_callback() {
+    $options = get_option('sp_notification_options');
+    $checked = isset($options['cleaning_whatsapp_enabled']) ? 'checked' : '';
+    echo "<input type='checkbox' name='sp_notification_options[cleaning_whatsapp_enabled]' value='1' $checked />";
+    echo "<p class='description'>Enable WhatsApp notifications for cleaning service reminders and review requests</p>";
+}
+
+// --- Cleaning Service Callbacks ---
+function ksc_cleaning_pricing_section_callback() {
+    echo 'Set pricing for solar panel cleaning services. Discount applies to subscription plans.';
+}
+
+function ksc_cleaning_price_per_kw_callback() {
+    $options = get_option('ksc_cleaning_options');
+    $val = isset($options['cleaning_price_per_kw']) ? esc_attr($options['cleaning_price_per_kw']) : '50';
+    echo "<input type='number' name='ksc_cleaning_options[cleaning_price_per_kw]' value='$val' min='0' step='1' />";
+    echo "<p class='description'>Base price charged per kW of solar system for each cleaning visit.</p>";
+}
+
+function ksc_cleaning_6month_discount_callback() {
+    $options = get_option('ksc_cleaning_options');
+    $val = isset($options['cleaning_6month_discount']) ? esc_attr($options['cleaning_6month_discount']) : '10';
+    echo "<input type='number' name='ksc_cleaning_options[cleaning_6month_discount]' value='$val' min='0' max='100' step='1' /> %";
+    echo "<p class='description'>Discount for 6-month subscription (6 visits prepaid).</p>";
+}
+
+function ksc_cleaning_yearly_discount_callback() {
+    $options = get_option('ksc_cleaning_options');
+    $val = isset($options['cleaning_yearly_discount']) ? esc_attr($options['cleaning_yearly_discount']) : '10';
+    echo "<input type='number' name='ksc_cleaning_options[cleaning_yearly_discount]' value='$val' min='0' max='100' step='1' /> %";
+    echo "<p class='description'>Discount for yearly subscription (12 visits prepaid).</p>";
 }

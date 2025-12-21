@@ -457,6 +457,10 @@
             initLeadComponent();
         } else if (section === 'my-clients') {
             loadMyClients();
+        } else if (section === 'manage-cleaners') {
+            loadCleanersList();
+        } else if (section === 'cleaning-services') {
+            loadCleaningServices();
         }
     };
 
@@ -1435,6 +1439,188 @@
             },
             complete: function () {
                 form.find('button').prop('disabled', false).text('Reset Password');
+            }
+        });
+    });
+
+    // ===============================
+    // CLEANER MANAGEMENT FUNCTIONS
+    // ===============================
+
+    // Load cleaners list
+    function loadCleanersList() {
+        const container = $('#cleaners-list-container');
+        container.html('<p>Loading cleaners...</p>');
+
+        $.ajax({
+            url: ajaxUrl,
+            type: 'POST',
+            data: { action: 'get_cleaners' },
+            success: function (response) {
+                if (response.success) {
+                    const cleaners = response.data;
+                    if (cleaners.length === 0) {
+                        container.html('<p>No cleaners found. Use the form above to add your first cleaner.</p>');
+                        return;
+                    }
+
+                    let html = '<div class="cleaners-grid" style="display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 20px;">';
+                    cleaners.forEach(cleaner => {
+                        const photoUrl = cleaner.photo_url || 'https://via.placeholder.com/80x80?text=No+Photo';
+                        const aadhaarMasked = cleaner.aadhaar ? 'XXXX-XXXX-' + cleaner.aadhaar.slice(-4) : 'N/A';
+
+                        html += `
+                            <div class="cleaner-card" style="background: #fff; border-radius: 12px; padding: 20px; box-shadow: 0 2px 8px rgba(0,0,0,0.1);">
+                                <div style="display: flex; gap: 15px; align-items: center; margin-bottom: 15px;">
+                                    <img src="${photoUrl}" alt="${cleaner.name}" style="width: 60px; height: 60px; border-radius: 50%; object-fit: cover;">
+                                    <div>
+                                        <h4 style="margin: 0; font-size: 16px;">${cleaner.name}</h4>
+                                        <p style="margin: 5px 0 0; color: #666; font-size: 13px;">📞 ${cleaner.phone}</p>
+                                    </div>
+                                </div>
+                                <div style="font-size: 13px; color: #555;">
+                                    <p style="margin: 5px 0;"><strong>Aadhaar:</strong> ${aadhaarMasked}</p>
+                                    <p style="margin: 5px 0;"><strong>Location:</strong> ${cleaner.city || 'N/A'}, ${cleaner.state || 'N/A'}</p>
+                                </div>
+                                <div style="margin-top: 15px; display: flex; gap: 10px;">
+                                    <a href="tel:${cleaner.phone}" class="btn btn-sm" style="padding: 6px 12px; font-size: 12px;">📞 Call</a>
+                                    <button class="btn btn-danger btn-sm delete-cleaner" data-id="${cleaner.id}" style="padding: 6px 12px; font-size: 12px;">🗑️ Delete</button>
+                                </div>
+                            </div>
+                        `;
+                    });
+                    html += '</div>';
+                    container.html(html);
+                } else {
+                    container.html('<p style="color: red;">Error loading cleaners: ' + response.data.message + '</p>');
+                }
+            },
+            error: function () {
+                container.html('<p style="color: red;">Error loading cleaners. Please try again.</p>');
+            }
+        });
+    }
+
+    // Load cleaning services
+    function loadCleaningServices() {
+        const tbody = $('#cleaning-services-tbody');
+        tbody.html('<tr><td colspan="7">Loading cleaning services...</td></tr>');
+
+        $.ajax({
+            url: ajaxUrl,
+            type: 'POST',
+            data: { action: 'get_cleaning_services' },
+            success: function (response) {
+                if (response.success) {
+                    const services = response.data;
+                    if (services.length === 0) {
+                        tbody.html('<tr><td colspan="7">No cleaning services yet. Bookings will appear here once customers book cleanings.</td></tr>');
+                        return;
+                    }
+
+                    let html = '';
+                    services.forEach(s => {
+                        const paymentBadge = s.payment_status === 'paid'
+                            ? '<span style="background:#d1fae5;color:#047857;padding:4px 8px;border-radius:4px;">Paid</span>'
+                            : '<span style="background:#fef3c7;color:#b45309;padding:4px 8px;border-radius:4px;">Pending</span>';
+                        const planLabels = {
+                            'one_time': 'One-Time',
+                            'monthly': 'Monthly',
+                            '6_month': '6-Month',
+                            'yearly': 'Yearly'
+                        };
+
+                        html += `
+                            <tr class="cleaning-service-row" data-id="${s.id}" style="cursor:pointer;">
+                                <td><strong>${s.customer_name}</strong><br><small>${s.customer_phone}</small></td>
+                                <td>${planLabels[s.plan_type] || s.plan_type}</td>
+                                <td>${s.system_size_kw} kW</td>
+                                <td>${s.visits_used || 0}/${s.visits_total || 1}</td>
+                                <td>${paymentBadge}</td>
+                                <td>₹${Number(s.total_amount || 0).toLocaleString()}</td>
+                                <td>
+                                    ${s.next_visit_date
+                                ? `<span style="color:#4f46e5;">${s.next_visit_date}</span>`
+                                : '<button class="btn btn-sm schedule-visit-btn" data-id="' + s.id + '">📅 Schedule</button>'}
+                                </td>
+                            </tr>
+                        `;
+                    });
+                    tbody.html(html);
+                } else {
+                    tbody.html('<tr><td colspan="7" style="color:red;">Error loading services</td></tr>');
+                }
+            },
+            error: function () {
+                tbody.html('<tr><td colspan="7" style="color:red;">Error loading cleaning services</td></tr>');
+            }
+        });
+    }
+
+    // Create cleaner form submission
+    $(document).on('submit', '#create-cleaner-form', function (e) {
+        e.preventDefault();
+
+        const form = $(this);
+        const formData = new FormData(this);
+        formData.append('action', 'create_cleaner');
+
+        const feedback = $('#create-cleaner-feedback');
+        const submitBtn = form.find('button[type="submit"]');
+
+        submitBtn.prop('disabled', true).text('Creating...');
+        feedback.html('');
+
+        $.ajax({
+            url: ajaxUrl,
+            type: 'POST',
+            data: formData,
+            processData: false,
+            contentType: false,
+            success: function (response) {
+                if (response.success) {
+                    feedback.html(`
+                        <div style="background: #d4edda; color: #155724; padding: 15px; border-radius: 8px;">
+                            <strong>✅ Cleaner created successfully!</strong><br>
+                            <strong>Username:</strong> ${response.data.username}<br>
+                            <strong>Password:</strong> ${response.data.password}<br>
+                            <em style="font-size: 12px;">Please save these credentials and share with the cleaner.</em>
+                        </div>
+                    `);
+                    form[0].reset();
+                    loadCleanersList();
+                } else {
+                    feedback.html(`<div style="background: #f8d7da; color: #721c24; padding: 15px; border-radius: 8px;">❌ ${response.data.message}</div>`);
+                }
+            },
+            error: function () {
+                feedback.html('<div style="background: #f8d7da; color: #721c24; padding: 15px; border-radius: 8px;">❌ Error creating cleaner. Please try again.</div>');
+            },
+            complete: function () {
+                submitBtn.prop('disabled', false).text('➕ Create Cleaner Account');
+            }
+        });
+    });
+
+    // Delete cleaner
+    $(document).on('click', '.delete-cleaner', function () {
+        const cleanerId = $(this).data('id');
+        if (!confirm('Are you sure you want to delete this cleaner?')) return;
+
+        $.ajax({
+            url: ajaxUrl,
+            type: 'POST',
+            data: { action: 'delete_cleaner', cleaner_id: cleanerId },
+            success: function (response) {
+                if (response.success) {
+                    showToast('Cleaner deleted successfully', 'success');
+                    loadCleanersList();
+                } else {
+                    showToast(response.data.message, 'error');
+                }
+            },
+            error: function () {
+                showToast('Error deleting cleaner', 'error');
             }
         });
     });

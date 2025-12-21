@@ -58,6 +58,11 @@ final class Krtrim_Solar_Core {
 		require_once $this->dir_path . 'includes/class-process-steps-manager.php';
 		require_once $this->dir_path . 'includes/class-notifications-manager.php';
 		require_once $this->dir_path . 'includes/class-error-logger.php';
+		require_once $this->dir_path . 'includes/post-types/class-cleaning-cpts.php';
+		require_once $this->dir_path . 'includes/api/class-cleaner-api.php';
+		require_once $this->dir_path . 'includes/api/class-cleaning-services-api.php';
+		require_once $this->dir_path . 'includes/class-cleaning-notifications.php';
+		require_once $this->dir_path . 'includes/integrations/class-cf7-cleaning-integration.php';
 		
 		// Admin view files (required by SP_Admin_Menus class)
 		require_once $this->dir_path . 'admin/views/view-vendor-approval.php';
@@ -97,6 +102,7 @@ final class Krtrim_Solar_Core {
 		add_shortcode( 'vendor_registration_form', 'sp_vendor_registration_form_shortcode' );
 		add_shortcode( 'solar_project_marketplace', 'sp_project_marketplace_shortcode' );
 		add_shortcode( 'vendor_status_dashboard', 'sp_vendor_status_dashboard_shortcode' );
+		add_shortcode( 'cleaner_dashboard', 'ksc_cleaner_dashboard_shortcode' );
 		
 		add_filter( 'template_include', [ $this, 'template_include_single_project' ] );
 		add_filter( 'plugin_action_links_' . plugin_basename( $this->file ), [ $this, 'add_plugin_action_links' ] );
@@ -679,6 +685,10 @@ function sp_create_plugin_essentials() {
 			'display_name' => 'Solar Client',
 			'capabilities' => [ 'read' => true ],
 		],
+		'solar_cleaner' => [
+			'display_name' => 'Solar Cleaner',
+			'capabilities' => [ 'read' => true ],
+		],
 	];
 
 	foreach ( $roles as $role => $details ) {
@@ -691,9 +701,11 @@ function sp_create_plugin_essentials() {
 		['title' => 'Dashboard', 'slug' => 'solar-dashboard', 'content' => '[unified_solar_dashboard]'],
 		['title' => 'Area Manager Dashboard', 'slug' => 'area-manager-dashboard', 'content' => '[area_manager_dashboard]'],
 		['title' => 'Sales Manager Dashboard', 'slug' => 'sales-manager-dashboard', 'content' => '[sales_manager_dashboard]'],
+		['title' => 'Cleaner Dashboard', 'slug' => 'cleaner-dashboard', 'content' => '[cleaner_dashboard]'],
 		['title' => 'Vendor Registration', 'slug' => 'vendor-registration', 'content' => '[vendor_registration_form]'],
 		['title' => 'Project Marketplace', 'slug' => 'project-marketplace', 'content' => '[solar_project_marketplace]'],
-		['title' => 'Vendor Status', 'slug' => 'vendor-status', 'content' => '[vendor_status_dashboard]']
+		['title' => 'Vendor Status', 'slug' => 'vendor-status', 'content' => '[vendor_status_dashboard]'],
+		['title' => 'Book Solar Cleaning', 'slug' => 'book-solar-cleaning', 'content' => '[solar_cleaning_booking]']
 	];
 
 	foreach ( $pages_to_create as $page ) {
