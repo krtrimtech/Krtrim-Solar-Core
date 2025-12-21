@@ -1,0 +1,606 @@
+/**
+ * Shared Lead Component Styles
+ * 
+ * Reusable styles for lead management in Area Manager and Sales Manager dashboards.
+ * 
+ * @package Krtrim_Solar_Core
+ * @since 1.0.1
+ */
+
+/* Lead Section Header */
+.lead-section-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 20px;
+    gap: 16px;
+    flex-wrap: wrap;
+}
+
+.lead-filters {
+    display: flex;
+    gap: 12px;
+    align-items: center;
+    flex-wrap: wrap;
+}
+
+.lead-filter-select {
+    padding: 10px 16px;
+    border: 2px solid #e5e7eb;
+    border-radius: 8px;
+    font-size: 14px;
+    background: white;
+    cursor: pointer;
+}
+
+.lead-filter-select:focus {
+    outline: none;
+    border-color: #10b981;
+}
+
+/* Lead Table */
+.lead-table-wrapper {
+    background: white;
+    border-radius: 12px;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
+    overflow: hidden;
+}
+
+.lead-table {
+    width: 100%;
+    border-collapse: collapse;
+}
+
+.lead-table thead {
+    background: #f9fafb;
+    border-bottom: 2px solid #e5e7eb;
+}
+
+.lead-table th {
+    padding: 14px 16px;
+    text-align: left;
+    font-weight: 600;
+    font-size: 13px;
+    color: #6b7280;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+.lead-table td {
+    padding: 14px 16px;
+    border-bottom: 1px solid #f3f4f6;
+    font-size: 14px;
+    color: #374151;
+}
+
+.lead-row-clickable {
+    cursor: pointer;
+    transition: background 0.15s;
+}
+
+.lead-row-clickable:hover {
+    background: #f0fdf4;
+}
+
+.lead-name-cell strong {
+    color: #111827;
+}
+
+.lead-actions-cell {
+    display: flex;
+    gap: 8px;
+}
+
+.btn-icon {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 32px;
+    height: 32px;
+    border-radius: 8px;
+    background: #f3f4f6;
+    text-decoration: none;
+    font-size: 16px;
+    transition: all 0.2s;
+}
+
+.btn-icon:hover {
+    background: #e5e7eb;
+    transform: scale(1.1);
+}
+
+.loading-cell,
+.empty-cell,
+.error-cell {
+    text-align: center;
+    padding: 40px !important;
+    color: #9ca3af;
+}
+
+.error-cell {
+    color: #ef4444;
+}
+
+/* Lead Status Badge */
+.lead-status-badge {
+    display: inline-block;
+    padding: 4px 10px;
+    border-radius: 20px;
+    font-size: 12px;
+    font-weight: 600;
+    text-transform: capitalize;
+}
+
+/* Mobile Lead Cards */
+.lead-cards-mobile {
+    display: none;
+}
+
+.lead-card-mobile {
+    background: white;
+    border-radius: 12px;
+    padding: 16px;
+    margin-bottom: 12px;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
+    cursor: pointer;
+    transition: all 0.2s;
+    border-left: 4px solid #10b981;
+}
+
+.lead-card-mobile:hover {
+    box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
+}
+
+.lead-card-mobile-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 8px;
+}
+
+.lead-card-mobile-header strong {
+    font-size: 16px;
+    color: #111827;
+}
+
+.lead-card-mobile-info {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 12px;
+    font-size: 13px;
+    color: #6b7280;
+    margin-bottom: 12px;
+}
+
+.lead-card-mobile-actions {
+    display: flex;
+    gap: 8px;
+    padding-top: 12px;
+    border-top: 1px solid #f3f4f6;
+}
+
+.lead-card-mobile-actions a {
+    flex: 1;
+    text-align: center;
+    padding: 8px;
+    border-radius: 8px;
+    background: #f3f4f6;
+    color: #374151;
+    text-decoration: none;
+    font-size: 13px;
+    font-weight: 500;
+    transition: background 0.2s;
+}
+
+.lead-card-mobile-actions a:hover {
+    background: #e5e7eb;
+}
+
+/* Lead Modal Styles */
+.lead-modal {
+    position: fixed;
+    z-index: 10000;
+    left: 0;
+    top: 0;
+    width: 100%;
+    height: 100%;
+    background-color: rgba(0, 0, 0, 0.5);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 20px;
+}
+
+.lead-modal-content {
+    background: white;
+    border-radius: 16px;
+    padding: 32px;
+    max-width: 550px;
+    width: 100%;
+    max-height: 90vh;
+    overflow-y: auto;
+    position: relative;
+    animation: leadModalFadeIn 0.2s ease-out;
+}
+
+.lead-detail-modal-content {
+    max-width: 700px;
+}
+
+@keyframes leadModalFadeIn {
+    from {
+        opacity: 0;
+        transform: translateY(-20px);
+    }
+
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+.close-lead-modal {
+    position: absolute;
+    right: 20px;
+    top: 20px;
+    font-size: 28px;
+    font-weight: bold;
+    color: #9ca3af;
+    cursor: pointer;
+    transition: color 0.2s;
+    line-height: 1;
+}
+
+.close-lead-modal:hover {
+    color: #111827;
+}
+
+.lead-modal h3 {
+    margin: 0 0 20px 0;
+    font-size: 20px;
+    color: #111827;
+}
+
+/* Lead Detail Modal Specific */
+#lead-detail-header {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin-bottom: 20px;
+}
+
+#lead-detail-header h3 {
+    margin: 0;
+    flex: 1;
+}
+
+.lead-info-grid {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 12px;
+    margin-bottom: 16px;
+}
+
+.lead-info-item {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+
+.lead-info-item .label {
+    font-size: 12px;
+    color: #9ca3af;
+}
+
+.lead-info-item .value {
+    font-size: 14px;
+    color: #111827;
+    font-weight: 500;
+}
+
+.lead-notes {
+    background: #f9fafb;
+    padding: 12px;
+    border-radius: 8px;
+    font-size: 14px;
+    color: #4b5563;
+    margin-bottom: 20px;
+}
+
+.lead-followup-section {
+    margin-top: 24px;
+    padding-top: 20px;
+    border-top: 1px solid #e5e7eb;
+}
+
+.lead-followup-section h4 {
+    margin: 0 0 16px 0;
+    font-size: 16px;
+    color: #111827;
+}
+
+.no-followups {
+    text-align: center;
+    padding: 24px;
+    color: #9ca3af;
+    font-style: italic;
+}
+
+/* Followup Thread */
+.followup-thread {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+}
+
+.followup-thread-item {
+    display: flex;
+    gap: 12px;
+    padding: 12px;
+    background: #f9fafb;
+    border-radius: 8px;
+    border-left: 3px solid #10b981;
+}
+
+.followup-icon {
+    font-size: 20px;
+    width: 28px;
+    text-align: center;
+    flex-shrink: 0;
+}
+
+.followup-content {
+    flex: 1;
+    min-width: 0;
+}
+
+.followup-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 4px;
+}
+
+.followup-type {
+    font-weight: 600;
+    font-size: 13px;
+    color: #111827;
+}
+
+.followup-date {
+    font-size: 11px;
+    color: #9ca3af;
+}
+
+.followup-notes {
+    font-size: 13px;
+    color: #4b5563;
+    line-height: 1.4;
+}
+
+/* Lead Detail Actions */
+.lead-detail-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+    margin-top: 20px;
+    padding-top: 20px;
+    border-top: 1px solid #e5e7eb;
+}
+
+.lead-detail-actions .btn {
+    padding: 10px 16px;
+    border-radius: 8px;
+    font-size: 14px;
+    font-weight: 500;
+    text-decoration: none;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    cursor: pointer;
+    border: none;
+    transition: all 0.2s;
+}
+
+.lead-detail-actions .btn-whatsapp {
+    background: #25d366;
+    color: white;
+}
+
+.lead-detail-actions .btn-call {
+    background: #3b82f6;
+    color: white;
+}
+
+.lead-detail-actions .btn-success {
+    background: #10b981;
+    color: white;
+}
+
+/* Status Update */
+.lead-status-update {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin-top: 16px;
+    padding: 12px;
+    background: #f9fafb;
+    border-radius: 8px;
+}
+
+.lead-status-update label {
+    font-size: 13px;
+    font-weight: 500;
+    color: #6b7280;
+}
+
+.lead-status-update select {
+    flex: 1;
+    padding: 8px 12px;
+    border: 2px solid #e5e7eb;
+    border-radius: 6px;
+    font-size: 14px;
+}
+
+/* Form Styles */
+.lead-modal .form-row {
+    display: flex;
+    gap: 16px;
+}
+
+.lead-modal .form-row .form-group {
+    flex: 1;
+}
+
+.lead-modal .form-group {
+    margin-bottom: 16px;
+}
+
+.lead-modal .form-group label {
+    display: block;
+    margin-bottom: 6px;
+    font-size: 14px;
+    font-weight: 500;
+    color: #374151;
+}
+
+.lead-modal .form-group input,
+.lead-modal .form-group select,
+.lead-modal .form-group textarea {
+    width: 100%;
+    padding: 10px 12px;
+    border: 2px solid #e5e7eb;
+    border-radius: 8px;
+    font-size: 14px;
+    transition: border-color 0.2s;
+}
+
+.lead-modal .form-group input:focus,
+.lead-modal .form-group select:focus,
+.lead-modal .form-group textarea:focus {
+    outline: none;
+    border-color: #10b981;
+}
+
+/* Mobile Bottom Navigation */
+.mobile-bottom-nav {
+    display: none;
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    background: white;
+    box-shadow: 0 -2px 10px rgba(0, 0, 0, 0.1);
+    z-index: 1000;
+    padding: 8px 0;
+    padding-bottom: calc(8px + env(safe-area-inset-bottom));
+}
+
+.mobile-bottom-nav-items {
+    display: flex;
+    justify-content: space-around;
+    align-items: center;
+}
+
+.mobile-nav-item {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 8px 16px;
+    color: #9ca3af;
+    text-decoration: none;
+    font-size: 11px;
+    font-weight: 500;
+    transition: color 0.2s;
+    cursor: pointer;
+}
+
+.mobile-nav-item .nav-icon {
+    font-size: 22px;
+    margin-bottom: 4px;
+}
+
+.mobile-nav-item.active,
+.mobile-nav-item:hover {
+    color: #10b981;
+}
+
+/* Responsive */
+@media (max-width: 768px) {
+    .lead-table-wrapper {
+        display: none;
+    }
+
+    .lead-cards-mobile {
+        display: block;
+    }
+
+    .lead-section-header {
+        flex-direction: column;
+        align-items: stretch;
+    }
+
+    .lead-filters {
+        width: 100%;
+    }
+
+    .lead-section-header .btn {
+        width: 100%;
+        justify-content: center;
+    }
+
+    .lead-modal-content {
+        padding: 24px 20px;
+        margin: 16px;
+        max-height: calc(100vh - 32px);
+    }
+
+    .lead-modal .form-row {
+        flex-direction: column;
+    }
+
+    .lead-info-grid {
+        grid-template-columns: 1fr;
+    }
+
+    .lead-detail-actions {
+        flex-direction: column;
+    }
+
+    .lead-detail-actions .btn {
+        width: 100%;
+        justify-content: center;
+    }
+
+    .mobile-bottom-nav {
+        display: block;
+    }
+
+    /* Add padding to main content to avoid overlap with bottom nav */
+    .sales-manager-dashboard .dashboard-main {
+        padding-bottom: 80px;
+    }
+}
+
+/* Empty State */
+.empty-state {
+    text-align: center;
+    padding: 48px 20px;
+    color: #9ca3af;
+}
+
+.empty-state .icon {
+    font-size: 48px;
+    margin-bottom: 12px;
+}
+
+.empty-state h3 {
+    color: #6b7280;
+    margin: 0 0 8px 0;
+    font-size: 18px;
+}
+
+.empty-state p {
+    margin: 0;
+    font-size: 14px;
+}

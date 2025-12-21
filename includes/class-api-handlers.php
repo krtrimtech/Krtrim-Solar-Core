@@ -21,6 +21,7 @@ class SP_API_Handlers {
     private $client_api;
     private $admin_manager_api;
     private $public_api;
+    private $sales_manager_api;
     
     /**
      * Constructor. Loads API modules and hooks into WordPress.
@@ -34,12 +35,14 @@ class SP_API_Handlers {
         require_once plugin_dir_path(__FILE__) . 'api/class-client-api.php';
         require_once plugin_dir_path(__FILE__) . 'api/class-admin-manager-api.php';
         require_once plugin_dir_path(__FILE__) . 'api/class-public-api.php';
+        require_once plugin_dir_path(__FILE__) . 'api/class-sales-manager-api.php';
         
         // Initialize API modules
         $this->vendor_api = new KSC_Vendor_API();
         $this->client_api = new KSC_Client_API();
         $this->admin_manager_api = new KSC_Admin_Manager_API();
         $this->public_api = new KSC_Public_API();
+        $this->sales_manager_api = new KSC_Sales_Manager_API();
         
         // REST API
         add_action('rest_api_init', [$this, 'register_rest_routes']);

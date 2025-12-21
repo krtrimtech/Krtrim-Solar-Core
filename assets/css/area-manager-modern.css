@@ -401,7 +401,8 @@
     flex-direction: column;
 }
 
-.notification-panel.active {
+.notification-panel.active,
+.notification-panel.open {
     right: 0;
 }
 

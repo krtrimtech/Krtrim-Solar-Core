@@ -71,6 +71,7 @@ final class Krtrim_Solar_Core {
 		require_once $this->dir_path . 'public/views/view-client-dashboard.php';
 		require_once $this->dir_path . 'public/views/view-vendor-dashboard.php';
 		require_once $this->dir_path . 'public/views/view-area-manager-dashboard.php';
+		require_once $this->dir_path . 'public/views/view-sales-manager-dashboard.php';
 		require_once $this->dir_path . 'public/views/view-marketplace.php';
 		require_once $this->dir_path . 'public/views/view-vendor-registration.php';
 		require_once $this->dir_path . 'public/views/view-vendor-status.php';
@@ -92,6 +93,7 @@ final class Krtrim_Solar_Core {
 
 		add_shortcode( 'unified_solar_dashboard', [ $this, 'shortcode_unified_dashboard' ] );
 		add_shortcode( 'area_manager_dashboard', 'sp_area_manager_dashboard_shortcode' );
+		add_shortcode( 'sales_manager_dashboard', 'sp_sales_manager_dashboard_shortcode' );
 		add_shortcode( 'vendor_registration_form', 'sp_vendor_registration_form_shortcode' );
 		add_shortcode( 'solar_project_marketplace', 'sp_project_marketplace_shortcode' );
 		add_shortcode( 'vendor_status_dashboard', 'sp_vendor_status_dashboard_shortcode' );
@@ -118,6 +120,10 @@ final class Krtrim_Solar_Core {
      */
     public function custom_login_redirect( $redirect_to, $request, $user ) {
         if ( isset( $user->roles ) && is_array( $user->roles ) ) {
+            // Sales Manager
+            if ( in_array( 'sales_manager', $user->roles ) ) {
+                return home_url( '/sales-manager-dashboard/' );
+            }
             // Area Manager
             if ( in_array( 'area_manager', $user->roles ) ) {
                 return home_url( '/area-manager-dashboard/' );
@@ -157,16 +163,17 @@ final class Krtrim_Solar_Core {
         }
 
         $user = wp_get_current_user();
-        $restricted_roles = [ 'solar_client', 'solar_vendor', 'area_manager' ];
+        $restricted_roles = [ 'solar_client', 'solar_vendor', 'area_manager', 'sales_manager' ];
         
         // Check if user has any restricted role
         foreach ( $restricted_roles as $role ) {
             if ( in_array( $role, (array) $user->roles ) ) {
                 // Define redirect mapping for each role
                 $redirect_map = [
-                    'area_manager'  => '/area-manager-dashboard/',
-                    'solar_client'  => '/solar-dashboard/',
-                    'solar_vendor'  => '/solar-dashboard/',
+                    'sales_manager'  => '/sales-manager-dashboard/',
+                    'area_manager'   => '/area-manager-dashboard/',
+                    'solar_client'   => '/solar-dashboard/',
+                    'solar_vendor'   => '/solar-dashboard/',
                 ];
                 
                 $redirect_url = isset( $redirect_map[$role] ) 
@@ -329,6 +336,7 @@ final class Krtrim_Solar_Core {
 		global $post;
 		if ( is_a( $post, 'WP_Post' ) && ( has_shortcode( $post->post_content, 'area_manager_dashboard' ) || is_page( 'area-manager-dashboard' ) ) ) {
             wp_enqueue_style('area-manager-modern', $this->dir_url . 'assets/css/area-manager-modern.css', [], '1.0.0');
+            wp_enqueue_style('lead-component-css', $this->dir_url . 'assets/css/components/lead-component.css', [], '1.0.1');
             wp_enqueue_style('leads-clients-enhanced', $this->dir_url . 'assets/css/leads-clients-enhanced.css', [], '1.0.0');
             wp_enqueue_style('project-modal', $this->dir_url . 'assets/css/project-modal.css', [], '1.0.0');
             wp_enqueue_style('date-picker-enhanced', $this->dir_url . 'assets/css/date-picker-enhanced.css', [], '1.0.0');
@@ -336,7 +344,8 @@ final class Krtrim_Solar_Core {
             wp_enqueue_style('password-field-css', $this->dir_url . 'assets/css/password-field.css', [], '1.0.0');
             wp_enqueue_script( 'chart-js', 'https://cdn.jsdelivr.net/npm/chart.js', [], '3.7.0', true );
             wp_enqueue_script('project-modal-js', $this->dir_url . 'assets/js/project-modal.js', ['jquery'], '1.0.0', true);
-			wp_enqueue_script( 'area-manager-dashboard-js', $this->dir_url . 'assets/js/area-manager-dashboard.js', [ 'jquery', 'chart-js' ], '1.0.6', true );
+            wp_enqueue_script('lead-component-js', $this->dir_url . 'assets/js/components/lead-component.js', ['jquery'], '1.0.1', true);
+			wp_enqueue_script( 'area-manager-dashboard-js', $this->dir_url . 'assets/js/area-manager-dashboard.js', [ 'jquery', 'chart-js', 'lead-component-js' ], '1.0.7', true );
 			wp_localize_script('area-manager-dashboard-js', 'sp_area_dashboard_vars', [
 				'ajax_url' => admin_url('admin-ajax.php'),
 				'create_project_nonce' => wp_create_nonce('sp_create_project_nonce_field'),
@@ -356,6 +365,22 @@ final class Krtrim_Solar_Core {
                 'get_clients_nonce' => wp_create_nonce('get_clients_nonce'),
                 'reset_password_nonce' => wp_create_nonce('reset_password_nonce'),
 				'states_cities_json_url' => $this->dir_url . 'assets/data/indian-states-cities.json',
+			]);
+		}
+
+		// ✅ SALES MANAGER DASHBOARD
+		global $post;
+		if ( is_a( $post, 'WP_Post' ) && ( has_shortcode( $post->post_content, 'sales_manager_dashboard' ) || is_page( 'sales-manager-dashboard' ) ) ) {
+			wp_enqueue_style('area-manager-modern', $this->dir_url . 'assets/css/area-manager-modern.css', [], '1.0.0');
+			wp_enqueue_style('lead-component-css', $this->dir_url . 'assets/css/components/lead-component.css', [], '1.0.1');
+			wp_enqueue_style('sales-manager-dashboard-css', $this->dir_url . 'assets/css/sales-manager-dashboard.css', ['area-manager-modern', 'lead-component-css'], '1.0.1');
+			wp_enqueue_style('toast-css', $this->dir_url . 'assets/css/toast.css', [], '1.0.0');
+			wp_enqueue_script('chart-js', 'https://cdn.jsdelivr.net/npm/chart.js', [], '3.7.0', true);
+			wp_enqueue_script('lead-component-js', $this->dir_url . 'assets/js/components/lead-component.js', ['jquery'], '1.0.1', true);
+			wp_enqueue_script('sales-manager-dashboard-js', $this->dir_url . 'assets/js/sales-manager-dashboard.js', ['jquery', 'chart-js', 'lead-component-js'], '1.0.1', true);
+			wp_localize_script('sales-manager-dashboard-js', 'sm_vars', [
+				'ajax_url' => admin_url('admin-ajax.php'),
+				'nonce' => wp_create_nonce('sp_sales_manager_nonce'),
 			]);
 		}
 
@@ -610,6 +635,23 @@ function sp_create_plugin_essentials() {
     ) $charset_collate;";
 	dbDelta( $sql_notifications );
 
+	// Lead follow-ups table for Sales Manager tracking
+	$table_followups = $wpdb->prefix . 'solar_lead_followups';
+	$sql_followups = "CREATE TABLE IF NOT EXISTS $table_followups (
+		id bigint(20) NOT NULL AUTO_INCREMENT,
+		lead_id bigint(20) NOT NULL,
+		sales_manager_id bigint(20) NOT NULL,
+		activity_type varchar(50) NOT NULL,
+		activity_date datetime NOT NULL,
+		notes text,
+		created_at datetime DEFAULT CURRENT_TIMESTAMP,
+		PRIMARY KEY (id),
+		KEY lead_id (lead_id),
+		KEY sales_manager_id (sales_manager_id),
+		KEY activity_date (activity_date)
+	) $charset_collate;";
+	dbDelta( $sql_followups );
+
 	// Create custom roles
 	$roles = [
 		'manager'      => [
@@ -624,6 +666,10 @@ function sp_create_plugin_essentials() {
 				'delete_posts' => true,
 				'create_users' => true,  // Required to create client users
 			],
+		],
+		'sales_manager' => [
+			'display_name' => 'Sales Manager',
+			'capabilities' => [ 'read' => true ],
 		],
 		'solar_vendor' => [
 			'display_name' => 'Solar Vendor',
@@ -644,6 +690,7 @@ function sp_create_plugin_essentials() {
 	$pages_to_create = [
 		['title' => 'Dashboard', 'slug' => 'solar-dashboard', 'content' => '[unified_solar_dashboard]'],
 		['title' => 'Area Manager Dashboard', 'slug' => 'area-manager-dashboard', 'content' => '[area_manager_dashboard]'],
+		['title' => 'Sales Manager Dashboard', 'slug' => 'sales-manager-dashboard', 'content' => '[sales_manager_dashboard]'],
 		['title' => 'Vendor Registration', 'slug' => 'vendor-registration', 'content' => '[vendor_registration_form]'],
 		['title' => 'Project Marketplace', 'slug' => 'project-marketplace', 'content' => '[solar_project_marketplace]'],
 		['title' => 'Vendor Status', 'slug' => 'vendor-status', 'content' => '[vendor_status_dashboard]']

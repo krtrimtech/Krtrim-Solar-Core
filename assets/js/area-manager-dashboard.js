@@ -145,6 +145,8 @@
             removeToast(toastId);
         }, 3000);
     }
+    // Expose showToast globally for shared components
+    window.showToast = showToast;
 
     function removeToast(toastId) {
         const toast = $('#' + toastId);
@@ -156,7 +158,6 @@
         }
     }
 
-    // Make showToast globally available
     // --- Initialize AJAX URL and nonces FIRST (before any functions use them) ---
     const ajaxUrl = (typeof sp_area_dashboard_vars !== 'undefined') ? sp_area_dashboard_vars.ajax_url : '';
 
@@ -167,6 +168,19 @@
 
     const createProjectNonce = sp_area_dashboard_vars.create_project_nonce;
     const projectDetailsNonce = sp_area_dashboard_vars.project_details_nonce;
+
+    // Track if shared lead component is initialized
+    let leadComponentInitialized = false;
+
+    // Initialize shared lead component
+    function initLeadComponent() {
+        if (!leadComponentInitialized && typeof window.initLeadComponent === 'function') {
+            window.initLeadComponent(ajaxUrl, sp_area_dashboard_vars.get_leads_nonce);
+            leadComponentInitialized = true;
+        } else if (typeof window.loadLeads === 'function') {
+            window.loadLeads();
+        }
+    }
 
     // --- Notification System ---
     function loadNotifications() {
@@ -181,13 +195,13 @@
                     const notifications = response.data || [];
                     const notifList = $('#notif-list');
                     const notifCount = $('#notif-count');
-                    
+
                     if (notifications.length > 0) {
                         let html = '';
                         notifications.forEach(n => {
                             const borderColor = n.type === 'approved' ? '#28a745' : n.type === 'rejected' ? '#dc3545' : '#007bff';
                             const bgColor = n.type === 'approved' ? '#f8fff9' : n.type === 'rejected' ? '#fff5f5' : '#f0f7ff';
-                            
+
                             html += `<div class="notification-item" style="padding:12px;position:relative; border-radius:8px; border-left:4px solid ${borderColor}; background:${bgColor}; margin-bottom:10px;">`;
                             html += `<div style="font-weight:600; color:#333;">${n.icon || '🔔'} ${n.title}</div>`;
                             html += `<div style="font-size:12px; color:#666; margin-top:4px;">${n.message}</div>`;
@@ -213,12 +227,12 @@
     }
 
     // Toggle notification panel
-    $(document).on('click', '#notification-toggle', function() {
+    $(document).on('click', '#notification-toggle', function () {
         $('#notification-panel').toggleClass('open');
     });
 
     // Close notification panel
-    $(document).on('click', '#close-notification-panel', function() {
+    $(document).on('click', '#close-notification-panel', function () {
         $('#notification-panel').removeClass('open');
     });
 
@@ -439,8 +453,8 @@
         } else if (section === 'vendor-approvals') {
             loadVendorApprovals();
         } else if (section === 'leads') {
-            console.log('Triggering loadLeads...');
-            loadLeads();
+            console.log('Triggering shared lead component...');
+            initLeadComponent();
         } else if (section === 'my-clients') {
             loadMyClients();
         }
@@ -470,8 +484,8 @@
                 loadDashboardStats();
             }
             if ($('#leads-section').is(':visible')) {
-                console.log('Leads visible on load, loading leads');
-                loadLeads();
+                console.log('Leads visible on load, initializing lead component');
+                initLeadComponent();
             }
         }, 500);
     });

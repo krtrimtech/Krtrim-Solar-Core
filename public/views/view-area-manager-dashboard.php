@@ -478,66 +478,13 @@ function sp_area_manager_dashboard_shortcode() {
                 </section>
 
 
-                <!-- Leads Section -->
+                <!-- Leads Section - Using Shared Component -->
                 <section id="leads-section" class="section-content" style="display:none;">
-                    <div class="section-header">
-                        <h2 class="section-title">Lead Management</h2>
-                        <div class="section-actions">
-                            <div class="search-box">
-                                <input type="text" id="lead-search" placeholder="Search leads..." />
-                                <span class="search-icon">🔍</span>
-                            </div>
-                            <select id="filter-lead-status" style="padding: 10px; border: 2px solid var(--border-color); border-radius: 8px;">
-                                <option value="">All Status</option>
-                                <option value="new">New</option>
-                                <option value="contacted">Contacted</option>
-                                <option value="interested">Interested</option>
-                                <option value="converted">Converted</option>
-                                <option value="lost">Lost</option>
-                            </select>
-                        </div>
-                    </div>
-                    
-                    <div class="card modern-form">
-                        <h3>Add New Lead</h3>
-                        <form id="create-lead-form">
-                            <div class="form-row">
-                                <label for="lead_name">Name</label>
-                                <input type="text" id="lead_name" name="lead_name" required>
-                            </div>
-                            <div class="form-group">
-                                <label for="lead_phone">Phone Number</label>
-                                <input type="text" id="lead_phone" name="lead_phone" required>
-                            </div>
-                            <div class="form-group">
-                                <label for="lead_email">Email</label>
-                                <input type="email" id="lead_email" name="lead_email">
-                            </div>
-                            <div class="form-group">
-                                <label for="lead_status">Status</label>
-                                <select id="lead_status" name="lead_status">
-                                    <option value="new">New</option>
-                                    <option value="contacted">Contacted</option>
-                                    <option value="interested">Interested</option>
-                                    <option value="converted">Converted</option>
-                                    <option value="lost">Lost</option>
-                                </select>
-                            </div>
-                            <div class="form-group">
-                                <label for="lead_notes">Notes</label>
-                                <textarea id="lead_notes" name="lead_notes" rows="3"></textarea>
-                            </div>
-                            <button type="submit" class="btn btn-primary">Add Lead</button>
-                            <div id="create-lead-feedback" style="margin-top:15px;"></div>
-                        </form>
-                    </div>
-
-                    <div class="card" style="margin-top: 20px;">
-                        <h3>Your Leads</h3>
-                        <div id="area-leads-container">
-                            <p>Loading leads...</p>
-                        </div>
-                    </div>
+                    <?php 
+                    // Include and render shared lead component
+                    require_once plugin_dir_path(dirname(dirname(__FILE__))) . 'includes/components/class-lead-component.php';
+                    KSC_Lead_Component::render_lead_section($user_roles, 'area_manager');
+                    ?>
                 </section>
 
                 <!-- My Clients Section -->
