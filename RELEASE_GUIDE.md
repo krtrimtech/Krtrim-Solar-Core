@@ -10,25 +10,25 @@ This project uses **GitHub Actions** to automatically build and release the plug
     *   Commit these changes:
         ```bash
         git add .
-        git commit -m "Bump version to 1.0.1"
+        git commit -m "Bump version to 1.2.0"
         git push origin main
         ```
 
 2.  **Create a Tag**:
     *   Create a new git tag for the version (must start with `v`):
         ```bash
-        git tag v1.0.1
+        git tag v1.2.0
         ```
 
 3.  **Push the Tag**:
     *   Push the tag to GitHub to trigger the release workflow:
         ```bash
-        git push origin v1.0.1
+        git push origin v1.2.0
         ```
 
 ## What Happens Next?
 
-1.  GitHub Actions will detect the new tag `v1.0.1`.
+1.  GitHub Actions will detect the new tag `v1.2.0`.
 2.  It will automatically zip the plugin files into `Krtrim-Solar-Core.zip`.
 3.  It will create a new **Release** on GitHub.
 4.  It will upload the zip file to that release.

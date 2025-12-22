@@ -17,17 +17,22 @@
 ## 🎯 Plugin Overview
 
 **Plugin Name:** Krtrim Solar Core  
-**Purpose:** Comprehensive solar project management system with vendor marketplace, bidding, and workflow tracking.
+**Version:** 1.2.0  
+**Purpose:** Comprehensive solar project management system with vendor marketplace, bidding, cleaning services, and workflow tracking.
 
 ### Key Features:
-- ✅ Multi-role user system (Admin, Manager, Area Manager, Vendor, Client)
+- ✅ Multi-role user system (Admin, Manager, Area Manager, Sales Manager, Vendor, Client, Cleaner)
 - ✅ Project lifecycle management
 - ✅ Vendor marketplace with bidding system
+- ✅ **Solar Cleaning Service Booking** (NEW in 1.2.0)
+- ✅ **Coupon/Discount System** (NEW in 1.2.0)
+- ✅ **Sales Manager Dashboard** (NEW in 1.2.0)
 - ✅ Coverage area-based vendor assignments
 - ✅ Step-by-step project progress tracking
-- ✅ Payment integration (Razorpay)
+- ✅ Payment integration (Razorpay) with Pay-After option
 - ✅ Real-time notifications (In-app, Email, WhatsApp)
 - ✅ Comprehensive dashboards for each role
+- ✅ Lead management with multi-type support (Solar/Cleaning)
 
 ---
 
@@ -152,6 +157,24 @@ In-app notification system
   - Track progress
   - Submit comments
   - Make payments
+  - Book cleaning services
+
+### 6. **Sales Manager** (NEW)
+- **Custom Role:** `sales_manager`
+- **Access:** Sales Manager Dashboard
+- **Permissions:**
+  - Manage assigned leads
+  - Add follow-ups
+  - Track lead status
+  - View lead analytics
+
+### 7. **Cleaner** (NEW)
+- **Custom Role:** `cleaner`
+- **Access:** Cleaner Dashboard
+- **Permissions:**
+  - View assigned cleaning visits
+  - Mark visits as completed
+  - View service history
 
 ---
 
@@ -296,18 +319,32 @@ In-app notification system
 ```
 Krtrim Solar Core/
 │
-├── unified-solar-dashboard.php          # Main plugin file
+├── unified-solar-dashboard.php          # Main plugin file (v1.2.0)
 │
 ├── includes/                             # Core functionality
 │   ├── class-admin-menus.php            # Admin menu registration
 │   ├── class-admin-widgets.php          # Dashboard widgets
 │   ├── class-api-handlers.php           # AJAX endpoints
-│   ├── class-custom-metaboxes.php       # Project metaboxes
+│   ├── class-custom-metaboxes.php       # Project, Lead & Cleaning metaboxes
 │   ├── class-notifications-manager.php   # Notification system
 │   ├── class-post-types-taxonomies.php  # CPT registration
 │   ├── class-process-steps-manager.php  # Step management
 │   ├── class-razorpay-client.php        # Payment integration
-│   └── ajax-get-project-details.php     # Project data endpoint
+│   ├── ajax-get-project-details.php     # Project data endpoint
+│   │
+│   ├── api/                              # API classes
+│   │   ├── class-admin-manager-api.php  # Admin/Manager AJAX handlers
+│   │   └── class-cleaning-services-api.php # Cleaning service APIs
+│   │
+│   ├── post-types/                       # Custom Post Types (NEW)
+│   │   ├── class-cleaning-cpts.php       # Cleaning service, visit, review CPTs
+│   │   └── class-coupon-cpt.php          # Coupon system CPT
+│   │
+│   ├── components/                       # Reusable components (NEW)
+│   │   └── class-lead-component.php      # Shared lead management UI
+│   │
+│   └── integrations/                     # Third-party integrations
+│       └── class-cf7-cleaning-integration.php # CF7 + Razorpay for cleaning
 │
 ├── admin/                                # Admin views
 │   └── views/
@@ -320,6 +357,9 @@ Krtrim Solar Core/
 │   └── views/
 │       ├── single-solar_project.php     # Single project page
 │       ├── view-area-manager-dashboard.php
+│       ├── view-sales-manager-dashboard.php  # NEW
+│       ├── view-cleaner-dashboard.php        # NEW
+│       ├── view-cleaning-booking.php         # NEW - Public booking form
 │       ├── view-client-dashboard.php
 │       ├── view-marketplace.php
 │       ├── view-vendor-dashboard.php
@@ -329,24 +369,29 @@ Krtrim Solar Core/
 ├── assets/                               # Frontend assets
 │   ├── css/
 │   │   ├── admin-dashboard-widgets.css
-│   │   ├── area-manager-dashboard.css
+│   │   ├── area-manager-modern.css
+│   │   ├── cleaning-booking.css          # NEW
 │   │   ├── dashboard.css
-│   │   ├── marketplace.css
-│   │   ├── vendor-dashboard.css
-│   │   └── vendor-registration.css
+│   │   ├── sales-manager-dashboard.css   # NEW
+│   │   ├── vendor-registration.css
+│   │   └── components/
+│   │       └── lead-component.css        # NEW
 │   │
 │   ├── js/
-│   │   ├── admin.js                     # Admin functionality
+│   │   ├── admin.js
 │   │   ├── area-manager-dashboard.js
+│   │   ├── sales-manager-dashboard.js    # NEW
 │   │   ├── dashboard.js
 │   │   ├── marketplace.js
 │   │   ├── project-bid.js
-│   │   └── vendor-registration.js
+│   │   ├── vendor-registration.js
+│   │   └── components/
+│   │       └── lead-component.js         # NEW - Shared lead functionality
 │   │
 │   └── data/
-│       └── indian-states-cities.json    # Location data
+│       └── indian-states-cities.json
 │
-└── PLUGIN_DOCUMENTATION.md              # This file
+└── PLUGIN_DOCUMENTATION.md
 ```
 
 ---
@@ -597,8 +642,12 @@ in_array('solar_client', $roles)
 - **Razorpay Checkout** (CDN)
 
 ### Custom Post Types
-- `solar_project` (Main project CPT)
-- `solar_lead` (Lead management)
+- `solar_project` - Main project CPT
+- `solar_lead` - Lead management
+- `cleaning_service` - Cleaning service orders (NEW)
+- `cleaning_visit` - Individual cleaning visits (NEW)
+- `service_review` - Customer reviews (NEW)
+- `solar_coupon` - Discount coupons (NEW)
 
 ### Page Templates
 The plugin creates default pages on activation:
@@ -653,6 +702,28 @@ This plugin is proprietary software developed for Krtrim Solar.
 
 ---
 
-**Last Updated:** 2024-11-29  
-**Version:** 1.0.0  
-**Documentation Version:** 1.0
+**Last Updated:** 2024-12-22  
+**Version:** 1.2.0  
+**Documentation Version:** 1.2
+
+---
+
+## 📝 Version History
+
+### v1.2.0 (December 2024)
+- ✨ Added Solar Cleaning Service booking system
+- ✨ Added Coupon/Discount system for cleaning services
+- ✨ Added Sales Manager Dashboard with lead management
+- ✨ Added Cleaner Dashboard for service technicians
+- ✨ Added shared Lead Component for consistent UI
+- ✨ Added admin metaboxes for Lead and Cleaning Order editing
+- 🔧 Improved Area Manager lead management with type selection
+- 🔧 Added Pay After Service payment option
+- 🔧 Separated CSS into modular component files
+
+### v1.0.0 (November 2024)
+- 🎉 Initial release
+- Solar project management
+- Vendor marketplace with bidding
+- Multi-role dashboard system
+- Razorpay payment integration
