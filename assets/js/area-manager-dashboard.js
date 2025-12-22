@@ -1028,41 +1028,9 @@
         });
     }
 
-    $('#create-lead-form').on('submit', function (e) {
-        e.preventDefault();
-        const form = $(this);
-        const feedback = $('#create-lead-feedback');
+    // NOTE: Lead form submission is handled by lead-component.js via form serialization
+    // which correctly includes the nonce from the form's hidden field
 
-        $.ajax({
-            url: ajaxUrl,
-            type: 'POST',
-            data: {
-                action: 'create_solar_lead',
-                nonce: sp_area_dashboard_vars.create_lead_nonce,
-                name: $('#lead_name').val(),
-                phone: $('#lead_phone').val(),
-                email: $('#lead_email').val(),
-                status: $('#lead_status').val(),
-                notes: $('#lead_notes').val(),
-            },
-            beforeSend: function () {
-                form.find('button').prop('disabled', true).text('Adding...');
-                feedback.text('').removeClass('text-success text-danger');
-            },
-            success: function (response) {
-                if (response.success) {
-                    showToast(response.data.message, 'success');
-                    form[0].reset();
-                    loadLeads();
-                } else {
-                    feedback.text(response.data.message).addClass('text-danger');
-                }
-            },
-            complete: function () {
-                form.find('button').prop('disabled', false).text('Add Lead');
-            }
-        });
-    });
 
     $(document).on('click', '.delete-lead-btn', function () {
         if (!confirm('Are you sure you want to delete this lead?')) return;

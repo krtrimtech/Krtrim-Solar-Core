@@ -153,9 +153,16 @@
                 $('#project-type-group').hide();
                 $('#system-size-group').show();
             }
-            // Update visual selection
-            $('.lead-type-option').css('border-color', '#e0e0e0');
-            $(this).closest('.lead-type-option').css('border-color', '#4f46e5');
+            // Update visual selection - reset all
+            $('.lead-type-option').css({
+                'border-color': '#e0e0e0',
+                'background': 'white'
+            });
+            // Highlight selected
+            $(this).closest('.lead-type-option').css({
+                'border-color': '#4f46e5',
+                'background': '#f5f3ff'
+            });
         });
 
         // Lead Type Filter
@@ -176,6 +183,7 @@
             type: 'POST',
             data: {
                 action: action,
+                nonce: window.leadAjax.nonce,
                 status: status,
                 search: search,
                 lead_type: leadType
@@ -293,6 +301,7 @@
             type: 'POST',
             data: {
                 action: action,
+                nonce: window.leadAjax.nonce,
                 lead_id: leadId
             },
             success: function (response) {
@@ -372,6 +381,7 @@
     // Create new lead
     function createLead($form) {
         const action = dashboardType === 'area_manager' ? 'create_solar_lead' : 'create_lead_by_sales_manager';
+        // Form serialization includes lead_nonce from the hidden field
         const formData = $form.serialize() + '&action=' + action;
 
         $.ajax({
@@ -401,6 +411,7 @@
     function addFollowup($form) {
         const formData = {
             action: 'add_lead_followup',
+            nonce: window.leadAjax.nonce,
             lead_id: $('#followup_lead_id').val(),
             activity_type: $('#followup_type').val(),
             activity_date: $('#followup_date').val(),
@@ -437,6 +448,7 @@
             type: 'POST',
             data: {
                 action: 'update_lead_by_sales_manager',
+                nonce: window.leadAjax.nonce,
                 lead_id: leadId,
                 lead_status: status
             },

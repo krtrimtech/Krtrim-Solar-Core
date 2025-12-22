@@ -42,7 +42,6 @@ class KSC_Coupon_CPT {
             'labels'              => $labels,
             'public'              => false,
             'show_ui'             => true,
-            'show_in_menu'        => 'ksc-settings', // Or top level if preferred, keeping under settings for now or maybe 'cleaning_service' parent if accessible? Let's use ksc-settings or top level. Plan didn't specify. Let's make it top level for visibility as requested for orders.
             'show_in_menu'        => true,
             'menu_icon'           => 'dashicons-tickets-alt',
             'capability_type'     => 'post',

@@ -20,6 +20,7 @@ class KSC_Cleaning_CPTs {
      * Initialize hooks
      */
     public function __construct() {
+        add_action('init', [$this, 'register_cleaning_service_cpt']);
         add_action('init', [$this, 'register_cleaning_visit_cpt']);
         add_action('init', [$this, 'register_service_review_cpt']);
         
@@ -297,7 +298,6 @@ class KSC_Cleaning_CPTs {
             'show_in_rest' => true,
             'description'  => 'Cleaner user ID if review is for cleaning',
         ]);
-    }
     }
 
     /**

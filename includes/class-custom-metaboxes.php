@@ -20,6 +20,26 @@ class SP_Custom_Metaboxes {
             'normal',
             'high'
         );
+
+        // Lead Details Meta Box
+        add_meta_box(
+            'sp_lead_details',
+            'Lead Details',
+            array( $this, 'render_lead_details_metabox' ),
+            'solar_lead',
+            'normal',
+            'high'
+        );
+
+        // Cleaning Order Details Meta Box
+        add_meta_box(
+            'sp_cleaning_details',
+            'Order Details',
+            array( $this, 'render_cleaning_details_metabox' ),
+            'cleaning_service',
+            'normal',
+            'high'
+        );
     }
 
     private function get_location_data() {
@@ -271,8 +291,27 @@ class SP_Custom_Metaboxes {
         }
         
         // Check post type
-        if ( isset( $_POST['post_type'] ) && 'solar_project' == $_POST['post_type'] ) {
+        if ( isset( $_POST['post_type'] )) {
+            $post_type = $_POST['post_type'];
+            
             if ( ! current_user_can( 'edit_post', $post_id ) ) {
+                return;
+            }
+
+            // Handle Lead meta
+            if ($post_type === 'solar_lead') {
+                $this->save_lead_meta($post_id);
+                return;
+            }
+
+            // Handle Cleaning Order meta
+            if ($post_type === 'cleaning_service') {
+                $this->save_cleaning_meta($post_id);
+                return;
+            }
+
+            // Handle Solar Project meta
+            if ($post_type !== 'solar_project') {
                 return;
             }
         } else {
@@ -317,6 +356,203 @@ class SP_Custom_Metaboxes {
                     $admin_api = new KSC_Admin_Manager_API();
                     $admin_api->create_default_process_steps($post_id);
                 }
+            }
+        }
+    }
+
+    /**
+     * Render Lead Details Meta Box
+     */
+    public function render_lead_details_metabox($post) {
+        wp_nonce_field('sp_save_lead_data', 'sp_lead_nonce');
+        
+        $lead_phone = get_post_meta($post->ID, '_lead_phone', true);
+        $lead_email = get_post_meta($post->ID, '_lead_email', true);
+        $lead_address = get_post_meta($post->ID, '_lead_address', true);
+        $lead_source = get_post_meta($post->ID, '_lead_source', true);
+        $lead_status = get_post_meta($post->ID, '_lead_status', true) ?: 'new';
+        $system_size = get_post_meta($post->ID, '_system_size_kw', true);
+        $assigned_sm = get_post_meta($post->ID, '_assigned_sales_manager', true);
+        ?>
+        <table class="form-table">
+            <tr>
+                <th><label for="lead_phone">Phone Number *</label></th>
+                <td><input type="text" id="lead_phone" name="lead_phone" value="<?php echo esc_attr($lead_phone); ?>" class="regular-text"></td>
+            </tr>
+            <tr>
+                <th><label for="lead_email">Email</label></th>
+                <td><input type="email" id="lead_email" name="lead_email" value="<?php echo esc_attr($lead_email); ?>" class="regular-text"></td>
+            </tr>
+            <tr>
+                <th><label for="lead_address">Address</label></th>
+                <td><textarea id="lead_address" name="lead_address" rows="3" class="large-text"><?php echo esc_textarea($lead_address); ?></textarea></td>
+            </tr>
+            <tr>
+                <th><label for="system_size">System Size (kW)</label></th>
+                <td><input type="number" id="system_size" name="system_size" value="<?php echo esc_attr($system_size); ?>" step="0.1"></td>
+            </tr>
+            <tr>
+                <th><label for="lead_source">Lead Source</label></th>
+                <td>
+                    <select id="lead_source" name="lead_source">
+                        <option value="">Select Source</option>
+                        <option value="website" <?php selected($lead_source, 'website'); ?>>Website</option>
+                        <option value="referral" <?php selected($lead_source, 'referral'); ?>>Referral</option>
+                        <option value="social_media" <?php selected($lead_source, 'social_media'); ?>>Social Media</option>
+                        <option value="google_ads" <?php selected($lead_source, 'google_ads'); ?>>Google Ads</option>
+                        <option value="cold_call" <?php selected($lead_source, 'cold_call'); ?>>Cold Call</option>
+                        <option value="walk_in" <?php selected($lead_source, 'walk_in'); ?>>Walk-in</option>
+                        <option value="other" <?php selected($lead_source, 'other'); ?>>Other</option>
+                    </select>
+                </td>
+            </tr>
+            <tr>
+                <th><label for="lead_status">Lead Status</label></th>
+                <td>
+                    <select id="lead_status" name="lead_status">
+                        <option value="new" <?php selected($lead_status, 'new'); ?>>New</option>
+                        <option value="contacted" <?php selected($lead_status, 'contacted'); ?>>Contacted</option>
+                        <option value="qualified" <?php selected($lead_status, 'qualified'); ?>>Qualified</option>
+                        <option value="proposal_sent" <?php selected($lead_status, 'proposal_sent'); ?>>Proposal Sent</option>
+                        <option value="negotiation" <?php selected($lead_status, 'negotiation'); ?>>Negotiation</option>
+                        <option value="converted" <?php selected($lead_status, 'converted'); ?>>Converted</option>
+                        <option value="lost" <?php selected($lead_status, 'lost'); ?>>Lost</option>
+                    </select>
+                </td>
+            </tr>
+            <tr>
+                <th><label for="assigned_sm">Assigned Sales Manager</label></th>
+                <td>
+                    <?php
+                    wp_dropdown_users(array(
+                        'role' => 'sales_manager',
+                        'name' => 'assigned_sm',
+                        'selected' => $assigned_sm,
+                        'show_option_none' => 'Not Assigned',
+                        'option_none_value' => '',
+                    ));
+                    ?>
+                </td>
+            </tr>
+        </table>
+        <?php
+    }
+
+    /**
+     * Render Cleaning Order Details Meta Box
+     */
+    public function render_cleaning_details_metabox($post) {
+        wp_nonce_field('sp_save_cleaning_data', 'sp_cleaning_nonce');
+        
+        $customer_name = get_post_meta($post->ID, '_customer_name', true);
+        $customer_phone = get_post_meta($post->ID, '_customer_phone', true);
+        $customer_address = get_post_meta($post->ID, '_customer_address', true);
+        $system_size_kw = get_post_meta($post->ID, '_system_size_kw', true);
+        $plan_type = get_post_meta($post->ID, '_plan_type', true) ?: 'one_time';
+        $visits_total = get_post_meta($post->ID, '_visits_total', true);
+        $visits_used = get_post_meta($post->ID, '_visits_used', true);
+        $total_amount = get_post_meta($post->ID, '_total_amount', true);
+        $payment_status = get_post_meta($post->ID, '_payment_status', true) ?: 'pending';
+        $payment_option = get_post_meta($post->ID, '_payment_option', true);
+        ?>
+        <table class="form-table">
+            <tr>
+                <th><label for="customer_name">Customer Name *</label></th>
+                <td><input type="text" id="customer_name" name="customer_name" value="<?php echo esc_attr($customer_name); ?>" class="regular-text" required></td>
+            </tr>
+            <tr>
+                <th><label for="customer_phone">Phone Number *</label></th>
+                <td><input type="text" id="customer_phone" name="customer_phone" value="<?php echo esc_attr($customer_phone); ?>" class="regular-text" required></td>
+            </tr>
+            <tr>
+                <th><label for="customer_address">Address</label></th>
+                <td><textarea id="customer_address" name="customer_address" rows="3" class="large-text"><?php echo esc_textarea($customer_address); ?></textarea></td>
+            </tr>
+            <tr>
+                <th><label for="system_size_kw">System Size (kW) *</label></th>
+                <td><input type="number" id="system_size_kw" name="system_size_kw" value="<?php echo esc_attr($system_size_kw); ?>" step="0.1" required></td>
+            </tr>
+            <tr>
+                <th><label for="plan_type">Plan Type</label></th>
+                <td>
+                    <select id="plan_type" name="plan_type">
+                        <option value="one_time" <?php selected($plan_type, 'one_time'); ?>>One Time</option>
+                        <option value="monthly" <?php selected($plan_type, 'monthly'); ?>>Monthly (12 visits)</option>
+                        <option value="6_month" <?php selected($plan_type, '6_month'); ?>>6 Month (6 visits)</option>
+                        <option value="yearly" <?php selected($plan_type, 'yearly'); ?>>Yearly (12 visits)</option>
+                    </select>
+                </td>
+            </tr>
+            <tr>
+                <th><label for="visits_total">Total Visits</label></th>
+                <td><input type="number" id="visits_total" name="visits_total" value="<?php echo esc_attr($visits_total); ?>"></td>
+            </tr>
+            <tr>
+                <th><label for="visits_used">Visits Used</label></th>
+                <td><input type="number" id="visits_used" name="visits_used" value="<?php echo esc_attr($visits_used); ?>"></td>
+            </tr>
+            <tr>
+                <th><label for="total_amount">Total Amount (₹)</label></th>
+                <td><input type="number" id="total_amount" name="total_amount" value="<?php echo esc_attr($total_amount); ?>" step="0.01"></td>
+            </tr>
+            <tr>
+                <th><label for="payment_status">Payment Status</label></th>
+                <td>
+                    <select id="payment_status" name="payment_status">
+                        <option value="pending" <?php selected($payment_status, 'pending'); ?>>Pending</option>
+                        <option value="paid" <?php selected($payment_status, 'paid'); ?>>Paid</option>
+                        <option value="failed" <?php selected($payment_status, 'failed'); ?>>Failed</option>
+                    </select>
+                </td>
+            </tr>
+            <tr>
+                <th><label for="payment_option">Payment Option</label></th>
+                <td>
+                    <select id="payment_option" name="payment_option">
+                        <option value="online" <?php selected($payment_option, 'online'); ?>>Online</option>
+                        <option value="pay_after" <?php selected($payment_option, 'pay_after'); ?>>Pay After Service</option>
+                    </select>
+                </td>
+            </tr>
+        </table>
+        <?php
+    }
+
+    /**
+     * Save Lead Meta Data
+     */
+    private function save_lead_meta($post_id) {
+        if (!isset($_POST['sp_lead_nonce']) || !wp_verify_nonce($_POST['sp_lead_nonce'], 'sp_save_lead_data')) {
+            return;
+        }
+        
+        $fields = ['lead_phone', 'lead_email', 'lead_address', 'lead_source', 'lead_status', 'system_size', 'assigned_sm'];
+        
+        foreach ($fields as $field) {
+            if (isset($_POST[$field])) {
+                $meta_key = '_' . ($field === 'system_size' ? 'system_size_kw' : ($field === 'assigned_sm' ? 'assigned_sales_manager' : $field));
+                update_post_meta($post_id, $meta_key, sanitize_text_field($_POST[$field]));
+            }
+        }
+    }
+
+    /**
+     * Save Cleaning Order Meta Data
+     */
+    private function save_cleaning_meta($post_id) {
+        if (!isset($_POST['sp_cleaning_nonce']) || !wp_verify_nonce($_POST['sp_cleaning_nonce'], 'sp_save_cleaning_data')) {
+            return;
+        }
+        
+        $fields = [
+            'customer_name', 'customer_phone', 'customer_address', 'system_size_kw',
+            'plan_type', 'visits_total', 'visits_used', 'total_amount',
+            'payment_status', 'payment_option'
+        ];
+        
+        foreach ($fields as $field) {
+            if (isset($_POST[$field])) {
+                update_post_meta($post_id, '_' . $field, sanitize_text_field($_POST[$field]));
             }
         }
     }

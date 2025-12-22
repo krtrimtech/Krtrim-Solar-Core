@@ -383,45 +383,7 @@ class KSC_CF7_Cleaning_Integration {
         }
     }
 
-    public function verify_payment_ajax() {
-        if (!isset($_POST['razorpay_payment_id'])) {
-            wp_send_json_error(['message' => 'Missing payment ID']);
-        }
 
-        $order_id = $_POST['razorpay_order_id'];
-        $payment_id = $_POST['razorpay_payment_id'];
-        $signature = $_POST['razorpay_signature'];
-
-        $api = $this->get_razorpay_api();
-
-        try {
-            $attributes = [
-                'razorpay_order_id' => $order_id,
-                'razorpay_payment_id' => $payment_id,
-                'razorpay_signature' => $signature
-            ];
-
-            $api->utility->verifyPaymentSignature($attributes);
-
-            // Fetch order to get booking ID (we stored it in notes)
-            $order = $api->order->fetch($order_id);
-            $booking_id = $order->notes['booking_id'];
-
-            // Update booking status
-            update_post_meta($booking_id, '_payment_status', 'paid');
-            update_post_meta($booking_id, '_razorpay_payment_id', $payment_id);
-            
-            // Log for activity
-            if (class_exists('SP_Notifications_Manager')) {
-                // ... logic to log payment success
-            }
-
-            wp_send_json_success(['booking_id' => $booking_id]);
-
-        } catch (Exception $e) {
-            wp_send_json_error(['message' => $e->getMessage()]);
-        }
-    }
 
     /**
      * AJAX Validate Coupon

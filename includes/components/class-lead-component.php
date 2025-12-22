@@ -124,15 +124,45 @@ class KSC_Lead_Component {
                     <!-- Lead Type Selection -->
                     <div class="form-group">
                         <label>Lead Type *</label>
-                        <div class="lead-type-options" style="display: flex; gap: 15px; margin-top: 8px;">
-                            <label class="lead-type-option" style="flex: 1; padding: 15px; border: 2px solid #e0e0e0; border-radius: 8px; cursor: pointer; text-align: center;">
-                                <input type="radio" name="lead_type" value="solar_project" checked style="display: none;">
-                                <span style="font-size: 24px;">☀️</span>
+                        <style>
+                            .lead-type-options {
+                                display: flex;
+                                gap: 15px;
+                                margin-top: 8px;
+                            }
+                            .lead-type-option {
+                                flex: 1;
+                                padding: 15px;
+                                border: 2px solid #e0e0e0;
+                                border-radius: 8px;
+                                cursor: pointer;
+                                text-align: center;
+                                transition: all 0.2s;
+                                position: relative;
+                                background: white;
+                            }
+                            .lead-type-option:has(input:checked) {
+                                border-color: #4f46e5;
+                                background: #f5f3ff;
+                            }
+                            .lead-type-option input[type="radio"] {
+                                position: absolute;
+                                top: 8px;
+                                right: 8px;
+                                width: 16px;
+                                height: 16px;
+                                cursor: pointer;
+                            }
+                        </style>
+                        <div class="lead-type-options">
+                            <label class="lead-type-option">
+                                <input type="radio" name="lead_type" value="solar_project" checked>
+                                <span style="font-size: 24px; display: block;">☀️</span>
                                 <div style="margin-top: 5px; font-weight: 500;">Solar Project</div>
                             </label>
-                            <label class="lead-type-option" style="flex: 1; padding: 15px; border: 2px solid #e0e0e0; border-radius: 8px; cursor: pointer; text-align: center;">
-                                <input type="radio" name="lead_type" value="cleaning_service" style="display: none;">
-                                <span style="font-size: 24px;">🧹</span>
+                            <label class="lead-type-option">
+                                <input type="radio" name="lead_type" value="cleaning_service">
+                                <span style="font-size: 24px; display: block;">🧹</span>
                                 <div style="margin-top: 5px; font-weight: 500;">Cleaning Service</div>
                             </label>
                         </div>
