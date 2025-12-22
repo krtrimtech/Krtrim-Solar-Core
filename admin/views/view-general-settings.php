@@ -234,14 +234,78 @@ function sp_register_general_settings() {
     // WhatsApp Settings Section
     add_settings_section(
         'sp_whatsapp_section',
-        'WhatsApp Click-to-Chat',
+        'WhatsApp Settings', // Changed title
         'sp_whatsapp_section_callback',
         'notification-settings'
     );
 
     add_settings_field(
+        'whatsapp_provider',
+        'WhatsApp Provider',
+        'sp_whatsapp_provider_callback',
+        'notification-settings',
+        'sp_whatsapp_section'
+    );
+
+    // WAHA Fields (Default)
+    add_settings_field(
+        'waha_api_url',
+        'WAHA API URL',
+        'sp_waha_api_url_callback',
+        'notification-settings',
+        'sp_whatsapp_section',
+        ['class' => 'waha-api-field']
+    );
+
+    add_settings_field(
+        'waha_session_name',
+        'Session Name',
+        'sp_waha_session_name_callback',
+        'notification-settings',
+        'sp_whatsapp_section',
+        ['class' => 'waha-api-field']
+    );
+
+    add_settings_field(
+        'waha_api_key',
+        'API Key',
+        'sp_waha_api_key_callback',
+        'notification-settings',
+        'sp_whatsapp_section',
+        ['class' => 'waha-api-field']
+    );
+
+    // Official API Fields
+    add_settings_field(
+        'whatsapp_phone_id',
+        'Phone Number ID (Official)',
+        'sp_whatsapp_phone_id_callback',
+        'notification-settings',
+        'sp_whatsapp_section',
+        ['class' => 'official-api-field']
+    );
+
+    add_settings_field(
+        'whatsapp_business_id',
+        'Business Account ID (Official)',
+        'sp_whatsapp_business_id_callback',
+        'notification-settings',
+        'sp_whatsapp_section',
+        ['class' => 'official-api-field']
+    );
+
+    add_settings_field(
+        'whatsapp_access_token',
+        'Access Token (Official)',
+        'sp_whatsapp_access_token_callback',
+        'notification-settings',
+        'sp_whatsapp_section',
+        ['class' => 'official-api-field']
+    );
+
+    add_settings_field(
         'whatsapp_enable',
-        'Enable WhatsApp Buttons',
+        'Enable Click-to-Chat Buttons', 
         'sp_whatsapp_enable_callback',
         'notification-settings',
         'sp_whatsapp_section'
@@ -515,6 +579,72 @@ function sp_email_submission_rejected_callback() {
     $checked = isset($options['email_submission_rejected']) ? 'checked' : '';
     echo "<input type='checkbox' name='sp_notification_options[email_submission_rejected]' value='1' $checked />";
 }
+// WhatsApp Callbacks
+function sp_whatsapp_provider_callback() {
+    $options = get_option('sp_notification_options');
+    $provider = isset($options['whatsapp_provider']) ? $options['whatsapp_provider'] : 'waha';
+    ?>
+    <select name="sp_notification_options[whatsapp_provider]" id="whatsapp_provider_select">
+        <option value="waha" <?php selected($provider, 'waha'); ?>>WAHA (Local/Custom API)</option>
+        <option value="official" <?php selected($provider, 'official'); ?>>Official WhatsApp Cloud API</option>
+    </select>
+    <p class="description">Select which service to use for sending automated messages.</p>
+    <script>
+        jQuery(document).ready(function($) {
+            function toggleFields() {
+                if ($('#whatsapp_provider_select').val() === 'official') {
+                    $('.official-api-field').closest('tr').show();
+                    $('.waha-api-field').closest('tr').hide();
+                } else {
+                    $('.official-api-field').closest('tr').hide();
+                    $('.waha-api-field').closest('tr').show();
+                }
+            }
+            $('#whatsapp_provider_select').change(toggleFields);
+            toggleFields(); // Init
+        });
+    </script>
+    <?php
+}
+
+function sp_waha_api_url_callback() {
+    $options = get_option('sp_notification_options');
+    $val = isset($options['waha_api_url']) ? esc_attr($options['waha_api_url']) : '';
+    echo "<input type='url' name='sp_notification_options[waha_api_url]' value='$val' style='width: 400px;' class='waha-api-field' />";
+}
+
+function sp_waha_session_name_callback() {
+    $options = get_option('sp_notification_options');
+    $val = isset($options['waha_session_name']) ? esc_attr($options['waha_session_name']) : 'default';
+    echo "<input type='text' name='sp_notification_options[waha_session_name]' value='$val' style='width: 200px;' class='waha-api-field' />";
+}
+
+function sp_waha_api_key_callback() {
+    $options = get_option('sp_notification_options');
+    $val = isset($options['waha_api_key']) ? esc_attr($options['waha_api_key']) : '';
+    echo "<input type='password' name='sp_notification_options[waha_api_key]' value='$val' style='width: 300px;' class='waha-api-field' />";
+}
+
+function sp_whatsapp_phone_id_callback() {
+    $options = get_option('sp_notification_options');
+    $val = isset($options['whatsapp_phone_id']) ? esc_attr($options['whatsapp_phone_id']) : '';
+    echo "<input type='text' name='sp_notification_options[whatsapp_phone_id]' value='$val' style='width: 350px;' class='official-api-field' />";
+    echo "<p class='description'>Found in Meta for Developers App Dashboard &gt; WhatsApp &gt; API Setup</p>";
+}
+
+function sp_whatsapp_business_id_callback() {
+    $options = get_option('sp_notification_options');
+    $val = isset($options['whatsapp_business_id']) ? esc_attr($options['whatsapp_business_id']) : '';
+    echo "<input type='text' name='sp_notification_options[whatsapp_business_id]' value='$val' style='width: 350px;' class='official-api-field' />";
+}
+
+function sp_whatsapp_access_token_callback() {
+    $options = get_option('sp_notification_options');
+    $val = isset($options['whatsapp_access_token']) ? esc_attr($options['whatsapp_access_token']) : '';
+    echo "<input type='password' name='sp_notification_options[whatsapp_access_token]' value='$val' style='width: 350px;' class='official-api-field' />";
+    echo "<p class='description'>Permanent System User Access Token recommended.</p>";
+}
+
 function sp_whatsapp_enable_callback() {
     $options = get_option('sp_notification_options');
     $checked = isset($options['whatsapp_enable']) ? 'checked' : '';

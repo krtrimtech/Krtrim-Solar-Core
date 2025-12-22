@@ -101,6 +101,31 @@ function sp_area_manager_dashboard_shortcode() {
                     <h4><?php echo esc_html($user->display_name); ?></h4>
                     <p>Area Manager</p>
                 </div>
+                <!-- Supervisor Contact -->
+                <div class="supervisor-info" style="margin-top: 15px; border-top: 1px solid rgba(255,255,255,0.1); padding-top: 15px;">
+                    <p style="font-size: 11px; text-transform: uppercase; color: rgba(255,255,255,0.6); margin-bottom: 5px;">My Supervisor</p>
+                    <?php
+                    $supervisor_ids = get_user_meta($user->ID, '_supervisor_ids', true);
+                    if (!empty($supervisor_ids) && is_array($supervisor_ids)) {
+                        foreach ($supervisor_ids as $sup_id) {
+                            $supervisor = get_userdata($sup_id);
+                            if ($supervisor) {
+                                echo '<div style="margin-bottom: 8px;">';
+                                echo '<p style="font-size: 13px; margin-bottom: 1px; font-weight: 500;">' . esc_html($supervisor->display_name) . '</p>';
+                                echo '<p style="font-size: 12px; opacity: 0.8; margin-bottom: 2px;">' . esc_html($supervisor->user_email) . '</p>';
+                                $sup_phone = get_user_meta($supervisor->ID, 'phone_number', true);
+                                if ($sup_phone) {
+                                    $whatsapp_url = 'https://wa.me/' . str_replace(['+', ' '], '', $sup_phone); // Simple sanitization
+                                    echo '<p style="font-size: 12px;"><a href="' . esc_url($whatsapp_url) . '" target="_blank" style="color: #4CAF50; text-decoration: none;">📱 ' . esc_html($sup_phone) . '</a></p>';
+                                }
+                                echo '</div>';
+                            }
+                        }
+                    } else {
+                        echo '<p style="font-size: 12px; opacity: 0.8;">No supervisor assigned</p>';
+                    }
+                    ?>
+                </div>
                 <a href="<?php echo wp_logout_url(home_url()); ?>" class="logout-btn" title="Logout">🚪</a>
             </div>
         </div>

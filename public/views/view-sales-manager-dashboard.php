@@ -69,6 +69,24 @@ function sp_sales_manager_dashboard_shortcode() {
                     <h4><?php echo esc_html($user->display_name); ?></h4>
                     <p>Sales Manager</p>
                 </div>
+                <!-- Admin Contact -->
+                <div class="supervisor-info" style="margin-top: 15px; border-top: 1px solid rgba(255,255,255,0.1); padding-top: 15px;">
+                    <p style="font-size: 11px; text-transform: uppercase; color: rgba(255,255,255,0.6); margin-bottom: 5px;">Support / Admin</p>
+                    <?php
+                    $admins = get_users(['role' => 'administrator', 'number' => 1]);
+                    if (!empty($admins)) {
+                        $admin = $admins[0];
+                        echo '<p style="font-size: 13px; margin-bottom: 2px;">' . esc_html($admin->display_name) . '</p>';
+                        echo '<p style="font-size: 12px; opacity: 0.8;">' . esc_html($admin->user_email) . '</p>';
+                        $admin_phone = get_user_meta($admin->ID, 'phone_number', true);
+                        if ($admin_phone) {
+                            echo '<p style="font-size: 12px; opacity: 0.8;">' . esc_html($admin_phone) . '</p>';
+                        }
+                    } else {
+                        echo '<p>Contact Admin</p>';
+                    }
+                    ?>
+                </div>
                 <a href="<?php echo wp_logout_url(home_url()); ?>" class="logout-btn" title="Logout">🚪</a>
             </div>
         </div>

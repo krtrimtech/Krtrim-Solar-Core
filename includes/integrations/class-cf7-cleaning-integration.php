@@ -43,6 +43,13 @@ class KSC_CF7_Cleaning_Integration {
         // AJAX for verifying payment and creating booking
         add_action('wp_ajax_verify_cleaning_payment', [$this, 'verify_cleaning_payment']);
         add_action('wp_ajax_nopriv_verify_cleaning_payment', [$this, 'verify_cleaning_payment']);
+
+        // AJAX for Pay After booking
+        add_action('wp_ajax_create_pay_after_booking', [$this, 'create_pay_after_booking']);
+        add_action('wp_ajax_nopriv_create_pay_after_booking', [$this, 'create_pay_after_booking']);
+        
+        add_action('wp_ajax_validate_cleaning_coupon', [$this, 'validate_coupon_ajax']);
+        add_action('wp_ajax_nopriv_validate_cleaning_coupon', [$this, 'validate_coupon_ajax']);
     }
 
     /**
@@ -92,6 +99,40 @@ class KSC_CF7_Cleaning_Integration {
         $price_data = $this->calculate_price($system_size_kw, $plan_type);
         $total_amount = $price_data['total'];
 
+        // Apply Coupon if exists
+        $coupon_code = isset($data['coupon_code']) ? sanitize_text_field($data['coupon_code']) : '';
+        $applied_coupon_id = 0;
+
+        if ($coupon_code) {
+            $c_args = [
+                'post_type' => 'solar_coupon',
+                'meta_key' => '_coupon_code',
+                'meta_value' => $coupon_code,
+                'posts_per_page' => 1
+            ];
+            $c_query = new WP_Query($c_args);
+            if ($c_query->have_posts()) {
+                $c_query->the_post();
+                $c_id = get_the_ID();
+                $c_expiry = get_post_meta($c_id, '_expiry_date', true);
+                
+                if (!$c_expiry || strtotime($c_expiry) >= time()) {
+                    $c_type = get_post_meta($c_id, '_discount_type', true);
+                    $c_amount = get_post_meta($c_id, '_discount_amount', true);
+                    
+                    if ($c_type == 'percent') {
+                        $discount = $total_amount * ($c_amount / 100);
+                    } else {
+                        $discount = $c_amount;
+                    }
+                    
+                    $total_amount = max(0, $total_amount - $discount);
+                    $applied_coupon_id = $c_id;
+                }
+                wp_reset_postdata();
+            }
+        }
+
         // Create post
         $post_id = wp_insert_post([
             'post_type'   => 'cleaning_service',
@@ -116,12 +157,49 @@ class KSC_CF7_Cleaning_Integration {
         update_post_meta($post_id, '_payment_option', $payment_option);
         update_post_meta($post_id, '_total_amount', $total_amount);
         update_post_meta($post_id, '_created_at', current_time('mysql'));
+        
+        if ($applied_coupon_id) {
+            update_post_meta($post_id, '_applied_coupon_id', $applied_coupon_id);
+            update_post_meta($post_id, '_applied_coupon_code', $coupon_code);
+        }
 
         // Handle date preferences
-        if ($payment_option === 'pay_before' && !empty($preferred_date)) {
+        if (!empty($preferred_date)) {
             update_post_meta($post_id, '_preferred_date', $preferred_date);
-        } elseif (!empty($preferred_week)) {
+        }
+        
+        if (!empty($preferred_week)) {
             update_post_meta($post_id, '_preferred_week', $preferred_week);
+        }
+
+        // Send Admin Notification
+        $admin_email = get_option('admin_email');
+        $subject = sprintf('New Cleaning Booking: %s - %s Plan', $customer_name, ucfirst(str_replace('_', ' ', $plan_type)));
+        
+        $message = "New Cleaning Service Booking Received:\n\n";
+        $message .= "Customer: " . $customer_name . "\n";
+        $message .= "Phone: " . $customer_phone . "\n";
+        $message .= "System Size: " . $system_size_kw . " kW\n";
+        $message .= "Plan: " . ucfirst(str_replace('_', ' ', $plan_type)) . "\n";
+        $message .= "Amount: ₹" . number_format($total_amount) . "\n";
+        $message .= "Payment Status: " . ucfirst($payment_status) . "\n";
+        $message .= "Preferred Date: " . ($preferred_date ?: 'Not specified') . "\n\n";
+        $message .= "View Booking: " . admin_url('post.php?post=' . $post_id . '&action=edit');
+
+        wp_mail($admin_email, $subject, $message);
+
+        // ✅ NEW: Add to Activity Stream / Notification Center
+        if (class_exists('SP_Notifications_Manager')) {
+            $admins = get_users(['role' => 'administrator']);
+            foreach ($admins as $admin) {
+                SP_Notifications_Manager::create_notification([
+                    'user_id' => $admin->ID,
+                    'project_id' => null, // No project ID for cleaning service yet, or could use $post_id if column supports generic post ID
+                    'message' => 'New Cleaning Booking: ' . $customer_name . ' (' . ucfirst($plan_type) . ')',
+                    'type' => 'info',
+                    'status' => 'unread',
+                ]);
+            }
         }
 
         return $post_id;
@@ -211,7 +289,10 @@ class KSC_CF7_Cleaning_Integration {
             wp_send_json_error(['message' => 'Payment gateway not configured']);
         }
 
-        require_once plugin_dir_path(dirname(dirname(__FILE__))) . 'includes/class-razorpay-light-client.php';
+        // Include Razorpay client
+        if (!class_exists('SP_Razorpay_Light_Client')) {
+            require_once plugin_dir_path(dirname(dirname(__FILE__))) . 'includes/class-razorpay-light-client.php';
+        }
         
         $razorpay = new SP_Razorpay_Light_Client($key_id, $key_secret);
         $amount_paise = intval($price['total'] * 100);
@@ -225,6 +306,7 @@ class KSC_CF7_Cleaning_Integration {
                 'customer_phone' => sanitize_text_field($data['customer_phone']),
                 'plan_type' => $plan,
                 'system_kw' => $kw,
+                'preferred_date' => sanitize_text_field($data['preferred_date'] ?? ''),
             ],
         ];
 
@@ -301,6 +383,155 @@ class KSC_CF7_Cleaning_Integration {
         }
     }
 
+    public function verify_payment_ajax() {
+        if (!isset($_POST['razorpay_payment_id'])) {
+            wp_send_json_error(['message' => 'Missing payment ID']);
+        }
+
+        $order_id = $_POST['razorpay_order_id'];
+        $payment_id = $_POST['razorpay_payment_id'];
+        $signature = $_POST['razorpay_signature'];
+
+        $api = $this->get_razorpay_api();
+
+        try {
+            $attributes = [
+                'razorpay_order_id' => $order_id,
+                'razorpay_payment_id' => $payment_id,
+                'razorpay_signature' => $signature
+            ];
+
+            $api->utility->verifyPaymentSignature($attributes);
+
+            // Fetch order to get booking ID (we stored it in notes)
+            $order = $api->order->fetch($order_id);
+            $booking_id = $order->notes['booking_id'];
+
+            // Update booking status
+            update_post_meta($booking_id, '_payment_status', 'paid');
+            update_post_meta($booking_id, '_razorpay_payment_id', $payment_id);
+            
+            // Log for activity
+            if (class_exists('SP_Notifications_Manager')) {
+                // ... logic to log payment success
+            }
+
+            wp_send_json_success(['booking_id' => $booking_id]);
+
+        } catch (Exception $e) {
+            wp_send_json_error(['message' => $e->getMessage()]);
+        }
+    }
+
+    /**
+     * AJAX Validate Coupon
+     */
+    public function validate_coupon_ajax() {
+        $code = isset($_POST['coupon_code']) ? strtoupper(sanitize_text_field($_POST['coupon_code'])) : '';
+        if (empty($code)) wp_send_json_error(['message' => 'Empty code']);
+
+        $args = [
+            'post_type' => 'solar_coupon',
+            'meta_key' => '_coupon_code',
+            'meta_value' => $code,
+            'posts_per_page' => 1,
+            'post_status' => 'publish'
+        ];
+        $query = new WP_Query($args);
+
+        if (!$query->have_posts()) {
+            wp_send_json_error(['message' => 'Invalid coupon code']);
+        }
+
+        $query->the_post();
+        $post_id = get_the_ID();
+        $expiry = get_post_meta($post_id, '_expiry_date', true);
+
+        if ($expiry && strtotime($expiry) < time()) {
+            wp_send_json_error(['message' => 'Coupon expired']);
+        }
+
+        $type = get_post_meta($post_id, '_discount_type', true);
+        $amount = get_post_meta($post_id, '_discount_amount', true);
+
+        wp_send_json_success([
+            'valid' => true,
+            'code' => $code,
+            'type' => $type,
+            'amount' => floatval($amount),
+            'message' => 'Coupon applied!'
+        ]);
+        
+        wp_reset_postdata();
+    }
+
+    /**
+     * Calculate discount based on coupon
+     */
+    private function calculate_discount($total_amount, $coupon_code) {
+        if (empty($coupon_code)) {
+            return 0;
+        }
+
+        $args = [
+            'post_type' => 'solar_coupon',
+            'meta_key' => '_coupon_code',
+            'meta_value' => strtoupper($coupon_code),
+            'posts_per_page' => 1,
+            'post_status' => 'publish'
+        ];
+        $query = new WP_Query($args);
+
+        if (!$query->have_posts()) {
+            return 0; // Invalid coupon
+        }
+
+        $query->the_post();
+        $post_id = get_the_ID();
+        $expiry = get_post_meta($post_id, '_expiry_date', true);
+
+        if ($expiry && strtotime($expiry) < time()) {
+            wp_reset_postdata();
+            return 0; // Coupon expired
+        }
+
+        $type = get_post_meta($post_id, '_discount_type', true);
+        $amount = floatval(get_post_meta($post_id, '_discount_amount', true));
+        wp_reset_postdata();
+
+        $discount = 0;
+        if ($type === 'percentage') {
+            $discount = $total_amount * ($amount / 100);
+        } elseif ($type === 'fixed_cart') {
+            $discount = $amount;
+        }
+
+        return min($discount, $total_amount); // Discount cannot exceed total amount
+    }
+
+    /**
+     * AJAX: Create Pay After Service booking
+     */
+    public function create_pay_after_booking() {
+        // Verify nonce usually, but for public form we check required fields
+        $data = $_POST;
+        
+        if (empty($data['customer_name']) || empty($data['customer_phone']) || empty($data['system_size_kw'])) {
+            wp_send_json_error(['message' => 'Missing required fields']);
+        }
+
+        $booking_id = $this->create_cleaning_booking($data, 'pending');
+
+        if ($booking_id) {
+            wp_send_json_success([
+                'message' => 'Booking created successfully!',
+                'booking_id' => $booking_id,
+            ]);
+        } else {
+            wp_send_json_error(['message' => 'Error creating booking. Please try again.']);
+        }
+    }
+
     /**
      * Render price calculator shortcode
      */
@@ -318,9 +549,7 @@ class KSC_CF7_Cleaning_Integration {
     }
 }
 
-// Initialize the class if CF7 is active
+// Initialize the class
 add_action('plugins_loaded', function() {
-    if (class_exists('WPCF7')) {
-        new KSC_CF7_Cleaning_Integration();
-    }
+    new KSC_CF7_Cleaning_Integration();
 });

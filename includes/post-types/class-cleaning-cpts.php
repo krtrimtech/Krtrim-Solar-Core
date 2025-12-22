@@ -20,9 +20,12 @@ class KSC_Cleaning_CPTs {
      * Initialize hooks
      */
     public function __construct() {
-        add_action('init', [$this, 'register_cleaning_service_cpt']);
         add_action('init', [$this, 'register_cleaning_visit_cpt']);
         add_action('init', [$this, 'register_service_review_cpt']);
+        
+        // Admin Columns
+        add_filter('manage_cleaning_service_posts_columns', [$this, 'add_cleaning_service_columns']);
+        add_action('manage_cleaning_service_posts_custom_column', [$this, 'render_cleaning_service_columns'], 10, 2);
     }
 
     /**
@@ -30,24 +33,25 @@ class KSC_Cleaning_CPTs {
      */
     public function register_cleaning_service_cpt() {
         $labels = [
-            'name'               => 'Cleaning Services',
-            'singular_name'      => 'Cleaning Service',
-            'menu_name'          => 'Cleaning Services',
-            'add_new'            => 'Add New',
-            'add_new_item'       => 'Add New Cleaning Service',
-            'edit_item'          => 'Edit Cleaning Service',
-            'new_item'           => 'New Cleaning Service',
-            'view_item'          => 'View Cleaning Service',
-            'search_items'       => 'Search Cleaning Services',
-            'not_found'          => 'No cleaning services found',
-            'not_found_in_trash' => 'No cleaning services in trash',
+            'name'               => 'Cleaning Orders',
+            'singular_name'      => 'Cleaning Order',
+            'menu_name'          => 'Cleaning Orders',
+            'add_new'            => 'Manual Order',
+            'add_new_item'       => 'Add New Cleaning Order',
+            'edit_item'          => 'Edit Order',
+            'new_item'           => 'New Order',
+            'view_item'          => 'View Order',
+            'search_items'       => 'Search Orders',
+            'not_found'          => 'No orders found',
+            'not_found_in_trash' => 'No orders in trash',
         ];
 
         $args = [
             'labels'              => $labels,
             'public'              => false,
             'show_ui'             => true,
-            'show_in_menu'        => 'ksc-settings',
+            'show_in_menu'        => true,
+            'menu_icon'           => 'dashicons-cart',
             'capability_type'     => 'post',
             'hierarchical'        => false,
             'supports'            => ['title'],
@@ -293,6 +297,107 @@ class KSC_Cleaning_CPTs {
             'show_in_rest' => true,
             'description'  => 'Cleaner user ID if review is for cleaning',
         ]);
+    }
+    }
+
+    /**
+     * Add custom columns to Cleaning Service list
+     */
+    public function add_cleaning_service_columns($columns) {
+        $new_columns = [];
+        foreach ($columns as $key => $value) {
+            $new_columns[$key] = $value;
+            if ($key === 'title') {
+                $new_columns['customer'] = 'Customer';
+                $new_columns['contact'] = 'Contact';
+                $new_columns['plan'] = 'Plan Details';
+                $new_columns['amount'] = 'Amount';
+                $new_columns['payment'] = 'Payment';
+                $new_columns['created'] = 'Date';
+            }
+        }
+        // Remove date from end and put our created column if we want, or just stick with standard date
+        unset($new_columns['date']); 
+        return $new_columns;
+    }
+
+    /**
+     * Render custom columns for Cleaning Service list
+     */
+    public function render_cleaning_service_columns($column, $post_id) {
+        switch ($column) {
+            case 'customer':
+                $name = get_post_meta($post_id, '_customer_name', true);
+                if ($name) {
+                    echo '<strong>' . esc_html($name) . '</strong>';
+                } else {
+                    echo '<span style="color: #999;">-</span>';
+                }
+                break;
+
+            case 'contact':
+                $phone = get_post_meta($post_id, '_customer_phone', true);
+                $address = get_post_meta($post_id, '_customer_address', true);
+                
+                if ($phone) {
+                    echo '<div>📞 ' . esc_html($phone) . '</div>';
+                }
+                if ($address) {
+                    echo '<div style="font-size: 11px; color: #666; margin-top: 2px;" title="' . esc_attr($address) . '">📍 ' . mb_strimwidth(esc_html($address), 0, 20, '...') . '</div>';
+                }
+                break;
+
+            case 'plan':
+                $plan = get_post_meta($post_id, '_plan_type', true);
+                $kw = get_post_meta($post_id, '_system_size_kw', true);
+                $visits = get_post_meta($post_id, '_visits_total', true);
+                
+                if ($plan) {
+                    echo '<div>' . ucfirst(str_replace('_', ' ', $plan)) . '</div>';
+                }
+                if ($kw) {
+                    echo '<div style="font-size: 11px; color: #666;">⚡ ' . esc_html($kw) . ' kW</div>';
+                }
+                if ($visits) {
+                    echo '<div style="font-size: 11px; color: #666;">Total Visits: ' . esc_html($visits) . '</div>';
+                }
+                break;
+
+            case 'amount':
+                $amount = get_post_meta($post_id, '_total_amount', true);
+                if ($amount) {
+                    echo '<strong>₹' . number_format($amount) . '</strong>';
+                } else {
+                    echo '-';
+                }
+                break;
+
+            case 'payment':
+                $status = get_post_meta($post_id, '_payment_status', true) ?: 'pending';
+                $option = get_post_meta($post_id, '_payment_option', true);
+                
+                $colors = [
+                    'pending' => '#ffc107',
+                    'paid' => '#28a745',
+                    'failed' => '#dc3545',
+                ];
+                $color = isset($colors[$status]) ? $colors[$status] : '#6c757d';
+                
+                echo sprintf(
+                    '<span style="background: %s; color: #fff; padding: 3px 8px; border-radius: 3px; font-size: 11px; font-weight: 600;">%s</span>', 
+                    $color, 
+                    ucfirst($status)
+                );
+                
+                if ($option === 'pay_after') {
+                    echo '<div style="font-size: 10px; color: #888; margin-top: 2px;">(Pay After)</div>';
+                }
+                break;
+
+            case 'created':
+                echo get_the_date('Y-m-d H:i', $post_id);
+                break;
+        }
     }
 }
 

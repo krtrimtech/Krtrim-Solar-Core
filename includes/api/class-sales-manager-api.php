@@ -190,6 +190,9 @@ class KSC_Sales_Manager_API {
                     'phone' => get_post_meta($lead_id, '_lead_phone', true),
                     'email' => get_post_meta($lead_id, '_lead_email', true),
                     'status' => get_post_meta($lead_id, '_lead_status', true) ?: 'new',
+                    'lead_type' => get_post_meta($lead_id, '_lead_type', true) ?: 'solar_project',
+                    'project_type' => get_post_meta($lead_id, '_lead_project_type', true),
+                    'system_size' => get_post_meta($lead_id, '_lead_system_size', true),
                     'source' => get_post_meta($lead_id, '_lead_source', true),
                     'created_date' => get_the_date('Y-m-d'),
                     'followups' => $followups,
@@ -244,6 +247,19 @@ class KSC_Sales_Manager_API {
         update_post_meta($post_id, '_lead_source', $source);
         update_post_meta($post_id, '_lead_notes', $notes);
         update_post_meta($post_id, '_lead_status', 'new');
+        
+        // Save Lead Type & Specifics
+        $lead_type = sanitize_text_field($_POST['lead_type'] ?? 'solar_project');
+        update_post_meta($post_id, '_lead_type', $lead_type);
+        
+        if ($lead_type === 'solar_project') {
+            $project_type = sanitize_text_field($_POST['lead_project_type'] ?? '');
+            update_post_meta($post_id, '_lead_project_type', $project_type);
+        } else {
+            $system_size = floatval($_POST['lead_system_size'] ?? 0);
+            update_post_meta($post_id, '_lead_system_size', $system_size);
+        }
+
         update_post_meta($post_id, '_created_by_sales_manager', $user_id);
         
         if ($supervisor_id) {
@@ -285,6 +301,17 @@ class KSC_Sales_Manager_API {
         if (isset($_POST['lead_notes'])) {
             update_post_meta($lead_id, '_lead_notes', sanitize_textarea_field($_POST['lead_notes']));
         }
+        // Optional: Update Type/Details if provided
+        if (isset($_POST['lead_type'])) {
+            $lead_type = sanitize_text_field($_POST['lead_type']);
+            update_post_meta($lead_id, '_lead_type', $lead_type);
+            
+            if ($lead_type === 'solar_project' && isset($_POST['lead_project_type'])) {
+                update_post_meta($lead_id, '_lead_project_type', sanitize_text_field($_POST['lead_project_type']));
+            } elseif ($lead_type === 'cleaning_service' && isset($_POST['lead_system_size'])) {
+                update_post_meta($lead_id, '_lead_system_size', floatval($_POST['lead_system_size']));
+            }
+        }
 
         wp_send_json_success(['message' => 'Lead updated']);
     }
@@ -325,6 +352,9 @@ class KSC_Sales_Manager_API {
                 'email' => get_post_meta($lead_id, '_lead_email', true),
                 'address' => get_post_meta($lead_id, '_lead_address', true),
                 'status' => get_post_meta($lead_id, '_lead_status', true) ?: 'new',
+                'lead_type' => get_post_meta($lead_id, '_lead_type', true) ?: 'solar_project',
+                'project_type' => get_post_meta($lead_id, '_lead_project_type', true),
+                'system_size' => get_post_meta($lead_id, '_lead_system_size', true),
                 'source' => get_post_meta($lead_id, '_lead_source', true),
                 'notes' => get_post_meta($lead_id, '_lead_notes', true),
                 'created_date' => $lead->post_date,

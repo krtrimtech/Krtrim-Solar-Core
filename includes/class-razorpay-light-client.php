@@ -30,14 +30,27 @@ class SP_Razorpay_Light_Client {
      * @param string $receipt_id A unique identifier for the receipt.
      * @return array The API response from Razorpay.
      */
-    public function create_order($amount, $currency, $receipt_id) {
+    /**
+     * Creates a Razorpay Order.
+     *
+     * @param array $data Order data (amount, currency, receipt, notes, etc.)
+     * @return array The API response from Razorpay.
+     */
+    public function create_order($data) {
         $url = self::API_URL . 'orders';
         
-        $body = [
-            'amount' => $amount,
-            'currency' => $currency,
-            'receipt' => $receipt_id,
-        ];
+        // Ensure defaults
+        $body = wp_parse_args($data, [
+            'currency' => 'INR',
+            'receipt' => uniqid(),
+            'notes' => []
+        ]);
+        
+        // If args were passed individually (legacy support), not needed here since we control calls, but good for safety if used elsewhere
+        if (!is_array($data)) {
+            // Fallback if someone calls it with (amount, currency, receipt) - though PHP would error on arg count first if we change signature.
+            // Let's just stick to array support as we are fixing the specific broken call.
+        }
 
         $args = [
             'method' => 'POST',
@@ -61,6 +74,10 @@ class SP_Razorpay_Light_Client {
         $http_code = wp_remote_retrieve_response_code($response);
 
         if ($http_code >= 200 && $http_code < 300) {
+            // Razorpay returns the order object directly on success
+            if (isset($decoded_body['id'])) {
+                return $decoded_body; // Return the whole object to be compatible with array access like $order['id']
+            }
             return ['success' => true, 'data' => $decoded_body];
         } else {
             $error_message = isset($decoded_body['error']['description']) ? $decoded_body['error']['description'] : 'An unknown error occurred with Razorpay.';

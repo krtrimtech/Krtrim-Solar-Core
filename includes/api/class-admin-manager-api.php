@@ -59,6 +59,9 @@ class KSC_Admin_Manager_API extends KSC_API_Base {
         
         // Location assignment
         add_action('wp_ajax_assign_area_manager_location', [$this, 'assign_area_manager_location']);
+        
+        // Team assignment
+        add_action('wp_ajax_assign_team_to_area_manager', [$this, 'assign_team_to_area_manager']);
     }
     
     /**
@@ -383,6 +386,9 @@ class KSC_Admin_Manager_API extends KSC_API_Base {
                 'type' => 'vendor_assigned',
             ]);
         }
+
+        // Trigger project awarded action (for automated notifications)
+        do_action('sp_project_awarded', $project_id, $vendor_id);
         
         wp_send_json_success([
             'message' => 'Project awarded successfully!',
@@ -1473,5 +1479,60 @@ class KSC_Admin_Manager_API extends KSC_API_Base {
         }
         
         wp_send_json_success(['projects' => $projects_with_bids]);
+    }
+
+    /**
+     * Assign Sales Team (Sales Managers) to an Area Manager
+     */
+    public function assign_team_to_area_manager() {
+        check_ajax_referer('assign_team_nonce', 'nonce');
+
+        if (!current_user_can('manage_options')) {
+            wp_send_json_error(['message' => 'Permission denied']);
+        }
+
+        $manager_id = intval($_POST['manager_id'] ?? 0);
+        $team_ids = $_POST['team_ids'] ?? [];
+
+        if (!$manager_id) {
+            wp_send_json_error(['message' => 'Invalid area manager ID']);
+        }
+
+        // Validate manager is an Area Manager
+        $manager = get_userdata($manager_id);
+        if (!$manager || !in_array('area_manager', (array)$manager->roles)) {
+            wp_send_json_error(['message' => 'User is not an Area Manager']);
+        }
+
+        // 1. Get all Sales Managers currently assigned to this Area Manager
+        $current_team = get_users([
+            'role' => 'sales_manager',
+            'meta_key' => '_assigned_area_manager',
+            'meta_value' => $manager_id,
+            'fields' => 'ID'
+        ]);
+        
+        // 2. Clear assignment for removed members
+        $removed_ids = array_diff($current_team, $team_ids);
+        foreach ($removed_ids as $removed_id) {
+            delete_user_meta($removed_id, '_assigned_area_manager');
+        }
+
+        // 3. Assign new members
+        $count = 0;
+        if (is_array($team_ids)) {
+            foreach ($team_ids as $sm_id) {
+                $sm_id = intval($sm_id);
+                $sm_user = get_userdata($sm_id);
+                if ($sm_user && in_array('sales_manager', (array)$sm_user->roles)) {
+                    update_user_meta($sm_id, '_assigned_area_manager', $manager_id);
+                    $count++;
+                }
+            }
+        }
+
+        wp_send_json_success([
+            'message' => "Team updated successfully. {$count} Sales Managers assigned."
+        ]);
     }
 }

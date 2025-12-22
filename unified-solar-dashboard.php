@@ -59,10 +59,14 @@ final class Krtrim_Solar_Core {
 		require_once $this->dir_path . 'includes/class-notifications-manager.php';
 		require_once $this->dir_path . 'includes/class-error-logger.php';
 		require_once $this->dir_path . 'includes/post-types/class-cleaning-cpts.php';
+        require_once $this->dir_path . 'includes/post-types/class-coupon-cpt.php';
 		require_once $this->dir_path . 'includes/api/class-cleaner-api.php';
 		require_once $this->dir_path . 'includes/api/class-cleaning-services-api.php';
 		require_once $this->dir_path . 'includes/class-cleaning-notifications.php';
+		require_once $this->dir_path . 'includes/integrations/class-whatsapp-handler.php';
+		require_once $this->dir_path . 'includes/integrations/class-official-whatsapp.php';
 		require_once $this->dir_path . 'includes/integrations/class-cf7-cleaning-integration.php';
+		require_once $this->dir_path . 'includes/class-project-notifications.php';
 		
 		// Admin view files (required by SP_Admin_Menus class)
 		require_once $this->dir_path . 'admin/views/view-vendor-approval.php';
@@ -80,6 +84,8 @@ final class Krtrim_Solar_Core {
 		require_once $this->dir_path . 'public/views/view-marketplace.php';
 		require_once $this->dir_path . 'public/views/view-vendor-registration.php';
 		require_once $this->dir_path . 'public/views/view-vendor-status.php';
+		require_once $this->dir_path . 'public/views/view-cleaner-dashboard.php';
+		require_once $this->dir_path . 'public/views/view-cleaning-booking.php';
 	}
 
 	private function init_hooks() {
@@ -103,6 +109,7 @@ final class Krtrim_Solar_Core {
 		add_shortcode( 'solar_project_marketplace', 'sp_project_marketplace_shortcode' );
 		add_shortcode( 'vendor_status_dashboard', 'sp_vendor_status_dashboard_shortcode' );
 		add_shortcode( 'cleaner_dashboard', 'ksc_cleaner_dashboard_shortcode' );
+		add_shortcode( 'solar_cleaning_booking', 'ksc_render_cleaning_booking_form' );
 		
 		add_filter( 'template_include', [ $this, 'template_include_single_project' ] );
 		add_filter( 'plugin_action_links_' . plugin_basename( $this->file ), [ $this, 'add_plugin_action_links' ] );

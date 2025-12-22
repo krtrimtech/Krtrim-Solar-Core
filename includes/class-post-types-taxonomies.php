@@ -18,6 +18,10 @@ class SP_Post_Types_Taxonomies {
         add_action( 'manage_solar_project_posts_custom_column', [ $this, 'render_custom_columns' ], 10, 2 );
         add_action( 'restrict_manage_posts', [ $this, 'add_status_filter' ] );
         add_filter( 'parse_query', [ $this, 'filter_projects_by_status' ] );
+
+        // Solar Lead Admin Columns
+        add_filter( 'manage_solar_lead_posts_columns', [ $this, 'add_lead_columns' ] );
+        add_action( 'manage_solar_lead_posts_custom_column', [ $this, 'render_lead_columns' ], 10, 2 );
     }
 
     /**
@@ -348,6 +352,105 @@ class SP_Post_Types_Taxonomies {
         if ($pagenow === 'edit.php' && isset($_GET['post_type']) && $_GET['post_type'] === 'solar_project' && isset($_GET['project_status_filter']) && $_GET['project_status_filter'] !== '') {
             $query->set('meta_key', 'project_status');
             $query->set('meta_value', $_GET['project_status_filter']);
+        }
+    }
+
+    /**
+     * Add custom columns to Solar Lead list.
+     */
+    public function add_lead_columns($columns) {
+        $new_columns = [];
+        foreach ($columns as $key => $value) {
+            $new_columns[$key] = $value;
+            if ($key === 'title') {
+                $new_columns['lead_phone'] = 'Phone';
+                $new_columns['lead_status'] = 'Status';
+                $new_columns['lead_type'] = 'Type';
+                $new_columns['lead_source'] = 'Source';
+                $new_columns['lead_agent'] = 'Assigned To';
+            }
+        }
+        return $new_columns;
+    }
+
+    /**
+     * Render custom columns for Solar Lead list.
+     */
+    public function render_lead_columns($column, $post_id) {
+        switch ($column) {
+            case 'lead_phone':
+                $phone = get_post_meta($post_id, '_lead_phone', true);
+                $email = get_post_meta($post_id, '_lead_email', true);
+                if ($phone) echo '<div>📞 <a href="tel:' . esc_attr($phone) . '">' . esc_html($phone) . '</a></div>';
+                if ($email) echo '<div style="font-size: 11px; color: #666;">📧 ' . esc_html($email) . '</div>';
+                break;
+
+            case 'lead_status':
+                $status = get_post_meta($post_id, '_lead_status', true) ?: 'new';
+                $colors = [
+                    'new' => '#1d4ed8', // Blue
+                    'interested' => '#6d28d9', // Purple
+                    'in_process' => '#b45309', // Orange
+                    'converted' => '#047857', // Green
+                    'lost' => '#b91c1c' // Red
+                ];
+                $bg_colors = [
+                    'new' => '#dbeafe',
+                    'interested' => '#ede9fe',
+                    'in_process' => '#fef3c7',
+                    'converted' => '#d1fae5',
+                    'lost' => '#fee2e2'
+                ];
+                $color = isset($colors[$status]) ? $colors[$status] : '#333';
+                $bg = isset($bg_colors[$status]) ? $bg_colors[$status] : '#eee';
+                
+                echo sprintf(
+                    '<span style="background: %s; color: %s; padding: 3px 8px; border-radius: 12px; font-size: 11px; font-weight: 600; display: inline-block;">%s</span>', 
+                    $bg, $color, ucfirst(str_replace('_', ' ', $status))
+                );
+                
+                // Show last follow-up date if available
+                $notes = get_post_meta($post_id, '_lead_notes', true);
+                if ($notes) {
+                    echo '<div style="font-size: 10px; color: #888; margin-top: 3px; max-width: 150px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">📝 ' . esc_html($notes) . '</div>';
+                }
+                break;
+
+            case 'lead_type':
+                $type = get_post_meta($post_id, '_lead_type', true) ?: 'solar_project';
+                $icon = ($type === 'cleaning_service') ? '🧹' : '☀️';
+                $label = ($type === 'cleaning_service') ? 'Cleaning' : 'Solar';
+                
+                echo '<span title="' . esc_attr($type) . '">' . $icon . ' ' . $label . '</span>';
+                
+                $subtype = ($type === 'solar_project') ? get_post_meta($post_id, '_lead_project_type', true) : get_post_meta($post_id, '_lead_system_size', true) . ' kW';
+                if ($subtype) {
+                    echo '<div style="font-size: 11px; color: #666;">' . esc_html($subtype) . '</div>';
+                }
+                break;
+
+            case 'lead_source':
+                $source = get_post_meta($post_id, '_lead_source', true);
+                echo $source ? ucfirst(str_replace('_', ' ', $source)) : '-';
+                break;
+
+            case 'lead_agent':
+                // Check for assigned AM or creator SM
+                $am_id = get_post_meta($post_id, '_assigned_area_manager', true);
+                $sm_id = get_post_meta($post_id, '_created_by_sales_manager', true);
+                
+                if ($am_id) {
+                    $user = get_userdata($am_id);
+                    echo '<div>👨‍💼 AM: ' . ($user ? esc_html($user->display_name) : 'Unknown') . '</div>';
+                }
+                if ($sm_id) {
+                    $user = get_userdata($sm_id);
+                    echo '<div style="font-size: 11px; color: #666;">Sales: ' . ($user ? esc_html($user->display_name) : 'Unknown') . '</div>';
+                }
+                if (!$am_id && !$sm_id) {
+                    echo '-';
+                }
+                break;
         }
     }
 }

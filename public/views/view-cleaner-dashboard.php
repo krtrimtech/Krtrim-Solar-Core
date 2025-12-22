@@ -34,7 +34,7 @@ if (!is_user_logged_in()) {
 }
 
 $current_user = wp_get_current_user();
-if (!in_array('solar_cleaner', (array) $current_user->roles)) {
+if (!in_array('solar_cleaner', (array) $current_user->roles) && !in_array('administrator', (array) $current_user->roles)) {
     echo '<div class="access-denied"><p>Access denied. This dashboard is for Solar Cleaners only.</p></div>';
     return;
 }
@@ -376,6 +376,24 @@ $cleaner_phone = get_user_meta($current_user->ID, 'phone', true);
     margin-bottom: 15px;
 }
 
+.team-card {
+    background: white;
+    border-radius: 12px;
+    padding: 20px;
+    margin-bottom: 15px;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+    border-left: 4px solid #7c3aed;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+.team-info h3 { margin: 0 0 5px 0; font-size: 18px; }
+.team-role { 
+    background: #f3e8ff; color: #7c3aed; 
+    padding: 2px 8px; border-radius: 12px; font-size: 12px; font-weight: 500; 
+}
+.team-contact { font-size: 14px; color: #6b7280; margin-top: 5px; }
+
 @media (max-width: 600px) {
     .cleaner-stats {
         grid-template-columns: 1fr;
@@ -395,6 +413,7 @@ jQuery(document).ready(function($) {
     // Load visits
     function loadVisits(filter = '') {
         $('#visits-container').html('<p>Loading visits...</p>');
+        $('#cleaner-stats').show(); // Show stats for visits
         
         $.ajax({
             url: ajaxUrl,
@@ -412,6 +431,51 @@ jQuery(document).ready(function($) {
                 }
             }
         });
+    }
+
+    // Load Team
+    function loadTeam() {
+        $('#visits-container').html('<p>Loading team...</p>');
+        $('#cleaner-stats').hide(); // Hide stats for team view
+        
+        $.ajax({
+            url: ajaxUrl,
+            type: 'POST',
+            data: { action: 'get_cleaner_superiors' },
+            success: function(response) {
+                if (response.success) {
+                    renderTeam(response.data);
+                } else {
+                    $('#visits-container').html('<p style="color:red;">Error loading team</p>');
+                }
+            }
+        });
+    }
+
+    // Render Team
+    function renderTeam(members) {
+        if (!members || members.length === 0) {
+            $('#visits-container').html('<div class="empty-state"><h3>No team members found</h3></div>');
+            return;
+        }
+
+        let html = '';
+        members.forEach(m => {
+            html += `
+                <div class="team-card">
+                    <div class="team-info">
+                        <h3>${m.name} <span class="team-role">${m.role}</span></h3>
+                        <div class="team-contact">📞 ${m.phone}</div>
+                        ${m.email ? `<div class="team-contact">✉️ ${m.email}</div>` : ''}
+                    </div>
+                    <div class="team-actions">
+                        <a href="tel:${m.phone}" class="btn btn-outline">📞 Call</a>
+                        <a href="https://wa.me/91${m.phone.replace(/\D/g,'').slice(-10)}" target="_blank" class="btn btn-success">💬 WhatsApp</a>
+                    </div>
+                </div>
+            `;
+        });
+        $('#visits-container').html(html);
     }
 
     // Render visits
@@ -499,7 +563,12 @@ jQuery(document).ready(function($) {
         $('.filter-tab').removeClass('active');
         $(this).addClass('active');
         currentFilter = $(this).data('filter');
-        loadVisits(currentFilter);
+        
+        if (currentFilter === 'team') {
+            loadTeam();
+        } else {
+            loadVisits(currentFilter);
+        }
     });
 
     // Open complete modal

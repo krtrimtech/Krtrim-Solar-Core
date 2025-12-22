@@ -24,6 +24,9 @@ class KSC_Cleaner_API {
         add_action('wp_ajax_get_cleaners', [$this, 'get_cleaners']);
         add_action('wp_ajax_update_cleaner', [$this, 'update_cleaner']);
         add_action('wp_ajax_delete_cleaner', [$this, 'delete_cleaner']);
+        
+        // Hierarchy
+        add_action('wp_ajax_get_cleaner_superiors', [$this, 'get_cleaner_superiors']);
     }
 
     /**
@@ -291,6 +294,68 @@ class KSC_Cleaner_API {
         wp_delete_user($cleaner_id);
 
         wp_send_json_success(['message' => 'Cleaner deleted successfully']);
+    }
+
+    /**
+     * Get cleaner's superiors (Area Manager + Sales Manager)
+     */
+    public function get_cleaner_superiors() {
+        if (!is_user_logged_in()) {
+            wp_send_json_error(['message' => 'Unauthorized']);
+        }
+
+        $user = wp_get_current_user();
+        if (!in_array('solar_cleaner', (array) $user->roles)) {
+            wp_send_json_error(['message' => 'Access denied']);
+        }
+
+        $superiors = [];
+
+        // 1. Get Area Manager (Creator)
+        $am_id = get_user_meta($user->ID, '_created_by', true);
+        if ($am_id) {
+            $am = get_userdata($am_id);
+            if ($am && in_array('area_manager', (array) $am->roles)) {
+                $superiors[] = [
+                    'name' => $am->display_name,
+                    'phone' => get_user_meta($am_id, 'phone', true),
+                    'role' => 'Area Manager',
+                    'email' => $am->user_email
+                ];
+
+                // 2. Get Sales Manager (Supervisor of AM)
+                $sm_ids = get_user_meta($am_id, '_supervisor_ids', true);
+                if (!empty($sm_ids) && is_array($sm_ids)) {
+                    foreach ($sm_ids as $sm_id) {
+                        $sm = get_userdata($sm_id);
+                        if ($sm && in_array('sales_manager', (array) $sm->roles)) {
+                            $superiors[] = [
+                                'name' => $sm->display_name,
+                                'phone' => get_user_meta($sm_id, 'phone', true),
+                                'role' => 'Sales Manager (Supervisor)',
+                                'email' => $sm->user_email
+                            ];
+                        }
+                    }
+                }
+            }
+        }
+
+        // Fallback: If no superiors found, show admin
+        if (empty($superiors)) {
+            $admins = get_users(['role' => 'administrator', 'number' => 1]);
+            if (!empty($admins)) {
+                $admin = $admins[0];
+                $superiors[] = [
+                    'name' => 'Support Team',
+                    'phone' => get_user_meta($admin->ID, 'phone', true),
+                    'role' => 'Administrator',
+                    'email' => $admin->user_email
+                ];
+            }
+        }
+
+        wp_send_json_success($superiors);
     }
 }
 
