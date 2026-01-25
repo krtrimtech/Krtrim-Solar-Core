@@ -1,10 +1,11 @@
 /**
- * Area Manager Dashboard JavaScript  
+ * Manager Dashboard JavaScript
+ * Extends Area Manager functionality with Team Analysis and AM Assignment
  */
 (function ($) {
     'use strict';
 
-    console.log('Area Manager Dashboard Script Initialized');
+    console.log('Manager Dashboard Script Initialized');
 
     // Password Toggle
     $(document).on('click', '.toggle-password', function () {
@@ -78,8 +79,8 @@
     });
 
     //Navigation (Global) ---
-    console.log('Attaching click handler to .area-manager-dashboard .nav-item');
-    $(document).on('click', '.area-manager-dashboard .nav-item', function (e) {
+    console.log('Attaching click handler to .manager-dashboard .nav-item');
+    $(document).on('click', '.manager-dashboard .nav-item', function (e) {
         console.log('=== NAV CLICK DETECTED ===');
         e.preventDefault();
         e.stopPropagation();
@@ -93,7 +94,7 @@
         console.log('All .section-content elements:', $('.section-content').length);
 
         // Remove active class
-        $('.area-manager-dashboard .nav-item').removeClass('active');
+        $('.manager-dashboard .nav-item').removeClass('active');
         $(this).addClass('active');
         console.log('Active class updated');
 
@@ -162,7 +163,7 @@
     const ajaxUrl = (typeof sp_area_dashboard_vars !== 'undefined') ? sp_area_dashboard_vars.ajax_url : '';
 
     if (!ajaxUrl) {
-        console.error('Area Manager Dashboard: sp_area_dashboard_vars is undefined or missing ajax_url.');
+        console.error('Manager Dashboard: sp_area_dashboard_vars is undefined or missing ajax_url.');
         return;
     }
 
@@ -464,8 +465,6 @@
             loadCleanersList();
         } else if (section === 'cleaning-services') {
             loadCleaningServices();
-        } else if (section === 'my-team') {
-            loadMyTeam();
         } else if (section === 'team-analysis') {
             loadTeamAnalysis();
         } else if (section === 'am-assignment') {
@@ -1641,10 +1640,9 @@
                                     <p style="margin: 5px 0;"><strong>Aadhaar:</strong> ${aadhaarMasked}</p>
                                     <p style="margin: 5px 0;"><strong>Location:</strong> ${cleaner.city || 'N/A'}, ${cleaner.state || 'N/A'}</p>
                                 </div>
-                                <div style="margin-top: 15px; display: flex; gap: 10px; flex-wrap: wrap;">
-                                    <button class="btn btn-primary btn-sm view-profile-btn" data-cleaner='${JSON.stringify(cleaner)}' style="padding: 6px 12px; font-size: 12px; flex: 1;">👤 Profile</button>
-                                    <a href="tel:${cleaner.phone}" class="btn btn-sm" style="padding: 6px 12px; font-size: 12px; border: 1px solid #ddd;">📞 Call</a>
-                                    <button class="btn btn-danger btn-sm delete-cleaner" data-id="${cleaner.id}" style="padding: 6px 12px; font-size: 12px;">🗑️</button>
+                                <div style="margin-top: 15px; display: flex; gap: 10px;">
+                                    <a href="tel:${cleaner.phone}" class="btn btn-sm" style="padding: 6px 12px; font-size: 12px;">📞 Call</a>
+                                    <button class="btn btn-danger btn-sm delete-cleaner" data-id="${cleaner.id}" style="padding: 6px 12px; font-size: 12px;">🗑️ Delete</button>
                                 </div>
                             </div>
                         `;
@@ -1660,36 +1658,6 @@
             }
         });
     }
-
-    // View Cleaner Profile Handler
-    $(document).on('click', '.view-profile-btn', function () {
-        const cleaner = JSON.parse($(this).attr('data-cleaner'));
-
-        // Populate Modal
-        $('#modal-cleaner-name').text(cleaner.name);
-        $('#modal-cleaner-phone').text(cleaner.phone);
-        $('#modal-cleaner-email').text(cleaner.email || 'N/A');
-        $('#modal-cleaner-address').text(cleaner.address || 'N/A');
-        $('#modal-cleaner-aadhaar').text(cleaner.aadhaar || 'N/A');
-
-        // Images
-        $('#modal-cleaner-photo').attr('src', cleaner.photo_url || 'https://via.placeholder.com/150?text=No+Photo');
-        if (cleaner.aadhaar_image_url) {
-            $('#modal-cleaner-aadhaar-img').attr('src', cleaner.aadhaar_image_url).show();
-            $('#modal-cleaner-aadhaar-img').parent().find('p').show();
-        } else {
-            $('#modal-cleaner-aadhaar-img').hide();
-            $('#modal-cleaner-aadhaar-img').parent().append('<p>No document uploaded</p>');
-        }
-
-        // Show Modal
-        $('#cleaner-detail-modal').show();
-    });
-
-    // Close Modal Handler
-    $('#close-cleaner-modal').on('click', function () {
-        $('#cleaner-detail-modal').hide();
-    });
 
     // Load cleaning services
     function loadCleaningServices() {
@@ -1871,110 +1839,8 @@
         }
 
         $('#schedule-visit-feedback').html('');
-        $('#cleaner-schedule-preview').hide();
-        $('#cleaner-schedule-content').html('<p style="color: #666; font-size: 14px;">Select a cleaner to view their schedule</p>');
         $('#schedule-visit-modal').show();
     });
-
-    // Load cleaner schedule when cleaner or date changes
-    $(document).on('change', '#schedule_cleaner_id, #schedule_date', function () {
-        loadCleanerSchedulePreview();
-    });
-
-    // Function to load and show cleaner's schedule
-    function loadCleanerSchedulePreview() {
-        const cleanerId = $('#schedule_cleaner_id').val();
-        const selectedDate = $('#schedule_date').val();
-
-        if (!cleanerId) {
-            $('#cleaner-schedule-preview').hide();
-            return;
-        }
-
-        // Get cleaner name from dropdown
-        const cleanerName = $('#schedule_cleaner_id option:selected').text();
-        $('#preview-cleaner-name').text(cleanerName.split(' (')[0] || 'Cleaner\'s');
-        $('#cleaner-schedule-preview').show();
-        $('#cleaner-schedule-content').html('<p style="color: #666; font-size: 14px;">Loading schedule...</p>');
-
-        $.ajax({
-            url: ajaxUrl,
-            type: 'POST',
-            data: {
-                action: 'get_cleaner_schedule',
-                cleaner_id: cleanerId,
-                date: selectedDate || new Date().toISOString().split('T')[0]
-            },
-            success: function (response) {
-                if (response.success) {
-                    renderCleanerSchedule(response.data, selectedDate);
-                } else {
-                    $('#cleaner-schedule-content').html('<p style="color: red; font-size: 14px;">Error loading schedule</p>');
-                }
-            },
-            error: function () {
-                $('#cleaner-schedule-content').html('<p style="color: red; font-size: 14px;">Error loading schedule</p>');
-            }
-        });
-    }
-
-    // Render cleaner's schedule
-    function renderCleanerSchedule(data, selectedDate) {
-        let html = '';
-
-        // Summary stats
-        html += `<div style="display: flex; gap: 10px; margin-bottom: 15px;">
-            <div style="background: #e8f4fd; padding: 10px; border-radius: 6px; text-align: center; flex: 1;">
-                <div style="font-size: 18px; font-weight: bold; color: #007bff;">${data.today_count || 0}</div>
-                <div style="font-size: 11px; color: #666;">Today</div>
-            </div>
-            <div style="background: #fff3cd; padding: 10px; border-radius: 6px; text-align: center; flex: 1;">
-                <div style="font-size: 18px; font-weight: bold; color: #856404;">${data.week_count || 0}</div>
-                <div style="font-size: 11px; color: #666;">This Week</div>
-            </div>
-            <div style="background: #d4edda; padding: 10px; border-radius: 6px; text-align: center; flex: 1;">
-                <div style="font-size: 18px; font-weight: bold; color: #155724;">${data.total_completed || 0}</div>
-                <div style="font-size: 11px; color: #666;">Completed</div>
-            </div>
-        </div>`;
-
-        // Selected date visits
-        if (selectedDate) {
-            const dateFormatted = new Date(selectedDate).toLocaleDateString('en-IN', { weekday: 'short', day: '2-digit', month: 'short' });
-            html += `<h5 style="margin-bottom: 10px; color: #333;">📅 ${dateFormatted}</h5>`;
-
-            if (data.date_visits && data.date_visits.length > 0) {
-                html += `<div style="background: #fff3cd; padding: 10px; border-radius: 6px; margin-bottom: 10px;">
-                    <strong style="color: #856404;">⚠️ ${data.date_visits.length} visit(s) already scheduled</strong>
-                </div>`;
-
-                data.date_visits.forEach(visit => {
-                    html += `<div style="background: white; padding: 10px; border-radius: 6px; margin-bottom: 8px; border-left: 3px solid #007bff;">
-                        <div style="font-weight: 500;">${visit.customer_name || 'Customer'}</div>
-                        <div style="font-size: 12px; color: #666;">🕐 ${visit.scheduled_time || 'TBD'} | ${visit.status || 'scheduled'}</div>
-                    </div>`;
-                });
-            } else {
-                html += `<div style="background: #d4edda; padding: 10px; border-radius: 6px;">
-                    <strong style="color: #155724;">✅ No visits scheduled on this date</strong>
-                </div>`;
-            }
-        }
-
-        // Upcoming visits (next 5)
-        if (data.upcoming_visits && data.upcoming_visits.length > 0) {
-            html += `<h5 style="margin: 15px 0 10px; color: #333;">📋 Upcoming Visits</h5>`;
-            data.upcoming_visits.slice(0, 5).forEach(visit => {
-                const visitDate = new Date(visit.scheduled_date).toLocaleDateString('en-IN', { day: '2-digit', month: 'short' });
-                html += `<div style="background: white; padding: 8px; border-radius: 4px; margin-bottom: 5px; font-size: 13px; display: flex; justify-content: space-between;">
-                    <span>${visitDate} - ${visit.customer_name || 'Customer'}</span>
-                    <span style="color: #666;">${visit.scheduled_time || ''}</span>
-                </div>`;
-            });
-        }
-
-        $('#cleaner-schedule-content').html(html);
-    }
 
     // Close modals
     $(document).on('click', '#schedule-visit-modal .close-modal', function () {
@@ -2157,297 +2023,14 @@
     });
 
     // ========================================
-    // MY TEAM FUNCTIONS (for Area Managers to view their Sales Managers)
-    // ========================================
-
-    function loadMyTeam() {
-        console.log('Loading my team data...');
-
-        $.ajax({
-            url: ajaxUrl,
-            type: 'POST',
-            data: {
-                action: 'get_am_team_data',
-                nonce: sp_area_dashboard_vars.get_projects_nonce
-            },
-            success: function (response) {
-                if (response.success) {
-                    renderMyTeam(response.data);
-                } else {
-                    console.error('Failed to load team data:', response);
-                    $('#my-team-sm-tbody').html('<tr><td colspan="7">Error loading team. ' + (response.data?.message || '') + '</td></tr>');
-                }
-            },
-            error: function (xhr, status, error) {
-                console.error('AJAX error loading team data:', error);
-                $('#my-team-sm-tbody').html('<tr><td colspan="7">Error loading team. Please try again.</td></tr>');
-            }
-        });
-    }
-
-    function renderMyTeam(data) {
-        // Update stats
-        const smCount = data.sales_managers?.length || 0;
-        let totalLeads = 0;
-        let totalConversions = 0;
-
-        if (data.sales_managers) {
-            data.sales_managers.forEach(sm => {
-                totalLeads += parseInt(sm.lead_count) || 0;
-                totalConversions += parseInt(sm.conversion_count) || 0;
-            });
-        }
-
-        $('#my-team-sm-count').text(smCount);
-        $('#my-team-leads-count').text(totalLeads);
-        $('#my-team-conversions-count').text(totalConversions);
-
-        // Render Sales Managers table
-        let smHtml = '';
-        if (data.sales_managers && data.sales_managers.length > 0) {
-            data.sales_managers.forEach(sm => {
-                const leads = parseInt(sm.lead_count) || 0;
-                const conversions = parseInt(sm.conversion_count) || 0;
-                const rate = leads > 0 ? ((conversions / leads) * 100).toFixed(1) : '0.0';
-                const phone = sm.phone || '-';
-                const whatsappLink = phone !== '-' ? `https://wa.me/${phone.replace(/[^0-9]/g, '')}` : '#';
-
-                smHtml += `
-                    <tr>
-                        <td><strong>${sm.display_name || 'N/A'}</strong></td>
-                        <td>${sm.email || 'N/A'}</td>
-                        <td>${phone}</td>
-                        <td>${leads}</td>
-                        <td>${conversions}</td>
-                        <td><span class="badge ${rate >= 20 ? 'badge-success' : rate >= 10 ? 'badge-warning' : 'badge-info'}">${rate}%</span></td>
-                        <td>
-                            <button class="action-btn action-btn-primary view-sm-leads" 
-                                    data-sm-id="${sm.ID}" 
-                                    data-sm-name="${sm.display_name}" 
-                                    title="View Leads">📋 View Leads</button>
-                            ${phone !== '-' ? `<a href="${whatsappLink}" target="_blank" class="action-btn action-btn-success" title="WhatsApp">📱</a>` : ''}
-                            <a href="mailto:${sm.email}" class="action-btn action-btn-info" title="Email">✉️</a>
-                        </td>
-                    </tr>
-                `;
-            });
-        } else {
-            smHtml = '<tr><td colspan="7">No Sales Managers assigned to you yet</td></tr>';
-        }
-        $('#my-team-sm-tbody').html(smHtml);
-    }
-
-    // --- SM Leads Detail Functions ---
-    let currentSmId = null;
-    let currentSmLeads = [];
-
-    // View SM Leads button click handler
-    $(document).on('click', '.view-sm-leads', function () {
-        const smId = $(this).data('sm-id');
-        const smName = $(this).data('sm-name');
-
-        currentSmId = smId;
-        $('#selected-sm-name').text(smName);
-        $('#sm-leads-detail-panel').slideDown();
-        $('#sm-leads-status-filter').val('');
-        $('#sm-leads-search').val('');
-
-        loadSmLeads(smId);
-    });
-
-    // Close SM leads panel
-    $(document).on('click', '#close-sm-leads-panel', function () {
-        $('#sm-leads-detail-panel').slideUp();
-        currentSmId = null;
-        currentSmLeads = [];
-    });
-
-    // Load SM leads
-    function loadSmLeads(smId) {
-        $('#sm-leads-tbody').html('<tr><td colspan="7">Loading leads...</td></tr>');
-
-        $.ajax({
-            url: ajaxUrl,
-            type: 'POST',
-            data: {
-                action: 'get_sm_leads_for_am',
-                sm_id: smId,
-                nonce: sp_area_dashboard_vars.get_leads_nonce
-            },
-            success: function (response) {
-                if (response.success) {
-                    currentSmLeads = response.data.leads || [];
-                    renderSmLeads(currentSmLeads);
-                } else {
-                    $('#sm-leads-tbody').html('<tr><td colspan="7">Error: ' + (response.data?.message || 'Failed to load leads') + '</td></tr>');
-                }
-            },
-            error: function () {
-                $('#sm-leads-tbody').html('<tr><td colspan="7">Error loading leads. Please try again.</td></tr>');
-            }
-        });
-    }
-
-    // Render SM leads table
-    function renderSmLeads(leads) {
-        const statusFilter = $('#sm-leads-status-filter').val();
-        const searchTerm = $('#sm-leads-search').val().toLowerCase();
-
-        let filteredLeads = leads.filter(lead => {
-            if (statusFilter && lead.status !== statusFilter) return false;
-            if (searchTerm) {
-                const searchableText = `${lead.name} ${lead.phone} ${lead.email} ${lead.city} ${lead.notes}`.toLowerCase();
-                if (!searchableText.includes(searchTerm)) return false;
-            }
-            return true;
-        });
-
-        let html = '';
-        if (filteredLeads.length > 0) {
-            filteredLeads.forEach(lead => {
-                const statusBadge = getStatusBadge(lead.status);
-                const location = [lead.city, lead.state].filter(Boolean).join(', ') || '-';
-                const createdDate = lead.created_date ? formatDate(lead.created_date) : '-';
-                const lastFollowup = lead.last_followup ? formatDate(lead.last_followup) : 'No followups';
-
-                html += `
-                    <tr>
-                        <td><strong>${lead.name || 'N/A'}</strong></td>
-                        <td>${lead.phone || '-'}</td>
-                        <td>${statusBadge}</td>
-                        <td>${location}</td>
-                        <td>${createdDate}</td>
-                        <td>${lastFollowup}</td>
-                        <td>
-                            <button class="action-btn action-btn-info view-lead-followups" 
-                                    data-lead-id="${lead.id}" 
-                                    data-lead-name="${lead.name}"
-                                    data-lead-phone="${lead.phone || ''}"
-                                    data-lead-email="${lead.email || ''}"
-                                    title="View Followups">📝 History</button>
-                            ${lead.phone ? `<a href="https://wa.me/${lead.phone.replace(/[^0-9]/g, '')}" target="_blank" class="action-btn action-btn-success" title="WhatsApp">📱</a>` : ''}
-                        </td>
-                    </tr>
-                `;
-            });
-        } else {
-            html = '<tr><td colspan="7">No leads found' + (statusFilter || searchTerm ? ' matching your filters' : '') + '</td></tr>';
-        }
-        $('#sm-leads-tbody').html(html);
-    }
-
-    // Status filter and search handlers
-    $(document).on('change', '#sm-leads-status-filter', function () {
-        renderSmLeads(currentSmLeads);
-    });
-
-    $(document).on('input', '#sm-leads-search', function () {
-        renderSmLeads(currentSmLeads);
-    });
-
-    // Helper function for status badge
-    function getStatusBadge(status) {
-        const badges = {
-            'new': '<span class="badge badge-info">New</span>',
-            'contacted': '<span class="badge badge-primary">Contacted</span>',
-            'qualified': '<span class="badge badge-warning">Qualified</span>',
-            'proposal': '<span class="badge badge-secondary">Proposal</span>',
-            'negotiation': '<span class="badge badge-warning">Negotiation</span>',
-            'converted': '<span class="badge badge-success">Converted</span>',
-            'lost': '<span class="badge badge-danger">Lost</span>'
-        };
-        return badges[status] || `<span class="badge">${status || 'Unknown'}</span>`;
-    }
-
-    // Helper function for date formatting
-    function formatDate(dateStr) {
-        if (!dateStr) return '-';
-        const date = new Date(dateStr);
-        return date.toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' });
-    }
-
-    // View Lead Followup History
-    $(document).on('click', '.view-lead-followups', function () {
-        const leadId = $(this).data('lead-id');
-        const leadName = $(this).data('lead-name');
-        const leadPhone = $(this).data('lead-phone');
-        const leadEmail = $(this).data('lead-email');
-
-        $('#followup-lead-name').text(leadName);
-        $('#followup-lead-contact').html(`📞 ${leadPhone || 'N/A'} | ✉️ ${leadEmail || 'N/A'}`);
-        $('#followup-timeline').html('<p>Loading followup history...</p>');
-        $('#lead-followup-modal').show();
-
-        $.ajax({
-            url: ajaxUrl,
-            type: 'POST',
-            data: {
-                action: 'get_lead_followup_history',
-                lead_id: leadId,
-                nonce: sp_area_dashboard_vars.get_leads_nonce
-            },
-            success: function (response) {
-                if (response.success && response.data.followups) {
-                    renderFollowupTimeline(response.data.followups);
-                } else {
-                    $('#followup-timeline').html('<p style="color: #666;">No followup records found for this lead.</p>');
-                }
-            },
-            error: function () {
-                $('#followup-timeline').html('<p style="color: red;">Error loading followup history.</p>');
-            }
-        });
-    });
-
-    // Render followup timeline
-    function renderFollowupTimeline(followups) {
-        if (!followups || followups.length === 0) {
-            $('#followup-timeline').html('<p style="color: #666;">No followup records found for this lead.</p>');
-            return;
-        }
-
-        let html = '<div class="timeline">';
-        followups.forEach((f, index) => {
-            const date = f.created_at ? formatDate(f.created_at) : 'Unknown date';
-            const icon = f.type === 'call' ? '📞' : f.type === 'email' ? '✉️' : f.type === 'whatsapp' ? '💬' : f.type === 'meeting' ? '🤝' : '📝';
-            const typeLabel = f.type ? f.type.charAt(0).toUpperCase() + f.type.slice(1) : 'Note';
-
-            html += `
-                <div class="timeline-item" style="border-left: 2px solid #007bff; padding-left: 20px; margin-bottom: 20px; position: relative;">
-                    <div style="position: absolute; left: -9px; top: 0; width: 16px; height: 16px; background: #007bff; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 10px;">${icon}</div>
-                    <div style="background: ${index === 0 ? '#e8f4fd' : '#f8f9fa'}; padding: 15px; border-radius: 8px;">
-                        <div style="display: flex; justify-content: space-between; margin-bottom: 8px;">
-                            <strong style="color: #007bff;">${typeLabel}</strong>
-                            <span style="color: #666; font-size: 12px;">${date}</span>
-                        </div>
-                        <p style="margin: 0; color: #333;">${f.notes || 'No notes'}</p>
-                        ${f.outcome ? `<p style="margin-top: 8px; font-size: 13px; color: #666;"><strong>Outcome:</strong> ${f.outcome}</p>` : ''}
-                        ${f.next_action ? `<p style="margin-top: 4px; font-size: 13px; color: #28a745;"><strong>Next Action:</strong> ${f.next_action} (${f.next_action_date ? formatDate(f.next_action_date) : 'TBD'})</p>` : ''}
-                    </div>
-                </div>
-            `;
-        });
-        html += '</div>';
-        $('#followup-timeline').html(html);
-    }
-
-    // Close followup modal
-    $(document).on('click', '[data-modal="lead-followup-modal"]', function () {
-        $('#lead-followup-modal').hide();
-    });
-    $(document).on('click', '#lead-followup-modal', function (e) {
-        if (e.target === this) $(this).hide();
-    });
-
-
-    // ========================================
-    // MANAGER-SPECIFIC FUNCTIONS (shown for manager role only)
+    // MANAGER-SPECIFIC FUNCTIONS
     // ========================================
 
     // --- Team Analysis Functions ---
     function loadTeamAnalysis() {
         console.log('Loading team analysis data...');
 
+        // Load Area Managers
         $.ajax({
             url: ajaxUrl,
             type: 'POST',
@@ -2540,7 +2123,11 @@
     // --- AM Assignment Functions ---
     function loadAMAssignments() {
         console.log('Loading AM assignments...');
+
+        // Load Area Managers for dropdown
         loadAMDropdown();
+
+        // Load current assignments table
         loadAssignmentsTable();
     }
 
@@ -2598,7 +2185,7 @@
         });
     }
 
-    // State change handler for city dropdown
+    // State change handler for city dropdown in AM assignment
     $(document).on('change', '#assign_state', function () {
         const state = $(this).val();
         if (!state) {
@@ -2606,6 +2193,7 @@
             return;
         }
 
+        // Load cities for this state
         $.ajax({
             url: ajaxUrl,
             type: 'POST',

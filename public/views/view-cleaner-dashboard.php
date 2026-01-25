@@ -64,6 +64,13 @@ $cleaner_phone = get_user_meta($current_user->ID, 'phone', true);
                 <span class="stat-label">Scheduled</span>
             </div>
         </div>
+        <div class="stat-card stat-in-progress">
+            <div class="stat-icon">⏱️</div>
+            <div class="stat-info">
+                <span class="stat-value" id="stat-in-progress">-</span>
+                <span class="stat-label">In Progress</span>
+            </div>
+        </div>
         <div class="stat-card">
             <div class="stat-icon">✅</div>
             <div class="stat-info">
@@ -83,6 +90,7 @@ $cleaner_phone = get_user_meta($current_user->ID, 'phone', true);
     <!-- Filter Tabs -->
     <div class="filter-tabs">
         <button class="filter-tab active" data-filter="scheduled">📅 Upcoming</button>
+        <button class="filter-tab" data-filter="in_progress">⏱️ In Progress</button>
         <button class="filter-tab" data-filter="today">📆 Today</button>
         <button class="filter-tab" data-filter="completed">✅ Completed</button>
         <button class="filter-tab" data-filter="">All</button>
@@ -93,18 +101,53 @@ $cleaner_phone = get_user_meta($current_user->ID, 'phone', true);
         <p>Loading visits...</p>
     </div>
 
+    <!-- Start Visit Modal -->
+    <div id="start-visit-modal" class="cleaner-modal" style="display:none;">
+        <div class="cleaner-modal-content">
+            <span class="close-modal">&times;</span>
+            <h3>🚀 Start Visit</h3>
+            <form id="start-visit-form" enctype="multipart/form-data">
+                <input type="hidden" id="start_visit_id" name="visit_id">
+                <input type="hidden" id="start_latitude" name="latitude">
+                <input type="hidden" id="start_longitude" name="longitude">
+                <?php wp_nonce_field('ksc_cleaner_start_nonce', 'cleaner_start_nonce'); ?>
+                
+                <div class="gps-status" id="start-gps-status">
+                    <div class="gps-icon">📍</div>
+                    <div class="gps-text">Fetching your location...</div>
+                </div>
+                
+                <div class="form-group">
+                    <label for="before_photo">📷 Before Photo *</label>
+                    <input type="file" id="before_photo" name="before_photo" accept="image/*" capture="environment" required>
+                    <small>Take a photo of the solar panels before cleaning</small>
+                </div>
+                
+                <button type="submit" class="btn btn-primary" style="width:100%;" id="start-visit-btn" disabled>🚀 Start Visit</button>
+            </form>
+            <div id="start-visit-feedback" style="margin-top:15px;"></div>
+        </div>
+    </div>
+
     <!-- Complete Visit Modal -->
     <div id="complete-visit-modal" class="cleaner-modal" style="display:none;">
         <div class="cleaner-modal-content">
             <span class="close-modal">&times;</span>
-            <h3>✅ Mark Visit Complete</h3>
+            <h3>✅ Complete Visit</h3>
             <form id="complete-visit-form" enctype="multipart/form-data">
                 <input type="hidden" id="complete_visit_id" name="visit_id">
+                <input type="hidden" id="complete_latitude" name="latitude">
+                <input type="hidden" id="complete_longitude" name="longitude">
                 <?php wp_nonce_field('ksc_cleaner_complete_nonce', 'cleaner_complete_nonce'); ?>
                 
+                <div class="gps-status" id="complete-gps-status">
+                    <div class="gps-icon">📍</div>
+                    <div class="gps-text">Fetching your location...</div>
+                </div>
+                
                 <div class="form-group">
-                    <label for="completion_photo">📷 Upload Completion Photo *</label>
-                    <input type="file" id="completion_photo" name="completion_photo" accept="image/*" required>
+                    <label for="after_photo">📷 After Photo *</label>
+                    <input type="file" id="after_photo" name="after_photo" accept="image/*" capture="environment" required>
                     <small>Take a photo of the cleaned solar panels</small>
                 </div>
                 
@@ -113,7 +156,7 @@ $cleaner_phone = get_user_meta($current_user->ID, 'phone', true);
                     <textarea id="completion_notes" name="completion_notes" rows="3" placeholder="Any observations about the cleaning..."></textarea>
                 </div>
                 
-                <button type="submit" class="btn btn-primary" style="width:100%;">✅ Mark Complete</button>
+                <button type="submit" class="btn btn-success" style="width:100%;" id="complete-visit-btn" disabled>✅ Complete Visit</button>
             </form>
             <div id="complete-visit-feedback" style="margin-top:15px;"></div>
         </div>
@@ -190,7 +233,7 @@ $cleaner_phone = get_user_meta($current_user->ID, 'phone', true);
 .filter-tab {
     padding: 10px 20px;
     border: 2px solid #e5e7eb;
-    background: white;
+    background: #ff7f02;
     border-radius: 8px;
     cursor: pointer;
     font-size: 14px;
@@ -394,13 +437,116 @@ $cleaner_phone = get_user_meta($current_user->ID, 'phone', true);
 }
 .team-contact { font-size: 14px; color: #6b7280; margin-top: 5px; }
 
+/* In Progress Status Styles */
+.stat-card.stat-in-progress {
+    background: linear-gradient(135deg, #fef3c7 0%, #fde68a 100%);
+}
+
+.visit-card.in_progress {
+    border-left-color: #f59e0b;
+    background: linear-gradient(135deg, #fef3c7 0%, white 100%);
+}
+
+.visit-status.in_progress {
+    background: #fef3c7;
+    color: #d97706;
+}
+
+/* GPS Status Indicator */
+.gps-status {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 15px;
+    background: #f8fafc;
+    border-radius: 10px;
+    margin-bottom: 20px;
+    border: 2px dashed #e5e7eb;
+}
+
+.gps-status.success {
+    background: #d1fae5;
+    border-color: #10b981;
+    border-style: solid;
+}
+
+.gps-status.error {
+    background: #fee2e2;
+    border-color: #ef4444;
+    border-style: solid;
+}
+
+.gps-icon {
+    font-size: 28px;
+}
+
+.gps-text {
+    font-size: 14px;
+    color: #4b5563;
+}
+
+.gps-status.success .gps-text {
+    color: #047857;
+}
+
+.gps-status.error .gps-text {
+    color: #b91c1c;
+}
+
+/* Timer Display */
+.visit-timer {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 14px;
+    font-weight: 600;
+    color: #d97706;
+    background: #fef3c7;
+    padding: 6px 12px;
+    border-radius: 20px;
+}
+
+.visit-timer .timer-value {
+    font-family: 'Courier New', monospace;
+}
+
+/* Start Visit Button */
+.btn-start {
+    background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%);
+    color: white;
+    border: none;
+    cursor: pointer;
+}
+
+.btn-start:hover {
+    opacity: 0.9;
+}
+
+/* Disabled button state */
+.btn:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+}
+
 @media (max-width: 600px) {
     .cleaner-stats {
-        grid-template-columns: 1fr;
+        grid-template-columns: repeat(2, 1fr);
     }
     
     .visit-details {
         grid-template-columns: 1fr;
+    }
+    
+    .filter-tabs {
+        overflow-x: auto;
+        flex-wrap: nowrap;
+        padding-bottom: 10px;
+    }
+    
+    .filter-tab {
+        flex-shrink: 0;
+        padding: 8px 14px;
+        font-size: 13px;
     }
 }
 </style>
@@ -409,18 +555,62 @@ $cleaner_phone = get_user_meta($current_user->ID, 'phone', true);
 jQuery(document).ready(function($) {
     const ajaxUrl = '<?php echo admin_url('admin-ajax.php'); ?>';
     let currentFilter = 'scheduled';
+    let timerIntervals = {};
+
+    // GPS Acquisition
+    function getGPSLocation(statusElementId) {
+        return new Promise((resolve, reject) => {
+            const statusEl = $(`#${statusElementId}`);
+            
+            if (!navigator.geolocation) {
+                statusEl.removeClass('success').addClass('error');
+                statusEl.find('.gps-text').text('Geolocation not supported by browser');
+                reject('Geolocation not supported');
+                return;
+            }
+
+            statusEl.find('.gps-text').text('Fetching your location...');
+            
+            navigator.geolocation.getCurrentPosition(
+                (position) => {
+                    const lat = position.coords.latitude.toFixed(6);
+                    const lng = position.coords.longitude.toFixed(6);
+                    statusEl.removeClass('error').addClass('success');
+                    statusEl.find('.gps-icon').text('✅');
+                    statusEl.find('.gps-text').text(`Location captured: ${lat}, ${lng}`);
+                    resolve({ latitude: lat, longitude: lng });
+                },
+                (error) => {
+                    let errorMsg = 'Unable to get location';
+                    if (error.code === 1) errorMsg = 'Location permission denied';
+                    else if (error.code === 2) errorMsg = 'Location unavailable';
+                    else if (error.code === 3) errorMsg = 'Location request timed out';
+                    
+                    statusEl.removeClass('success').addClass('error');
+                    statusEl.find('.gps-icon').text('❌');
+                    statusEl.find('.gps-text').text(errorMsg);
+                    reject(errorMsg);
+                },
+                { enableHighAccuracy: true, timeout: 15000, maximumAge: 0 }
+            );
+        });
+    }
 
     // Load visits
     function loadVisits(filter = '') {
         $('#visits-container').html('<p>Loading visits...</p>');
-        $('#cleaner-stats').show(); // Show stats for visits
+        $('#cleaner-stats').show();
+        
+        // Clear all timers
+        Object.keys(timerIntervals).forEach(key => clearInterval(timerIntervals[key]));
+        timerIntervals = {};
         
         $.ajax({
             url: ajaxUrl,
             type: 'POST',
             data: {
                 action: 'get_cleaning_visits',
-                status: filter === 'today' ? 'scheduled' : filter
+                status: (filter === 'today' || filter === 'in_progress') ? '' : filter
             },
             success: function(response) {
                 if (response.success) {
@@ -436,7 +626,7 @@ jQuery(document).ready(function($) {
     // Load Team
     function loadTeam() {
         $('#visits-container').html('<p>Loading team...</p>');
-        $('#cleaner-stats').hide(); // Hide stats for team view
+        $('#cleaner-stats').hide();
         
         $.ajax({
             url: ajaxUrl,
@@ -478,6 +668,29 @@ jQuery(document).ready(function($) {
         $('#visits-container').html(html);
     }
 
+    // Format elapsed time
+    function formatElapsedTime(startTimeStr) {
+        if (!startTimeStr) return '00:00:00';
+        const startTime = new Date(startTimeStr);
+        const now = new Date();
+        const diff = Math.floor((now - startTime) / 1000);
+        
+        const hours = Math.floor(diff / 3600);
+        const minutes = Math.floor((diff % 3600) / 60);
+        const seconds = diff % 60;
+        
+        return `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
+    }
+
+    // Get status display
+    function getStatusDisplay(status) {
+        switch(status) {
+            case 'completed': return '✅ Completed';
+            case 'in_progress': return '⏱️ In Progress';
+            default: return '📅 Scheduled';
+        }
+    }
+
     // Render visits
     function renderVisits(visits, filter) {
         if (!visits || visits.length === 0) {
@@ -495,15 +708,18 @@ jQuery(document).ready(function($) {
         let filtered = visits;
 
         if (filter === 'today') {
-            filtered = visits.filter(v => v.scheduled_date === today);
+            filtered = visits.filter(v => v.scheduled_date === today && v.status !== 'completed');
+        } else if (filter === 'in_progress') {
+            filtered = visits.filter(v => v.status === 'in_progress');
         }
 
         if (filtered.length === 0) {
+            let emptyMsg = filter === 'today' ? 'No visits for today' : `No ${filter || ''} visits`;
             $('#visits-container').html(`
                 <div class="empty-state">
                     <div class="icon">📋</div>
-                    <h3>No visits for today</h3>
-                    <p>Enjoy your day off! 🌞</p>
+                    <h3>${emptyMsg}</h3>
+                    <p>${filter === 'today' ? 'Enjoy your day off! 🌞' : 'Check back later.'}</p>
                 </div>
             `);
             return;
@@ -513,13 +729,38 @@ jQuery(document).ready(function($) {
         filtered.forEach(v => {
             const isToday = v.scheduled_date === today;
             const isCompleted = v.status === 'completed';
-            const cardClass = isCompleted ? 'completed' : (isToday ? 'today' : '');
+            const isInProgress = v.status === 'in_progress';
+            const isScheduled = v.status === 'scheduled';
+            
+            let cardClass = v.status;
+            if (isToday && isScheduled) cardClass = 'today';
+            
+            // Action buttons based on status
+            let actionButtons = `
+                <a href="tel:${v.customer_phone}" class="btn btn-outline">📞 Call</a>
+                <a href="https://maps.google.com/?q=${encodeURIComponent(v.customer_address || '')}" target="_blank" class="btn btn-outline">🗺️ Navigate</a>
+            `;
+            
+            if (isScheduled) {
+                actionButtons += `<button class="btn btn-start start-visit-btn" data-id="${v.id}">🚀 Start Visit</button>`;
+            } else if (isInProgress) {
+                actionButtons += `<button class="btn btn-success complete-visit-btn" data-id="${v.id}">✅ Complete</button>`;
+            }
+
+            // Timer for in-progress visits
+            let timerHtml = '';
+            if (isInProgress && v.start_time) {
+                timerHtml = `<div class="visit-timer" id="timer-${v.id}"><span>⏱️</span> <span class="timer-value">${formatElapsedTime(v.start_time)}</span></div>`;
+            }
             
             html += `
                 <div class="visit-card ${cardClass}">
                     <div class="visit-header">
                         <h3 class="visit-customer">${v.customer_name}</h3>
-                        <span class="visit-status ${v.status}">${v.status === 'completed' ? '✅ Completed' : '📅 Scheduled'}</span>
+                        <div style="display:flex;gap:8px;align-items:center;">
+                            ${timerHtml}
+                            <span class="visit-status ${v.status}">${getStatusDisplay(v.status)}</span>
+                        </div>
                     </div>
                     <div class="visit-details">
                         <div class="visit-detail">📅 ${formatDate(v.scheduled_date)}</div>
@@ -528,25 +769,34 @@ jQuery(document).ready(function($) {
                         <div class="visit-detail">📍 ${v.customer_address || 'N/A'}</div>
                     </div>
                     <div class="visit-actions">
-                        <a href="tel:${v.customer_phone}" class="btn btn-outline">📞 Call</a>
-                        <a href="https://maps.google.com/?q=${encodeURIComponent(v.customer_address || '')}" target="_blank" class="btn btn-outline">🗺️ Navigate</a>
-                        ${!isCompleted ? `<button class="btn btn-success complete-visit-btn" data-id="${v.id}">✅ Mark Complete</button>` : ''}
+                        ${actionButtons}
                     </div>
                 </div>
             `;
         });
 
         $('#visits-container').html(html);
+        
+        // Start timers for in-progress visits
+        filtered.forEach(v => {
+            if (v.status === 'in_progress' && v.start_time) {
+                timerIntervals[v.id] = setInterval(() => {
+                    $(`#timer-${v.id} .timer-value`).text(formatElapsedTime(v.start_time));
+                }, 1000);
+            }
+        });
     }
 
     // Update stats
     function updateStats(visits) {
         const today = new Date().toISOString().split('T')[0];
         const scheduled = visits.filter(v => v.status === 'scheduled').length;
+        const inProgress = visits.filter(v => v.status === 'in_progress').length;
         const completed = visits.filter(v => v.status === 'completed').length;
-        const todayVisits = visits.filter(v => v.scheduled_date === today && v.status === 'scheduled').length;
+        const todayVisits = visits.filter(v => v.scheduled_date === today && (v.status === 'scheduled' || v.status === 'in_progress')).length;
 
         $('#stat-scheduled').text(scheduled);
+        $('#stat-in-progress').text(inProgress);
         $('#stat-completed').text(completed);
         $('#stat-today').text(todayVisits);
     }
@@ -571,16 +821,99 @@ jQuery(document).ready(function($) {
         }
     });
 
-    // Open complete modal
+    // Open start visit modal
+    $(document).on('click', '.start-visit-btn', function() {
+        const visitId = $(this).data('id');
+        $('#start_visit_id').val(visitId);
+        $('#start_latitude').val('');
+        $('#start_longitude').val('');
+        $('#start-visit-btn').prop('disabled', true);
+        $('#start-gps-status').removeClass('success error');
+        $('#start-gps-status .gps-icon').text('📍');
+        $('#start-gps-status .gps-text').text('Fetching your location...');
+        $('#start-visit-feedback').html('');
+        $('#start-visit-form')[0].reset();
+        $('#start-visit-modal').show();
+        
+        // Get GPS
+        getGPSLocation('start-gps-status').then(coords => {
+            $('#start_latitude').val(coords.latitude);
+            $('#start_longitude').val(coords.longitude);
+            $('#start-visit-btn').prop('disabled', false);
+        }).catch(err => {
+            // Allow form submission even without GPS, but warn user
+            $('#start-visit-btn').prop('disabled', false);
+        });
+    });
+
+    // Open complete visit modal
     $(document).on('click', '.complete-visit-btn', function() {
         const visitId = $(this).data('id');
         $('#complete_visit_id').val(visitId);
+        $('#complete_latitude').val('');
+        $('#complete_longitude').val('');
+        $('#complete-visit-btn').prop('disabled', true);
+        $('#complete-gps-status').removeClass('success error');
+        $('#complete-gps-status .gps-icon').text('📍');
+        $('#complete-gps-status .gps-text').text('Fetching your location...');
+        $('#complete-visit-feedback').html('');
+        $('#complete-visit-form')[0].reset();
         $('#complete-visit-modal').show();
+        
+        // Get GPS
+        getGPSLocation('complete-gps-status').then(coords => {
+            $('#complete_latitude').val(coords.latitude);
+            $('#complete_longitude').val(coords.longitude);
+            $('#complete-visit-btn').prop('disabled', false);
+        }).catch(err => {
+            // Allow form submission even without GPS
+            $('#complete-visit-btn').prop('disabled', false);
+        });
     });
 
     // Close modal
     $(document).on('click', '.close-modal', function() {
         $(this).closest('.cleaner-modal').hide();
+    });
+
+    // Start visit form
+    $('#start-visit-form').on('submit', function(e) {
+        e.preventDefault();
+        
+        const form = $(this);
+        const formData = new FormData(this);
+        formData.append('action', 'start_cleaning_visit');
+
+        const feedback = $('#start-visit-feedback');
+        const submitBtn = $('#start-visit-btn');
+        
+        submitBtn.prop('disabled', true).text('Starting...');
+
+        $.ajax({
+            url: ajaxUrl,
+            type: 'POST',
+            data: formData,
+            processData: false,
+            contentType: false,
+            success: function(response) {
+                if (response.success) {
+                    feedback.html('<div style="background:#d1fae5;color:#047857;padding:12px;border-radius:8px;">🚀 Visit started! Time tracking has begun.</div>');
+                    form[0].reset();
+                    setTimeout(() => {
+                        $('#start-visit-modal').hide();
+                        loadVisits(currentFilter);
+                    }, 1500);
+                } else {
+                    feedback.html('<div style="background:#fee2e2;color:#b91c1c;padding:12px;border-radius:8px;">❌ ' + (response.data?.message || 'Error starting visit') + '</div>');
+                }
+            },
+            error: function() {
+                feedback.html('<div style="background:#fee2e2;color:#b91c1c;padding:12px;border-radius:8px;">❌ Error starting visit</div>');
+            },
+            complete: function() {
+                submitBtn.prop('disabled', false).text('🚀 Start Visit');
+            }
+        });
     });
 
     // Complete visit form
@@ -592,7 +925,7 @@ jQuery(document).ready(function($) {
         formData.append('action', 'complete_cleaning_visit');
 
         const feedback = $('#complete-visit-feedback');
-        const submitBtn = form.find('button[type="submit"]');
+        const submitBtn = $('#complete-visit-btn');
         
         submitBtn.prop('disabled', true).text('Uploading...');
 
@@ -604,21 +937,21 @@ jQuery(document).ready(function($) {
             contentType: false,
             success: function(response) {
                 if (response.success) {
-                    feedback.html('<div style="background:#d1fae5;color:#047857;padding:12px;border-radius:8px;">✅ Visit marked complete!</div>');
+                    feedback.html('<div style="background:#d1fae5;color:#047857;padding:12px;border-radius:8px;">✅ Visit completed successfully!</div>');
                     form[0].reset();
                     setTimeout(() => {
                         $('#complete-visit-modal').hide();
                         loadVisits(currentFilter);
                     }, 1500);
                 } else {
-                    feedback.html('<div style="background:#fee2e2;color:#b91c1c;padding:12px;border-radius:8px;">❌ ' + response.data.message + '</div>');
+                    feedback.html('<div style="background:#fee2e2;color:#b91c1c;padding:12px;border-radius:8px;">❌ ' + (response.data?.message || 'Error completing visit') + '</div>');
                 }
             },
             error: function() {
                 feedback.html('<div style="background:#fee2e2;color:#b91c1c;padding:12px;border-radius:8px;">❌ Error completing visit</div>');
             },
             complete: function() {
-                submitBtn.prop('disabled', false).text('✅ Mark Complete');
+                submitBtn.prop('disabled', false).text('✅ Complete Visit');
             }
         });
     });
@@ -628,3 +961,4 @@ jQuery(document).ready(function($) {
 });
 </script>
 <?php } // End of ksc_render_cleaner_dashboard_content function
+

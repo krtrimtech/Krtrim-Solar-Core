@@ -1,6 +1,7 @@
 <?php
 /**
- * Shortcode and logic for the Area Manager frontend dashboard.
+ * Shortcode and logic for the Manager frontend dashboard.
+ * Manager has multi-state access and can assign areas to Area Managers.
  */
 
 // Exit if accessed directly.
@@ -8,7 +9,7 @@ if ( ! defined( 'ABSPATH' ) ) {
     exit;
 }
 
-function sp_area_manager_dashboard_shortcode() {
+function sp_manager_dashboard_shortcode() {
     // Security check
     if ( ! is_user_logged_in() ) {
         wp_safe_redirect( wp_login_url( get_permalink() ) );
@@ -18,8 +19,13 @@ function sp_area_manager_dashboard_shortcode() {
     $current_user = wp_get_current_user();
     $user_roles   = $current_user->roles;
 
-    if ( ! in_array( 'area_manager', $user_roles, true ) && ! in_array( 'administrator', $user_roles, true ) && ! in_array( 'manager', $user_roles, true ) ) {
-        if ( in_array( 'solar_client', $user_roles, true ) || in_array( 'solar_vendor', $user_roles, true ) ) {
+    if ( ! in_array( 'manager', $user_roles, true ) && ! in_array( 'administrator', $user_roles, true ) ) {
+        // Redirect non-managers to appropriate dashboard
+        if ( in_array( 'area_manager', $user_roles, true ) ) {
+            $dashboard_url = get_permalink( get_page_by_path( 'area-manager-dashboard' ) );
+            wp_safe_redirect( $dashboard_url );
+            exit;
+        } elseif ( in_array( 'solar_client', $user_roles, true ) || in_array( 'solar_vendor', $user_roles, true ) ) {
             $dashboard_url = get_permalink( get_page_by_path( 'solar-dashboard' ) );
             wp_safe_redirect( $dashboard_url );
             exit;
@@ -69,7 +75,7 @@ function sp_area_manager_dashboard_shortcode() {
 
     ob_start();
     ?>
-    <div id="areaManagerDashboard" class="modern-solar-dashboard area-manager-dashboard">
+    <div id="managerDashboard" class="modern-solar-dashboard manager-dashboard">
         <!-- Sidebar -->
         <div class="dashboard-sidebar">
             <div class="sidebar-brand">
@@ -94,24 +100,20 @@ function sp_area_manager_dashboard_shortcode() {
                 
                 <a href="javascript:void(0)" class="nav-item" data-section="manage-cleaners"><span>🧹</span> Manage Cleaners</a>
                 <a href="javascript:void(0)" class="nav-item" data-section="cleaning-services"><span>🧼</span> Cleaning Services</a>
-                <a href="javascript:void(0)" class="nav-item" data-section="my-team"><span>👥</span> My Team</a>
                 
-                <?php if (in_array('manager', $user_roles, true) || in_array('administrator', $user_roles, true)) : ?>
-                <!-- Manager-Only Sections -->
+                <!-- Manager-Specific Sections -->
                 <div style="margin-top: 15px; border-top: 1px solid rgba(255,255,255,0.1); padding-top: 15px;">
                     <p style="font-size: 11px; text-transform: uppercase; color: rgba(255,255,255,0.5); margin-bottom: 10px; padding: 0 20px;">Manager Tools</p>
                 </div>
                 <a href="javascript:void(0)" class="nav-item" data-section="team-analysis"><span>📊</span> Team Analysis</a>
                 <a href="javascript:void(0)" class="nav-item" data-section="am-assignment"><span>🗺️</span> AM Assignment</a>
-                <?php endif; ?>
             </nav>
             <div class="sidebar-profile">
                 <div class="profile-info">
                     <h4><?php echo esc_html($user->display_name); ?></h4>
-                    <p><?php echo in_array('manager', $user_roles, true) ? 'Manager' : 'Area Manager'; ?></p>
+                    <p>Manager</p>
                 </div>
-                <?php if (in_array('manager', $user_roles, true)) : ?>
-                <!-- Assigned States for Manager -->
+                <!-- Assigned States -->
                 <div class="supervisor-info" style="margin-top: 15px; border-top: 1px solid rgba(255,255,255,0.1); padding-top: 15px;">
                     <p style="font-size: 11px; text-transform: uppercase; color: rgba(255,255,255,0.6); margin-bottom: 5px;">Assigned States</p>
                     <?php
@@ -123,33 +125,6 @@ function sp_area_manager_dashboard_shortcode() {
                     }
                     ?>
                 </div>
-                <?php else : ?>
-                <!-- Supervisor Contact for Area Manager -->
-                <div class="supervisor-info" style="margin-top: 15px; border-top: 1px solid rgba(255,255,255,0.1); padding-top: 15px;">
-                    <p style="font-size: 11px; text-transform: uppercase; color: rgba(255,255,255,0.6); margin-bottom: 5px;">My Supervisor</p>
-                    <?php
-                    $supervisor_ids = get_user_meta($user->ID, '_supervisor_ids', true);
-                    if (!empty($supervisor_ids) && is_array($supervisor_ids)) {
-                        foreach ($supervisor_ids as $sup_id) {
-                            $supervisor = get_userdata($sup_id);
-                            if ($supervisor) {
-                                echo '<div style="margin-bottom: 8px;">';
-                                echo '<p style="font-size: 13px; margin-bottom: 1px; font-weight: 500;">' . esc_html($supervisor->display_name) . '</p>';
-                                echo '<p style="font-size: 12px; opacity: 0.8; margin-bottom: 2px;">' . esc_html($supervisor->user_email) . '</p>';
-                                $sup_phone = get_user_meta($supervisor->ID, 'phone_number', true);
-                                if ($sup_phone) {
-                                    $whatsapp_url = 'https://wa.me/' . str_replace(['+', ' '], '', $sup_phone);
-                                    echo '<p style="font-size: 12px;"><a href="' . esc_url($whatsapp_url) . '" target="_blank" style="color: #4CAF50; text-decoration: none;">📱 ' . esc_html($sup_phone) . '</a></p>';
-                                }
-                                echo '</div>';
-                            }
-                        }
-                    } else {
-                        echo '<p style="font-size: 12px; opacity: 0.8;">No supervisor assigned</p>';
-                    }
-                    ?>
-                </div>
-                <?php endif; ?>
                 <a href="<?php echo wp_logout_url(home_url()); ?>" class="logout-btn" title="Logout">🚪</a>
             </div>
         </div>
@@ -264,8 +239,7 @@ function sp_area_manager_dashboard_shortcode() {
                     </div>
 
 
-
-            </section>
+                </section>
 
                 <!-- Projects List Section -->
                 <section id="projects-section" class="section-content" style="display:none;">
@@ -657,78 +631,6 @@ function sp_area_manager_dashboard_shortcode() {
                             <p>Loading cleaners...</p>
                         </div>
                     </div>
-
-                    <!-- Enhanced Cleaner Detail Modal -->
-                    <div id="cleaner-detail-modal" class="modal-overlay" style="display: none; position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.85); z-index: 10000; justify-content: center; align-items: center; overflow-y: auto;">
-                        <div class="modal-box" style="background: #fff; border-radius: 12px; width: 90%; max-width: 800px; max-height: 90vh; overflow-y: auto; position: relative; animation: slideIn 0.3s ease-out;">
-                            <button id="close-cleaner-modal" style="position: absolute; top: 15px; right: 20px; background: none; border: none; font-size: 28px; cursor: pointer; color: #666; z-index: 10;">&times;</button>
-                            
-                            <!-- Modal Header -->
-                            <div style="background: linear-gradient(135deg, #1e3c72 0%, #2a5298 100%); padding: 30px; color: white; border-radius: 12px 12px 0 0;">
-                                <div style="display: flex; gap: 20px; align-items: center;">
-                                    <div style="position: relative;">
-                                        <img id="modal-cleaner-photo" src="" alt="Cleaner Photo" style="width: 100px; height: 100px; border-radius: 50%; border: 4px solid white; object-fit: cover; background: #eee;">
-                                    </div>
-                                    <div>
-                                        <h2 id="modal-cleaner-name" style="margin: 0; font-size: 24px;"></h2>
-                                        <p id="modal-cleaner-role" style="margin: 5px 0 0; opacity: 0.9; font-size: 14px;">Solar Cleaner</p>
-                                    </div>
-                                </div>
-                            </div>
-
-                            <!-- Modal Content -->
-                            <div style="padding: 30px;">
-                                <div style="display: grid; grid-template-columns: 1fr 1.5fr; gap: 30px;">
-                                    <!-- Left Column: Details -->
-                                    <div>
-                                        <h3 style="border-bottom: 2px solid #eee; padding-bottom: 10px; margin-top: 0;">📋 Personal Details</h3>
-                                        <div style="margin-bottom: 20px;">
-                                            <label style="display: block; color: #666; font-size: 12px; font-weight: 600; text-transform: uppercase;">Phone Number</label>
-                                            <p id="modal-cleaner-phone" style="font-size: 16px; margin: 5px 0 0; font-weight: 500;"></p>
-                                        </div>
-                                        <div style="margin-bottom: 20px;">
-                                            <label style="display: block; color: #666; font-size: 12px; font-weight: 600; text-transform: uppercase;">Email</label>
-                                            <p id="modal-cleaner-email" style="font-size: 16px; margin: 5px 0 0;"></p>
-                                        </div>
-                                        <div style="margin-bottom: 20px;">
-                                            <label style="display: block; color: #666; font-size: 12px; font-weight: 600; text-transform: uppercase;">Address</label>
-                                            <p id="modal-cleaner-address" style="font-size: 16px; margin: 5px 0 0; color: #444; line-height: 1.5;"></p>
-                                        </div>
-                                        <div>
-                                            <label style="display: block; color: #666; font-size: 12px; font-weight: 600; text-transform: uppercase;">Aadhaar Number</label>
-                                            <p id="modal-cleaner-aadhaar" style="font-size: 16px; margin: 5px 0 0; letter-spacing: 1px;"></p>
-                                        </div>
-                                    </div>
-
-                                    <!-- Right Column: Documents -->
-                                    <div>
-                                        <h3 style="border-bottom: 2px solid #eee; padding-bottom: 10px; margin-top: 0;">🆔 Documents</h3>
-                                        <div style="background: #f8f9fa; padding: 20px; border-radius: 8px; text-align: center;">
-                                            <p style="margin: 0 0 10px; font-weight: 600; color: #555;">Aadhaar Card Preview</p>
-                                            <img id="modal-cleaner-aadhaar-img" src="" alt="Aadhaar Card" style="max-width: 100%; border-radius: 4px; box-shadow: 0 2px 8px rgba(0,0,0,0.1); cursor: pointer;" onclick="window.open(this.src, '_blank')">
-                                            <p style="margin-top: 10px; font-size: 12px; color: #888;">Click image to view full size</p>
-                                        </div>
-                                    </div>
-                                </div>
-
-                                <!-- Action Buttons -->
-                                <div style="margin-top: 30px; pt: 20px; border-top: 1px solid #eee; display: flex; justify-content: flex-end; gap: 15px;">
-                                    <button id="edit-cleaner-btn" class="btn btn-primary" style="background: #f0ad4e; border-color: #eea236;">✏️ Edit Profile</button>
-                                    <button class="btn btn-secondary" onclick="document.getElementById('cleaner-detail-modal').style.display='none'">Close</button>
-                                </div>
-                            </div>
-                        </div>
-                        </div>
-                    </div>
-
-                    <!-- Activity Feed Widget -->
-                    <div class="card" style="margin-top: 25px;">
-                        <h3 style="margin-bottom: 20px;">🔔 Recent Team Activity</h3>
-                        <div id="team-activity-feed" style="max-height: 400px; overflow-y: auto;">
-                            <!-- Activity items will be loaded here -->
-                            <p style="text-align: center; color: #666; padding: 20px;">Loading activity...</p>
-                        </div>
-                    </div>
                 </section>
 
                 <!-- Cleaning Services Section -->
@@ -772,129 +674,6 @@ function sp_area_manager_dashboard_shortcode() {
                     </div>
                 </section>
 
-                <!-- My Team Section (for all AMs - shows assigned Sales Managers) -->
-                <section id="my-team-section" class="section-content" style="display:none;">
-                    <div class="section-header">
-                        <h2 class="section-title">👥 My Team</h2>
-                        <p style="color: #666; margin-top: 8px;">View Sales Managers assigned to you and their performance</p>
-                    </div>
-                    
-                    <!-- Team Stats -->
-                    <div class="stats-grid" style="margin-bottom: 30px;">
-                        <div class="stat-card">
-                            <div class="stat-icon">👥</div>
-                            <div class="stat-details">
-                                <h3 id="my-team-sm-count">0</h3>
-                                <span>Sales Managers</span>
-                            </div>
-                        </div>
-                        <div class="stat-card stat-info">
-                            <div class="stat-icon">🎯</div>
-                            <div class="stat-details">
-                                <h3 id="my-team-leads-count">0</h3>
-                                <span>Total Leads</span>
-                            </div>
-                        </div>
-                        <div class="stat-card stat-success">
-                            <div class="stat-icon">✅</div>
-                            <div class="stat-details">
-                                <h3 id="my-team-conversions-count">0</h3>
-                                <span>Conversions</span>
-                            </div>
-                        </div>
-                    </div>
-                    
-                    <!-- Sales Managers Table -->
-                    <div class="card" style="margin-bottom: 20px;">
-                        <h3>👥 My Sales Managers</h3>
-                        <p style="color: #666; font-size: 14px; margin-bottom: 15px;">Click on "View Leads" to see all leads and activities for each Sales Manager</p>
-                        <div class="table-responsive">
-                            <table class="data-table" id="my-team-sm-table">
-                                <thead>
-                                    <tr>
-                                        <th>Name</th>
-                                        <th>Email</th>
-                                        <th>Phone</th>
-                                        <th>Leads</th>
-                                        <th>Conversions</th>
-                                        <th>Conversion Rate</th>
-                                        <th>Actions</th>
-                                    </tr>
-                                </thead>
-                                <tbody id="my-team-sm-tbody">
-                                    <tr><td colspan="7">Loading your sales team...</td></tr>
-                                </tbody>
-                            </table>
-                        </div>
-                    </div>
-                    
-                    <!-- SM Leads Detail Panel (hidden until SM is selected) -->
-                    <div id="sm-leads-detail-panel" class="card" style="display: none;">
-                        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
-                            <h3 id="sm-leads-title">📋 Leads for: <span id="selected-sm-name"></span></h3>
-                            <button type="button" class="btn btn-secondary" id="close-sm-leads-panel" style="padding: 8px 15px;">✕ Close</button>
-                        </div>
-                        
-                        <!-- Leads Filter -->
-                        <div class="filter-row" style="display: flex; gap: 15px; flex-wrap: wrap; margin-bottom: 20px;">
-                            <select id="sm-leads-status-filter" style="padding: 10px; border: 1px solid #ddd; border-radius: 6px; min-width: 150px;">
-                                <option value="">All Statuses</option>
-                                <option value="new">New</option>
-                                <option value="contacted">Contacted</option>
-                                <option value="qualified">Qualified</option>
-                                <option value="proposal">Proposal Sent</option>
-                                <option value="negotiation">Negotiation</option>
-                                <option value="converted">Converted</option>
-                                <option value="lost">Lost</option>
-                            </select>
-                            <input type="text" id="sm-leads-search" placeholder="Search leads..." 
-                                   style="padding: 10px; border: 1px solid #ddd; border-radius: 6px; flex: 1; min-width: 200px;">
-                        </div>
-                        
-                        <!-- Leads Table -->
-                        <div class="table-responsive">
-                            <table class="data-table" id="sm-leads-table">
-                                <thead>
-                                    <tr>
-                                        <th>Lead Name</th>
-                                        <th>Phone</th>
-                                        <th>Status</th>
-                                        <th>Location</th>
-                                        <th>Created</th>
-                                        <th>Last Followup</th>
-                                        <th>Actions</th>
-                                    </tr>
-                                </thead>
-                                <tbody id="sm-leads-tbody">
-                                    <tr><td colspan="7">Select a Sales Manager to view leads...</td></tr>
-                                </tbody>
-                            </table>
-                        </div>
-                    </div>
-                    
-                    <!-- Lead Followup History Modal -->
-                    <div id="lead-followup-modal" class="modal" style="display: none;">
-                        <div class="modal-content" style="max-width: 700px;">
-                            <div class="modal-header">
-                                <h3>📞 Lead Followup History</h3>
-                                <span class="close-modal" data-modal="lead-followup-modal">&times;</span>
-                            </div>
-                            <div class="modal-body">
-                                <div id="lead-info-header" style="background: #f8f9fa; padding: 15px; border-radius: 8px; margin-bottom: 20px;">
-                                    <h4 id="followup-lead-name" style="margin-bottom: 8px;"></h4>
-                                    <p id="followup-lead-contact" style="color: #666; font-size: 14px;"></p>
-                                </div>
-                                <h4 style="margin-bottom: 15px;">📝 Activity Timeline</h4>
-                                <div id="followup-timeline" style="max-height: 400px; overflow-y: auto;">
-                                    <p>Loading followup history...</p>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                </section>
-
-
-                <?php if (in_array('manager', $user_roles, true) || in_array('administrator', $user_roles, true)) : ?>
                 <!-- Team Analysis Section (Manager Only) -->
                 <section id="team-analysis-section" class="section-content" style="display:none;">
                     <div class="section-header">
@@ -1063,7 +842,6 @@ function sp_area_manager_dashboard_shortcode() {
                         </div>
                     </div>
                 </section>
-                <?php endif; ?>
 
                 <!-- Reset Password Modal -->
                 <div id="reset-password-modal" class="modal" style="display:none;">
@@ -1159,47 +937,34 @@ function sp_area_manager_dashboard_shortcode() {
 
     <!-- Schedule Visit Modal -->
     <div id="schedule-visit-modal" class="modal" style="display:none;">
-        <div class="modal-content" style="max-width: 700px;">
+        <div class="modal-content" style="max-width: 500px;">
             <span class="close-modal">&times;</span>
             <h3>+ Schedule Cleaning Visit</h3>
-            <div style="display: flex; gap: 20px; flex-wrap: wrap;">
-                <!-- Left: Form -->
-                <div style="flex: 1; min-width: 280px;">
-                    <form id="schedule-visit-form">
-                        <input type="hidden" id="schedule_service_id">
-                        <div class="form-group">
-                            <label>Customer</label>
-                            <p id="schedule_customer_name" style="font-weight: 600; margin: 5px 0;"></p>
-                        </div>
-                        <div class="form-group">
-                            <label for="schedule_cleaner_id">Select Cleaner *</label>
-                            <select id="schedule_cleaner_id" name="cleaner_id" required style="width: 100%; padding: 10px; border: 1px solid #ddd; border-radius: 6px;">
-                                <option value="">Loading cleaners...</option>
-                            </select>
-                        </div>
-                        <div class="form-row" style="display: flex; gap: 15px;">
-                            <div class="form-group" style="flex: 1;">
-                                <label for="schedule_date">Date *</label>
-                                <input type="date" id="schedule_date" name="scheduled_date" required style="width: 100%; padding: 10px; border: 1px solid #ddd; border-radius: 6px;">
-                            </div>
-                            <div class="form-group" style="flex: 1;">
-                                <label for="schedule_time">Time *</label>
-                                <input type="time" id="schedule_time" name="scheduled_time" value="09:00" required style="width: 100%; padding: 10px; border: 1px solid #ddd; border-radius: 6px;">
-                            </div>
-                        </div>
-                        <button type="submit" class="btn btn-primary" style="width: 100%; margin-top: 10px;">+ Schedule Visit</button>
-                        <div id="schedule-visit-feedback" style="margin-top: 15px;"></div>
-                    </form>
+            <form id="schedule-visit-form">
+                <input type="hidden" id="schedule_service_id">
+                <div class="form-group">
+                    <label>Customer</label>
+                    <p id="schedule_customer_name" style="font-weight: 600; margin: 5px 0;"></p>
                 </div>
-                
-                <!-- Right: Cleaner Schedule Preview -->
-                <div id="cleaner-schedule-preview" style="flex: 1; min-width: 280px; background: #f8f9fa; border-radius: 8px; padding: 15px; display: none;">
-                    <h4 style="margin-bottom: 15px; color: #333;">📅 <span id="preview-cleaner-name">Cleaner's</span> Schedule</h4>
-                    <div id="cleaner-schedule-content">
-                        <p style="color: #666; font-size: 14px;">Select a cleaner to view their schedule</p>
+                <div class="form-group">
+                    <label for="schedule_cleaner_id">Select Cleaner *</label>
+                    <select id="schedule_cleaner_id" name="cleaner_id" required style="width: 100%; padding: 10px; border: 1px solid #ddd; border-radius: 6px;">
+                        <option value="">Loading cleaners...</option>
+                    </select>
+                </div>
+                <div class="form-row" style="display: flex; gap: 15px;">
+                    <div class="form-group" style="flex: 1;">
+                        <label for="schedule_date">Date *</label>
+                        <input type="date" id="schedule_date" name="scheduled_date" required style="width: 100%; padding: 10px; border: 1px solid #ddd; border-radius: 6px;">
+                    </div>
+                    <div class="form-group" style="flex: 1;">
+                        <label for="schedule_time">Time *</label>
+                        <input type="time" id="schedule_time" name="scheduled_time" value="09:00" required style="width: 100%; padding: 10px; border: 1px solid #ddd; border-radius: 6px;">
                     </div>
                 </div>
-            </div>
+                <button type="submit" class="btn btn-primary" style="width: 100%; margin-top: 10px;">+ Schedule Visit</button>
+                <div id="schedule-visit-feedback" style="margin-top: 15px;"></div>
+            </form>
         </div>
     </div>
 

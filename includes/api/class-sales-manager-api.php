@@ -46,7 +46,8 @@ class KSC_Sales_Manager_API {
         $user = wp_get_current_user();
         return in_array('sales_manager', (array) $user->roles) || 
                in_array('administrator', (array) $user->roles) ||
-               in_array('manager', (array) $user->roles);
+               in_array('manager', (array) $user->roles) ||
+               in_array('area_manager', (array) $user->roles);
     }
 
     /**
@@ -384,9 +385,29 @@ class KSC_Sales_Manager_API {
             wp_send_json_error(['message' => 'All fields are required']);
         }
 
-        // Verify lead exists and SM has access
-        $created_by = get_post_meta($lead_id, '_created_by_sales_manager', true);
-        if ($created_by != $user_id && !current_user_can('administrator')) {
+        // Verify lead exists and user has access
+        $created_by_sm = get_post_meta($lead_id, '_created_by_sales_manager', true);
+        $lead_post = get_post($lead_id);
+        $post_author = $lead_post ? $lead_post->post_author : 0;
+        
+        $has_access = false;
+        
+        // 1. Owner (Creator) or Admin or Manager
+        if ($created_by_sm == $user_id || $post_author == $user_id || current_user_can('administrator') || in_array('manager', (array) wp_get_current_user()->roles)) {
+            $has_access = true;
+        } 
+        // 2. Area Manager supervising the Creator (SM)
+        elseif (in_array('area_manager', (array) wp_get_current_user()->roles)) {
+            // If created by SM, check if AM supervises them
+            if ($created_by_sm) {
+                $assigned_am = get_user_meta($created_by_sm, '_assigned_area_manager', true);
+                if ($assigned_am == $user_id) {
+                    $has_access = true;
+                }
+            }
+        }
+
+        if (!$has_access) {
             wp_send_json_error(['message' => 'Access denied']);
         }
 

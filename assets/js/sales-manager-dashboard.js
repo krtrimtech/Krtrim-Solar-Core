@@ -136,6 +136,7 @@
         const titles = {
             'dashboard': 'Dashboard',
             'my-leads': 'Leads',
+            'cleaning-services': 'Cleaning Services',
             'conversions': 'My Conversions'
         };
         $('#section-title').text(titles[section] || 'Dashboard');
@@ -155,6 +156,9 @@
                 break;
             case 'conversions':
                 loadConversions();
+                break;
+            case 'cleaning-services':
+                loadSMCleaningServices();
                 break;
         }
     }
@@ -733,6 +737,288 @@
             clearTimeout(timeout);
             timeout = setTimeout(later, wait);
         };
+    }
+
+    // ===============================
+    // CLEANING SERVICES FUNCTIONALITY
+    // ===============================
+
+    let smCleanersList = [];
+
+    function loadSMCleaningServices() {
+        const tbody = $('#sm-cleaning-services-tbody');
+        tbody.html('<tr><td colspan="6">Loading...</td></tr>');
+
+        $.ajax({
+            url: sm_vars.ajax_url,
+            type: 'POST',
+            data: { action: 'get_cleaning_services' },
+            success: function (response) {
+                if (response.success) {
+                    renderSMCleaningServices(response.data);
+                } else {
+                    tbody.html('<tr><td colspan="6">Error loading services</td></tr>');
+                }
+            },
+            error: function () {
+                tbody.html('<tr><td colspan="6">Error loading services</td></tr>');
+            }
+        });
+
+        // Load cleaners for scheduling
+        loadSMCleaners();
+    }
+
+    function loadSMCleaners() {
+        $.ajax({
+            url: sm_vars.ajax_url,
+            type: 'POST',
+            data: { action: 'get_cleaners' },
+            success: function (response) {
+                if (response.success) {
+                    smCleanersList = response.data;
+                }
+            }
+        });
+    }
+
+    function renderSMCleaningServices(services) {
+        const tbody = $('#sm-cleaning-services-tbody');
+
+        if (!services || services.length === 0) {
+            tbody.html('<tr><td colspan="6">No cleaning services from your leads yet.</td></tr>');
+            return;
+        }
+
+        const planLabels = {
+            'one_time': 'One-Time',
+            'monthly': 'Monthly',
+            '6_month': '6-Month',
+            'yearly': 'Yearly'
+        };
+
+        let html = '';
+        services.forEach(s => {
+            const paymentBadge = s.payment_status === 'paid'
+                ? '<span style="background:#d1fae5;color:#047857;padding:4px 8px;border-radius:4px;">Paid</span>'
+                : '<span style="background:#fef3c7;color:#b45309;padding:4px 8px;border-radius:4px;">Pending</span>';
+
+            html += `
+                <tr class="sm-cleaning-service-row" data-id="${s.id}" style="cursor:pointer;">
+                    <td><strong>${s.customer_name}</strong><br><small>${s.customer_phone}</small></td>
+                    <td>${planLabels[s.plan_type] || s.plan_type}</td>
+                    <td>${s.system_size_kw} kW</td>
+                    <td>${s.visits_used || 0}/${s.visits_total || 1}</td>
+                    <td>${paymentBadge}</td>
+                    <td>
+                        ${s.next_visit_date
+                    ? `<span style="color:#4f46e5;">✓ ${s.next_visit_date}</span>`
+                    : s.preferred_date
+                        ? `<span style="color:#b45309;">⏳ ${s.preferred_date}</span><br><button class="btn btn-sm sm-schedule-visit-btn" data-id="${s.id}" data-name="${s.customer_name}">+ Schedule</button>`
+                        : `<button class="btn btn-sm sm-schedule-visit-btn" data-id="${s.id}" data-name="${s.customer_name}">+ Schedule</button>`}
+                    </td>
+                </tr>
+            `;
+        });
+        tbody.html(html);
+    }
+
+    // Open schedule visit modal for SM
+    $(document).on('click', '.sm-schedule-visit-btn', function (e) {
+        e.preventDefault();
+        e.stopPropagation();
+
+        const serviceId = $(this).data('id');
+        const customerName = $(this).data('name');
+
+        $('#schedule_service_id').val(serviceId);
+        $('#schedule_customer_name').text(customerName);
+
+        // Set minimum date to today
+        const today = new Date().toISOString().split('T')[0];
+        $('#schedule_date').attr('min', today).val(today);
+
+        // Populate cleaners dropdown
+        const select = $('#schedule_cleaner_id');
+        select.empty().append('<option value="">Select Cleaner</option>');
+        smCleanersList.forEach(cleaner => {
+            select.append(`<option value="${cleaner.id}">${cleaner.name} (📞 ${cleaner.phone})</option>`);
+        });
+
+        $('#schedule-visit-feedback').html('');
+        $('#schedule-visit-modal').show();
+    });
+
+    // Close modals
+    $(document).on('click', '#schedule-visit-modal .close-modal', function () {
+        $('#schedule-visit-modal').hide();
+    });
+
+    $(document).on('click', '#service-detail-modal .close-modal', function () {
+        $('#service-detail-modal').hide();
+    });
+
+    // Submit schedule visit form
+    $('#schedule-visit-form').on('submit', function (e) {
+        e.preventDefault();
+
+        const form = $(this);
+        const feedback = $('#schedule-visit-feedback');
+        const submitBtn = form.find('button[type="submit"]');
+
+        const serviceId = $('#schedule_service_id').val();
+        const cleanerId = $('#schedule_cleaner_id').val();
+        const scheduledDate = $('#schedule_date').val();
+        const scheduledTime = $('#schedule_time').val();
+
+        if (!cleanerId) {
+            feedback.html('<div style="background:#f8d7da;color:#721c24;padding:10px;border-radius:6px;">Please select a cleaner</div>');
+            return;
+        }
+
+        submitBtn.prop('disabled', true).text('Scheduling...');
+        feedback.html('');
+
+        $.ajax({
+            url: sm_vars.ajax_url,
+            type: 'POST',
+            data: {
+                action: 'schedule_cleaning_visit',
+                service_id: serviceId,
+                cleaner_id: cleanerId,
+                scheduled_date: scheduledDate,
+                scheduled_time: scheduledTime
+            },
+            success: function (response) {
+                if (response.success) {
+                    feedback.html('<div style="background:#d4edda;color:#155724;padding:10px;border-radius:6px;">✅ ' + response.data.message + '</div>');
+                    showToast('Visit scheduled successfully!', 'success');
+
+                    setTimeout(() => {
+                        $('#schedule-visit-modal').hide();
+                        form[0].reset();
+                        loadSMCleaningServices();
+                    }, 1500);
+                } else {
+                    feedback.html('<div style="background:#f8d7da;color:#721c24;padding:10px;border-radius:6px;">❌ ' + response.data.message + '</div>');
+                }
+            },
+            error: function () {
+                feedback.html('<div style="background:#f8d7da;color:#721c24;padding:10px;border-radius:6px;">❌ Error scheduling visit</div>');
+            },
+            complete: function () {
+                submitBtn.prop('disabled', false).text('+ Schedule Visit');
+            }
+        });
+    });
+
+    // Click on service row to view details
+    $(document).on('click', '.sm-cleaning-service-row', function (e) {
+        if ($(e.target).is('button') || $(e.target).closest('button').length) {
+            return;
+        }
+
+        const serviceId = $(this).data('id');
+        loadSMServiceDetails(serviceId);
+    });
+
+    function loadSMServiceDetails(serviceId) {
+        const content = $('#service-detail-content');
+        content.html('<p>Loading...</p>');
+        $('#service-detail-modal').show();
+
+        $.ajax({
+            url: sm_vars.ajax_url,
+            type: 'POST',
+            data: {
+                action: 'get_cleaning_service_details',
+                service_id: serviceId
+            },
+            success: function (response) {
+                if (response.success) {
+                    const s = response.data.service;
+                    const visits = response.data.visits || [];
+                    const planLabels = {
+                        'one_time': 'One-Time',
+                        'monthly': 'Monthly',
+                        '6_month': '6-Month',
+                        'yearly': 'Yearly'
+                    };
+
+                    let html = `
+                        <div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 15px; margin-bottom: 20px;">
+                            <div style="background: #f8f9fa; padding: 15px; border-radius: 8px;">
+                                <strong>👤 Customer</strong><br>
+                                ${s.customer_name}<br>
+                                <small>📞 ${s.customer_phone}</small>
+                            </div>
+                            <div style="background: #f8f9fa; padding: 15px; border-radius: 8px;">
+                                <strong>📋 Plan</strong><br>
+                                ${planLabels[s.plan_type] || s.plan_type}<br>
+                                <small>${s.system_size_kw} kW System</small>
+                            </div>
+                            <div style="background: #f8f9fa; padding: 15px; border-radius: 8px;">
+                                <strong>🧹 Visits</strong><br>
+                                ${s.visits_used || 0} / ${s.visits_total || 1} Used
+                            </div>
+                            <div style="background: #f8f9fa; padding: 15px; border-radius: 8px;">
+                                <strong>💰 Payment</strong><br>
+                                ₹${Number(s.total_amount || 0).toLocaleString()}<br>
+                                <small style="color: ${s.payment_status === 'paid' ? '#047857' : '#b45309'}">${s.payment_status === 'paid' ? '✅ Paid' : '⏳ Pending'}</small>
+                            </div>
+                        </div>
+                        
+                        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
+                            <h4 style="margin: 0;">🗓️ Visit History</h4>
+                            ${(s.visits_used < s.visits_total) ? `<button class="btn btn-primary sm-schedule-visit-btn" data-id="${serviceId}" data-name="${s.customer_name}" style="padding: 8px 15px;">+ Schedule Visit</button>` : ''}
+                        </div>
+                    `;
+
+                    if (visits && visits.length > 0) {
+                        html += '<table style="width: 100%; border-collapse: collapse;">';
+                        html += '<thead><tr style="background: #f1f5f9;"><th style="padding: 10px; text-align: left;">Date</th><th style="padding: 10px; text-align: left;">Time</th><th style="padding: 10px; text-align: left;">Cleaner</th><th style="padding: 10px; text-align: left;">Status</th></tr></thead>';
+                        html += '<tbody>';
+
+                        visits.forEach(visit => {
+                            const statusColors = {
+                                'scheduled': '#fef3c7',
+                                'completed': '#d1fae5',
+                                'cancelled': '#fee2e2'
+                            };
+                            const statusIcons = {
+                                'scheduled': '⏳',
+                                'completed': '✅',
+                                'cancelled': '❌'
+                            };
+
+                            html += `
+                                <tr style="border-bottom: 1px solid #e5e7eb;">
+                                    <td style="padding: 10px;">${visit.scheduled_date}</td>
+                                    <td style="padding: 10px;">${visit.scheduled_time || '09:00'}</td>
+                                    <td style="padding: 10px;">${visit.cleaner_name || 'Not assigned'}</td>
+                                    <td style="padding: 10px;">
+                                        <span style="background: ${statusColors[visit.status] || '#e5e7eb'}; padding: 4px 10px; border-radius: 4px;">
+                                            ${statusIcons[visit.status] || '❓'} ${visit.status}
+                                        </span>
+                                    </td>
+                                </tr>
+                            `;
+                        });
+
+                        html += '</tbody></table>';
+                    } else {
+                        html += '<p style="color: #666; text-align: center; padding: 20px;">No visits scheduled yet.</p>';
+                    }
+
+                    content.html(html);
+                } else {
+                    content.html('<p style="color: red;">Error loading service details.</p>');
+                }
+            },
+            error: function () {
+                content.html('<p style="color: red;">Error loading service details.</p>');
+            }
+        });
     }
 
 })(jQuery);

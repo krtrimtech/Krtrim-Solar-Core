@@ -503,6 +503,27 @@ class SP_Admin_Widgets {
             ];
         }
 
+        // ✅ RECENT ACTIVITY LOGS (Cleaner & System Actions)
+        $logs_table = $wpdb->prefix . 'solar_activity_logs';
+        $recent_logs = $wpdb->get_results(
+            "SELECT * FROM {$logs_table} 
+            ORDER BY created_at DESC 
+            LIMIT 10"
+        );
+
+        foreach ($recent_logs as $log) {
+            $icon = '📝';
+            if (strpos($log->action_type, 'create') !== false) $icon = '🆕';
+            if (strpos($log->action_type, 'delete') !== false) $icon = '🗑️';
+            if (strpos($log->action_type, 'update') !== false) $icon = '✏️';
+
+            $activities[] = [
+                'icon' => $icon,
+                'text' => sprintf('%s by %s: %s', ucfirst(str_replace('_', ' ', $log->action_type)), ucfirst($log->user_role), $log->details),
+                'time' => strtotime($log->created_at)
+            ];
+        }
+
         // Sort by time
         usort($activities, function($a, $b) {
             return $b['time'] - $a['time'];

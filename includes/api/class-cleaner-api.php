@@ -30,7 +30,7 @@ class KSC_Cleaner_API {
     }
 
     /**
-     * Verify Area Manager or Admin access
+     * Verify Area Manager, Sales Manager, or Admin access
      */
     private function verify_am_access() {
         if (!is_user_logged_in()) {
@@ -39,7 +39,8 @@ class KSC_Cleaner_API {
         $user = wp_get_current_user();
         return in_array('area_manager', (array) $user->roles) || 
                in_array('administrator', (array) $user->roles) ||
-               in_array('manager', (array) $user->roles);
+               in_array('manager', (array) $user->roles) ||
+               in_array('sales_manager', (array) $user->roles);
     }
 
     /**
@@ -130,6 +131,11 @@ class KSC_Cleaner_API {
         if ($am_state) update_user_meta($user_id, 'state', $am_state);
         if ($am_city) update_user_meta($user_id, 'city', $am_city);
 
+        // Log Activity
+        $current_user = wp_get_current_user();
+        $role = in_array('administrator', $current_user->roles) ? 'administrator' : 'area_manager';
+        $this->log_activity($current_user->ID, $role, 'create_cleaner', $user_id, $name, 'Created new cleaner account');
+
         wp_send_json_success([
             'message' => 'Cleaner account created successfully',
             'cleaner_id' => $user_id,
@@ -175,47 +181,7 @@ class KSC_Cleaner_API {
     /**
      * Get cleaners for current Area Manager
      */
-    public function get_cleaners() {
-        if (!$this->verify_am_access()) {
-            wp_send_json_error(['message' => 'Unauthorized access']);
-        }
 
-        $current_user = wp_get_current_user();
-        
-        // Admin sees all cleaners, AM sees only their own
-        $meta_query = [];
-        if (!in_array('administrator', (array) $current_user->roles) && !in_array('manager', (array) $current_user->roles)) {
-            $meta_query[] = [
-                'key' => '_supervised_by_area_manager',
-                'value' => get_current_user_id(),
-            ];
-        }
-
-        $cleaners = get_users([
-            'role' => 'solar_cleaner',
-            'meta_query' => $meta_query,
-            'orderby' => 'display_name',
-            'order' => 'ASC',
-        ]);
-
-        $result = [];
-        foreach ($cleaners as $cleaner) {
-            $result[] = [
-                'id' => $cleaner->ID,
-                'name' => $cleaner->display_name,
-                'phone' => get_user_meta($cleaner->ID, 'phone', true),
-                'email' => $cleaner->user_email,
-                'aadhaar' => get_user_meta($cleaner->ID, '_aadhaar_number', true),
-                'photo_url' => get_user_meta($cleaner->ID, '_photo_url', true),
-                'address' => get_user_meta($cleaner->ID, '_cleaner_address', true),
-                'state' => get_user_meta($cleaner->ID, 'state', true),
-                'city' => get_user_meta($cleaner->ID, 'city', true),
-                'created_at' => get_user_meta($cleaner->ID, '_created_at', true),
-            ];
-        }
-
-        wp_send_json_success($result);
-    }
 
     /**
      * Update cleaner details
@@ -252,6 +218,11 @@ class KSC_Cleaner_API {
         if (!empty($_POST['cleaner_address'])) {
             update_user_meta($cleaner_id, '_cleaner_address', sanitize_textarea_field($_POST['cleaner_address']));
         }
+
+        // Log Activity
+        $cleaner_user = get_userdata($cleaner_id);
+        $role = in_array('administrator', $current_user->roles) ? 'administrator' : 'area_manager';
+        $this->log_activity($current_user->ID, $role, 'update_cleaner', $cleaner_id, $cleaner_user->display_name, 'Updated cleaner profile details');
 
         wp_send_json_success(['message' => 'Cleaner updated successfully']);
     }
@@ -292,6 +263,11 @@ class KSC_Cleaner_API {
         // Delete user
         require_once ABSPATH . 'wp-admin/includes/user.php';
         wp_delete_user($cleaner_id);
+
+        // Log Activity
+        $role = in_array('administrator', $current_user->roles) ? 'administrator' : 'area_manager';
+        // Need to get name before deleting if possible, otherwise use ID
+        $this->log_activity($current_user->ID, $role, 'delete_cleaner', $cleaner_id, 'Cleaner #' . $cleaner_id, 'Deleted cleaner account');
 
         wp_send_json_success(['message' => 'Cleaner deleted successfully']);
     }
@@ -356,6 +332,86 @@ class KSC_Cleaner_API {
         }
 
         wp_send_json_success($superiors);
+    }
+
+    /**
+     * Helper: Log Activity
+     */
+    private function log_activity($user_id, $role, $action, $target_id, $target_name, $details) {
+        global $wpdb;
+        $table = $wpdb->prefix . 'solar_activity_logs';
+        $wpdb->insert($table, [
+            'user_id' => $user_id,
+            'user_role' => $role,
+            'action_type' => $action,
+            'target_id' => $target_id,
+            'target_name' => $target_name,
+            'details' => $details,
+            'created_at' => current_time('mysql')
+        ]);
+    }
+
+    /**
+     * Get updated cleaner details API (Single or List)
+     */
+    public function get_cleaners() {
+        if (!$this->verify_am_access()) {
+            wp_send_json_error(['message' => 'Unauthorized access']);
+        }
+
+        $current_user = wp_get_current_user();
+        
+        // Admin/Manager sees all cleaners, AM sees their own, SM sees their AM's cleaners
+        $meta_query = [];
+        if (!in_array('administrator', (array) $current_user->roles) && !in_array('manager', (array) $current_user->roles)) {
+            if (in_array('sales_manager', (array) $current_user->roles)) {
+                $supervising_am = get_user_meta($current_user->ID, '_assigned_area_manager', true); // Fixed meta key
+                if ($supervising_am) {
+                    $meta_query[] = [
+                        'key' => '_supervised_by_area_manager',
+                        'value' => $supervising_am,
+                    ];
+                } else {
+                    wp_send_json_success([]);
+                    return;
+                }
+            } else {
+                $meta_query[] = [
+                    'key' => '_supervised_by_area_manager',
+                    'value' => get_current_user_id(),
+                ];
+            }
+        }
+
+        $cleaners = get_users([
+            'role' => 'solar_cleaner',
+            'meta_query' => $meta_query,
+            'orderby' => 'display_name',
+            'order' => 'ASC',
+        ]);
+
+        $result = [];
+        foreach ($cleaners as $cleaner) {
+            $aadhaar_img_id = get_user_meta($cleaner->ID, '_aadhaar_image_id', true);
+            $photo_id = get_user_meta($cleaner->ID, '_photo_id', true);
+
+            $result[] = [
+                'id' => $cleaner->ID,
+                'name' => $cleaner->display_name,
+                'phone' => get_user_meta($cleaner->ID, 'phone', true),
+                'email' => $cleaner->user_email,
+                'aadhaar' => get_user_meta($cleaner->ID, '_aadhaar_number', true),
+                'photo_url' => get_user_meta($cleaner->ID, '_photo_url', true),
+                'aadhaar_image_url' => get_user_meta($cleaner->ID, '_aadhaar_image_url', true),
+                'address' => get_user_meta($cleaner->ID, '_cleaner_address', true),
+                'state' => get_user_meta($cleaner->ID, 'state', true),
+                'city' => get_user_meta($cleaner->ID, 'city', true),
+                'created_at' => get_user_meta($cleaner->ID, '_created_at', true),
+                'supervisor_id' => get_user_meta($cleaner->ID, '_supervised_by_area_manager', true),
+            ];
+        }
+
+        wp_send_json_success($result);
     }
 }
 

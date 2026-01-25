@@ -290,3 +290,102 @@ jQuery(document).ready(function ($) {
 
 });
 
+// --- Admin Cleaner Management Logic ---
+
+// Open Cleaner Profile Modal
+$(document).on('click', '.admin-view-cleaner-btn', function (e) {
+    e.preventDefault();
+    const cleanerId = $(this).data('id');
+    const modal = $('#admin-cleaner-profile-modal');
+
+    // Reset and Show Loading
+    modal.find('h2').text('Loading...');
+    modal.find('p, img').not('.close-modal-btn').css('opacity', 0.5);
+    modal.show();
+
+    // Fetch Data
+    $.ajax({
+        url: ajaxurl,
+        type: 'POST',
+        data: {
+            action: 'get_cleaners' // Admin gets all cleaners so this works if we filter or just find by ID in JS
+        },
+        success: function (response) {
+            if (response.success) {
+                const cleaner = response.data.find(c => c.id == cleanerId);
+                if (cleaner) {
+                    populateAdminCleanerModal(cleaner);
+                } else {
+                    alert('Cleaner not found.');
+                    modal.hide();
+                }
+            } else {
+                alert('Error fetching cleaner details.');
+                modal.hide();
+            }
+        },
+        error: function () {
+            alert('Connection error.');
+            modal.hide();
+        }
+    });
+});
+
+function populateAdminCleanerModal(cleaner) {
+    const modal = $('#admin-cleaner-profile-modal');
+
+    modal.find('#admin-cleaner-name').text(cleaner.name);
+    modal.find('#admin-cleaner-meta').text('Solar Cleaner • Joined ' + new Date(cleaner.created_at).toLocaleDateString());
+    modal.find('#admin-cleaner-phone').text(cleaner.phone);
+    modal.find('#admin-cleaner-email').text(cleaner.email || 'N/A');
+    modal.find('#admin-cleaner-address').text(cleaner.address || 'N/A');
+    modal.find('#admin-cleaner-aadhaar').text(cleaner.aadhaar || 'N/A');
+
+    // Images
+    const photoUrl = cleaner.photo_url || 'https://via.placeholder.com/150?text=No+Photo';
+    modal.find('#admin-cleaner-photo').attr('src', photoUrl).css('opacity', 1);
+
+    if (cleaner.aadhaar_image_url) {
+        modal.find('#admin-cleaner-aadhaar-img').attr('src', cleaner.aadhaar_image_url).show().css('opacity', 1);
+        modal.find('#admin-cleaner-aadhaar-img').next().show();
+    } else {
+        modal.find('#admin-cleaner-aadhaar-img').hide();
+        modal.find('#admin-cleaner-aadhaar-img').next().hide();
+    }
+
+    // Bind Actions
+    modal.find('#admin-edit-cleaner-btn').data('id', cleaner.id).off('click').on('click', function () {
+        // Future: Implement inline edit or redirect to user-edit.php
+        window.location.href = 'user-edit.php?user_id=' + cleaner.id;
+    });
+
+    modal.find('#admin-delete-cleaner-btn').data('id', cleaner.id).off('click').on('click', function () {
+        if (confirm('Are you sure you want to permanently delete this cleaner account? This action cannot be undone.')) {
+            deleteCleanerAsAdmin(cleaner.id);
+        }
+    });
+}
+
+function deleteCleanerAsAdmin(cleanerId) {
+    $.ajax({
+        url: ajaxurl,
+        type: 'POST',
+        data: {
+            action: 'delete_cleaner',
+            cleaner_id: cleanerId,
+            // nonce should be added if stricter security is needed, using generic admin nonce or specific one
+        },
+        success: function (response) {
+            if (response.success) {
+                alert('Cleaner deleted successfully.');
+                $('#admin-cleaner-profile-modal').hide();
+                location.reload();
+            } else {
+                alert('Error: ' + response.data.message);
+            }
+        }
+    });
+}
+
+
+

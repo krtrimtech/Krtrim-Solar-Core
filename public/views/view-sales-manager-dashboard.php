@@ -62,6 +62,7 @@ function sp_sales_manager_dashboard_shortcode() {
             <nav class="sidebar-nav">
                 <a href="javascript:void(0)" class="nav-item active" data-section="dashboard"><span>🏠</span> Dashboard</a>
                 <a href="javascript:void(0)" class="nav-item" data-section="my-leads"><span>👥</span> Leads</a>
+                <a href="javascript:void(0)" class="nav-item" data-section="cleaning-services"><span>🧼</span> Cleaning Services</a>
                 <a href="javascript:void(0)" class="nav-item" data-section="conversions"><span>✅</span> My Conversions</a>
             </nav>
             <div class="sidebar-profile">
@@ -171,6 +172,34 @@ function sp_sales_manager_dashboard_shortcode() {
                     ?>
                 </section>
 
+                <!-- Cleaning Services Section -->
+                <section id="cleaning-services-section" class="section-content" style="display:none;">
+                    <div class="section-header">
+                        <h2 class="section-title">🧼 My Cleaning Services</h2>
+                        <p style="color: #666;">Services from leads you created</p>
+                    </div>
+                    
+                    <div class="card">
+                        <div class="table-responsive">
+                            <table class="data-table" id="sm-cleaning-services-table">
+                                <thead>
+                                    <tr>
+                                        <th>Customer</th>
+                                        <th>Plan</th>
+                                        <th>System</th>
+                                        <th>Visits</th>
+                                        <th>Payment</th>
+                                        <th>Next Visit</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="sm-cleaning-services-tbody">
+                                    <tr><td colspan="6">Loading...</td></tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </section>
+
                 <!-- Conversions Section -->
                 <section id="conversions-section" class="section-content" style="display:none;">
                     <h2>✅ My Conversions</h2>
@@ -196,6 +225,10 @@ function sp_sales_manager_dashboard_shortcode() {
                 <span class="nav-icon">👥</span>
                 <span>Leads</span>
             </a>
+            <a href="javascript:void(0)" class="mobile-nav-item" data-section="cleaning-services">
+                <span class="nav-icon">🧼</span>
+                <span>Cleaning</span>
+            </a>
             <a href="javascript:void(0)" class="mobile-nav-item" data-section="conversions">
                 <span class="nav-icon">✅</span>
                 <span>Conversions</span>
@@ -215,6 +248,50 @@ function sp_sales_manager_dashboard_shortcode() {
         </div>
         <div class="notification-list" id="notif-list">
             <p style="text-align: center; color: #999; padding: 20px;">Loading notifications...</p>
+        </div>
+    </div>
+
+    <!-- Schedule Visit Modal -->
+    <div id="schedule-visit-modal" class="modal" style="display:none;">
+        <div class="modal-content" style="max-width: 500px;">
+            <span class="close-modal">&times;</span>
+            <h3>+ Schedule Cleaning Visit</h3>
+            <form id="schedule-visit-form">
+                <input type="hidden" id="schedule_service_id">
+                <div class="form-group">
+                    <label>Customer</label>
+                    <p id="schedule_customer_name" style="font-weight: 600; margin: 5px 0;"></p>
+                </div>
+                <div class="form-group">
+                    <label for="schedule_cleaner_id">Select Cleaner *</label>
+                    <select id="schedule_cleaner_id" name="cleaner_id" required style="width: 100%; padding: 10px; border: 1px solid #ddd; border-radius: 6px;">
+                        <option value="">Loading cleaners...</option>
+                    </select>
+                </div>
+                <div class="form-row" style="display: flex; gap: 15px;">
+                    <div class="form-group" style="flex: 1;">
+                        <label for="schedule_date">Date *</label>
+                        <input type="date" id="schedule_date" name="scheduled_date" required style="width: 100%; padding: 10px; border: 1px solid #ddd; border-radius: 6px;">
+                    </div>
+                    <div class="form-group" style="flex: 1;">
+                        <label for="schedule_time">Time *</label>
+                        <input type="time" id="schedule_time" name="scheduled_time" value="09:00" required style="width: 100%; padding: 10px; border: 1px solid #ddd; border-radius: 6px;">
+                    </div>
+                </div>
+                <button type="submit" class="btn btn-primary" style="width: 100%; margin-top: 10px;">+ Schedule Visit</button>
+                <div id="schedule-visit-feedback" style="margin-top: 15px;"></div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Service Detail Modal -->
+    <div id="service-detail-modal" class="modal" style="display:none;">
+        <div class="modal-content" style="max-width: 700px;">
+            <span class="close-modal">&times;</span>
+            <h3>🧼 Cleaning Service Details</h3>
+            <div id="service-detail-content">
+                <p>Loading...</p>
+            </div>
         </div>
     </div>
 

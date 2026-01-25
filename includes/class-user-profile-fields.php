@@ -50,10 +50,29 @@ class SP_User_Profile_Fields {
     private function render_area_manager_fields( $user, $can_edit ) {
         $selected_state = get_user_meta( $user->ID, 'state', true );
         $selected_city  = get_user_meta( $user->ID, 'city', true );
+        $selected_city  = get_user_meta( $user->ID, 'city', true );
         $locations = $this->get_location_data();
+        
+        // Get Managers for supervisor selection
+        $managers = get_users(['role' => 'manager', 'orderby' => 'display_name']);
+        $supervisor_id = get_user_meta( $user->ID, '_supervised_by_manager', true );
         ?>
-        <h3><?php _e( 'Location Information', 'krtrim-solar-core' ); ?></h3>
+        <h3><?php _e( 'Area Manager Information', 'krtrim-solar-core' ); ?></h3>
         <table class="form-table">
+            <tr>
+                <th><label for="supervised_by_manager"><?php _e( 'Supervised By (Manager)', 'krtrim-solar-core' ); ?></label></th>
+                <td>
+                    <select name="supervised_by_manager" id="supervised_by_manager" class="regular-text" <?php if ( ! $can_edit ) echo 'disabled'; ?>>
+                        <option value="">-- Independent / Unassigned --</option>
+                        <?php foreach ( $managers as $mgr ) : ?>
+                            <option value="<?php echo esc_attr( $mgr->ID ); ?>" <?php selected( $supervisor_id, $mgr->ID ); ?>>
+                                <?php echo esc_html( $mgr->display_name ); ?>
+                            </option>
+                        <?php endforeach; ?>
+                    </select>
+                    <p class="description"><?php _e( 'Assign this Area Manager to a top-level Manager.', 'krtrim-solar-core' ); ?></p>
+                </td>
+            </tr>
             <tr>
                 <th><label for="state"><?php _e( 'State', 'krtrim-solar-core' ); ?></label></th>
                 <td>
@@ -148,6 +167,11 @@ class SP_User_Profile_Fields {
 
         if ( isset( $_POST['city'] ) ) {
             update_user_meta( $user_id, 'city', sanitize_text_field( $_POST['city'] ) );
+        }
+        
+        // Area Manager supervisor field
+        if ( isset( $_POST['supervised_by_manager'] ) ) {
+            update_user_meta( $user_id, '_supervised_by_manager', intval( $_POST['supervised_by_manager'] ) );
         }
 
         // Sales Manager supervisor field

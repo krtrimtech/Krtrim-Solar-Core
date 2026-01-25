@@ -41,11 +41,19 @@ abstract class KSC_API_Base {
      * @sends JSON error if not area manager
      */
     protected function verify_area_manager_role() {
-        if (!is_user_logged_in() || !in_array('area_manager', (array)wp_get_current_user()->roles)) {
-            wp_send_json_error(['message' => 'Permission denied. Area Manager role required.']);
+        if (!is_user_logged_in()) {
+            wp_send_json_error(['message' => 'Permission denied. Login required.']);
         }
         
-        return wp_get_current_user();
+        $user = wp_get_current_user();
+        $allowed_roles = ['area_manager', 'manager', 'administrator'];
+        $has_role = !empty(array_intersect($allowed_roles, (array)$user->roles));
+        
+        if (!$has_role) {
+            wp_send_json_error(['message' => 'Permission denied. Area Manager or higher role required.']);
+        }
+        
+        return $user;
     }
     
     /**

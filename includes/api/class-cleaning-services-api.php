@@ -27,12 +27,16 @@ class KSC_Cleaning_Services_API {
         
         // Visit management
         add_action('wp_ajax_get_cleaning_visits', [$this, 'get_cleaning_visits']);
+        add_action('wp_ajax_start_cleaning_visit', [$this, 'start_cleaning_visit']);
         add_action('wp_ajax_complete_cleaning_visit', [$this, 'complete_cleaning_visit']);
         add_action('wp_ajax_cancel_cleaning_visit', [$this, 'cancel_cleaning_visit']);
+        
+        // Cleaner schedule for assignment preview
+        add_action('wp_ajax_get_cleaner_schedule', [$this, 'get_cleaner_schedule']);
     }
 
     /**
-     * Verify Area Manager or Admin access
+     * Verify Area Manager, Sales Manager, or Admin access
      */
     private function verify_am_access() {
         if (!is_user_logged_in()) {
@@ -41,8 +45,9 @@ class KSC_Cleaning_Services_API {
         $user = wp_get_current_user();
         if (!in_array('area_manager', (array) $user->roles) && 
             !in_array('administrator', (array) $user->roles) &&
-            !in_array('manager', (array) $user->roles)) {
-            wp_send_json_error(['message' => 'Access denied. Area Manager role required.']);
+            !in_array('manager', (array) $user->roles) &&
+            !in_array('sales_manager', (array) $user->roles)) {
+            wp_send_json_error(['message' => 'Access denied. Appropriate role required.']);
         }
         return $user;
     }
@@ -62,12 +67,21 @@ class KSC_Cleaning_Services_API {
             'post_status' => 'publish',
         ];
 
-        // Admin sees all, AM sees only their area
+        // Admin sees all, AM sees their area, SM sees services they created
         if (!in_array('administrator', (array) $user->roles)) {
-            $args['meta_query'][] = [
-                'key' => '_assigned_area_manager',
-                'value' => $user->ID,
-            ];
+            if (in_array('sales_manager', (array) $user->roles)) {
+                // SM sees only services created from their leads
+                $args['meta_query'][] = [
+                    'key' => '_created_by_sales_manager',
+                    'value' => $user->ID,
+                ];
+            } else {
+                // AM sees services in their area
+                $args['meta_query'][] = [
+                    'key' => '_assigned_area_manager',
+                    'value' => $user->ID,
+                ];
+            }
         }
 
         // Filter by payment status
@@ -106,6 +120,7 @@ class KSC_Cleaning_Services_API {
                     'payment_status' => get_post_meta($service_id, '_payment_status', true),
                     'payment_option' => get_post_meta($service_id, '_payment_option', true),
                     'total_amount' => get_post_meta($service_id, '_total_amount', true),
+                    'preferred_date' => get_post_meta($service_id, '_preferred_date', true),
                     'next_visit_date' => $next_visit ? $next_visit['scheduled_date'] : null,
                     'next_visit_cleaner' => $next_visit ? $next_visit['cleaner_name'] : null,
                     'created_at' => get_the_date('Y-m-d'),
@@ -301,6 +316,69 @@ class KSC_Cleaning_Services_API {
     }
 
     /**
+     * Start a cleaning visit (check-in with GPS and before photo)
+     */
+    public function start_cleaning_visit() {
+        $user = wp_get_current_user();
+        
+        // Allow cleaner, AM, or admin
+        $allowed_roles = ['solar_cleaner', 'area_manager', 'administrator', 'manager'];
+        if (!array_intersect($allowed_roles, (array) $user->roles)) {
+            wp_send_json_error(['message' => 'Access denied']);
+        }
+
+        $visit_id = intval($_POST['visit_id'] ?? 0);
+        $latitude = sanitize_text_field($_POST['latitude'] ?? '');
+        $longitude = sanitize_text_field($_POST['longitude'] ?? '');
+
+        if (!$visit_id) {
+            wp_send_json_error(['message' => 'Visit ID is required']);
+        }
+
+        // Verify visit exists and is scheduled
+        $visit = get_post($visit_id);
+        if (!$visit || $visit->post_type !== 'cleaning_visit') {
+            wp_send_json_error(['message' => 'Invalid visit']);
+        }
+
+        $current_status = get_post_meta($visit_id, '_status', true);
+        if ($current_status !== 'scheduled') {
+            wp_send_json_error(['message' => 'Visit is not in scheduled status']);
+        }
+
+        // Handle before photo upload
+        $before_photo_id = 0;
+        if (!empty($_FILES['before_photo']) && $_FILES['before_photo']['error'] === 0) {
+            require_once(ABSPATH . 'wp-admin/includes/file.php');
+            require_once(ABSPATH . 'wp-admin/includes/image.php');
+            require_once(ABSPATH . 'wp-admin/includes/media.php');
+            
+            $attachment_id = media_handle_upload('before_photo', 0);
+            if (!is_wp_error($attachment_id)) {
+                $before_photo_id = $attachment_id;
+            }
+        }
+
+        // Update visit status and metadata
+        update_post_meta($visit_id, '_status', 'in_progress');
+        update_post_meta($visit_id, '_start_time', current_time('mysql'));
+        
+        if ($latitude && $longitude) {
+            update_post_meta($visit_id, '_start_location', $latitude . ',' . $longitude);
+        }
+        
+        if ($before_photo_id) {
+            update_post_meta($visit_id, '_before_photo', $before_photo_id);
+        }
+
+        wp_send_json_success([
+            'message' => 'Visit started successfully',
+            'visit_id' => $visit_id,
+            'start_time' => current_time('mysql')
+        ]);
+    }
+
+    /**
      * Complete a cleaning visit
      */
     public function complete_cleaning_visit() {
@@ -422,12 +500,198 @@ class KSC_Cleaning_Services_API {
                     'scheduled_date' => get_post_meta($visit_id, '_scheduled_date', true),
                     'scheduled_time' => get_post_meta($visit_id, '_scheduled_time', true),
                     'status' => get_post_meta($visit_id, '_status', true),
+                    'start_time' => get_post_meta($visit_id, '_start_time', true),
+                    'end_time' => get_post_meta($visit_id, '_end_time', true),
+                    'start_location' => get_post_meta($visit_id, '_start_location', true),
+                    'end_location' => get_post_meta($visit_id, '_end_location', true),
+                    'before_photo' => get_post_meta($visit_id, '_before_photo', true),
+                    'after_photo' => get_post_meta($visit_id, '_after_photo', true),
                 ];
             }
             wp_reset_postdata();
         }
 
         wp_send_json_success($visits);
+    }
+    
+    /**
+     * Get cleaner's schedule for assignment preview
+     */
+    public function get_cleaner_schedule() {
+        $this->verify_am_access();
+        
+        $cleaner_id = intval($_POST['cleaner_id'] ?? 0);
+        $selected_date = sanitize_text_field($_POST['date'] ?? date('Y-m-d'));
+        
+        if (!$cleaner_id) {
+            wp_send_json_error(['message' => 'Cleaner ID required']);
+        }
+        
+        $today = date('Y-m-d');
+        $week_start = date('Y-m-d', strtotime('monday this week'));
+        $week_end = date('Y-m-d', strtotime('sunday this week'));
+        
+        // Get visits for today
+        $today_visits = new WP_Query([
+            'post_type' => 'cleaning_visit',
+            'posts_per_page' => -1,
+            'post_status' => 'publish',
+            'meta_query' => [
+                'relation' => 'AND',
+                [
+                    'key' => '_cleaner_id',
+                    'value' => $cleaner_id
+                ],
+                [
+                    'key' => '_scheduled_date',
+                    'value' => $today
+                ],
+                [
+                    'key' => '_status',
+                    'value' => ['scheduled', 'in_progress'],
+                    'compare' => 'IN'
+                ]
+            ]
+        ]);
+        $today_count = $today_visits->found_posts;
+        
+        // Get visits for this week
+        $week_visits = new WP_Query([
+            'post_type' => 'cleaning_visit',
+            'posts_per_page' => -1,
+            'post_status' => 'publish',
+            'meta_query' => [
+                'relation' => 'AND',
+                [
+                    'key' => '_cleaner_id',
+                    'value' => $cleaner_id
+                ],
+                [
+                    'key' => '_scheduled_date',
+                    'value' => [$week_start, $week_end],
+                    'compare' => 'BETWEEN',
+                    'type' => 'DATE'
+                ],
+                [
+                    'key' => '_status',
+                    'value' => ['scheduled', 'in_progress'],
+                    'compare' => 'IN'
+                ]
+            ]
+        ]);
+        $week_count = $week_visits->found_posts;
+        
+        // Get total completed visits
+        $completed_visits = new WP_Query([
+            'post_type' => 'cleaning_visit',
+            'posts_per_page' => -1,
+            'post_status' => 'publish',
+            'meta_query' => [
+                'relation' => 'AND',
+                [
+                    'key' => '_cleaner_id',
+                    'value' => $cleaner_id
+                ],
+                [
+                    'key' => '_status',
+                    'value' => 'completed'
+                ]
+            ]
+        ]);
+        $total_completed = $completed_visits->found_posts;
+        
+        // Get visits for selected date
+        $date_visits_query = new WP_Query([
+            'post_type' => 'cleaning_visit',
+            'posts_per_page' => -1,
+            'post_status' => 'publish',
+            'meta_query' => [
+                'relation' => 'AND',
+                [
+                    'key' => '_cleaner_id',
+                    'value' => $cleaner_id
+                ],
+                [
+                    'key' => '_scheduled_date',
+                    'value' => $selected_date
+                ],
+                [
+                    'key' => '_status',
+                    'value' => ['scheduled', 'in_progress'],
+                    'compare' => 'IN'
+                ]
+            ],
+            'orderby' => 'meta_value',
+            'meta_key' => '_scheduled_time',
+            'order' => 'ASC'
+        ]);
+        
+        $date_visits = [];
+        if ($date_visits_query->have_posts()) {
+            while ($date_visits_query->have_posts()) {
+                $date_visits_query->the_post();
+                $visit_id = get_the_ID();
+                $service_id = get_post_meta($visit_id, '_service_id', true);
+                $date_visits[] = [
+                    'id' => $visit_id,
+                    'customer_name' => get_post_meta($service_id, '_customer_name', true) ?: 'Customer',
+                    'scheduled_time' => get_post_meta($visit_id, '_scheduled_time', true) ?: 'TBD',
+                    'status' => get_post_meta($visit_id, '_status', true) ?: 'scheduled'
+                ];
+            }
+            wp_reset_postdata();
+        }
+        
+        // Get upcoming visits (next 7 days)
+        $upcoming_query = new WP_Query([
+            'post_type' => 'cleaning_visit',
+            'posts_per_page' => 10,
+            'post_status' => 'publish',
+            'meta_query' => [
+                'relation' => 'AND',
+                [
+                    'key' => '_cleaner_id',
+                    'value' => $cleaner_id
+                ],
+                [
+                    'key' => '_scheduled_date',
+                    'value' => $today,
+                    'compare' => '>='
+                ],
+                [
+                    'key' => '_status',
+                    'value' => ['scheduled', 'in_progress'],
+                    'compare' => 'IN'
+                ]
+            ],
+            'orderby' => 'meta_value',
+            'meta_key' => '_scheduled_date',
+            'order' => 'ASC'
+        ]);
+        
+        $upcoming_visits = [];
+        if ($upcoming_query->have_posts()) {
+            while ($upcoming_query->have_posts()) {
+                $upcoming_query->the_post();
+                $visit_id = get_the_ID();
+                $service_id = get_post_meta($visit_id, '_service_id', true);
+                $upcoming_visits[] = [
+                    'id' => $visit_id,
+                    'customer_name' => get_post_meta($service_id, '_customer_name', true) ?: 'Customer',
+                    'scheduled_date' => get_post_meta($visit_id, '_scheduled_date', true),
+                    'scheduled_time' => get_post_meta($visit_id, '_scheduled_time', true) ?: ''
+                ];
+            }
+            wp_reset_postdata();
+        }
+        
+        wp_send_json_success([
+            'today_count' => $today_count,
+            'week_count' => $week_count,
+            'total_completed' => $total_completed,
+            'date_visits' => $date_visits,
+            'upcoming_visits' => $upcoming_visits
+        ]);
     }
 }
 
