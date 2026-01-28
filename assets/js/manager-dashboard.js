@@ -2035,7 +2035,7 @@
             url: ajaxUrl,
             type: 'POST',
             data: {
-                action: 'get_manager_team_data',
+                action: 'get_team_analysis_data',
                 nonce: sp_area_dashboard_vars.get_projects_nonce
             },
             success: function (response) {
@@ -2072,6 +2072,15 @@
                         <td>${am.state || '-'}</td>
                         <td>${am.project_count || 0}</td>
                         <td>${am.team_size || 0}</td>
+                        <td>
+                            <button class="btn btn-sm view-member-detail" 
+                                    data-user-id="${am.ID || am.id}" 
+                                    data-role="area_manager" 
+                                    data-name="${am.display_name || 'N/A'}"
+                                    title="View Details">
+                                👁️ View
+                            </button>
+                        </td>
                     </tr>
                 `;
             });
@@ -2091,6 +2100,15 @@
                         <td>${sm.supervising_am || '-'}</td>
                         <td>${sm.lead_count || 0}</td>
                         <td>${sm.conversion_count || 0}</td>
+                        <td>
+                            <button class="btn btn-sm view-member-detail" 
+                                    data-user-id="${sm.ID || sm.id}" 
+                                    data-role="sales_manager" 
+                                    data-name="${sm.display_name || 'N/A'}"
+                                    title="View Details">
+                                👁️ View
+                            </button>
+                        </td>
                     </tr>
                 `;
             });
@@ -2111,6 +2129,15 @@
                         <td>${cleaner.supervising_am || '-'}</td>
                         <td>${cleaner.completed_visits || 0}</td>
                         <td><span class="badge ${statusClass}">${cleaner.status || 'active'}</span></td>
+                        <td>
+                            <button class="btn btn-sm view-member-detail" 
+                                    data-user-id="${cleaner.id}" 
+                                    data-role="cleaner" 
+                                    data-name="${cleaner.name || 'N/A'}"
+                                    title="View Details">
+                                👁️ View
+                            </button>
+                        </td>
                     </tr>
                 `;
             });
@@ -2284,6 +2311,178 @@
             }
         });
     });
+
+    // ========================================
+    // Team Member Detail Modal
+    // ========================================
+
+    // Open team member detail modal
+    $(document).on('click', '.view-member-detail', function () {
+        const userId = $(this).data('user-id');
+        const role = $(this).data('role');
+        const memberName = $(this).data('name');
+
+        $('#member-modal-name').text(memberName + ' - Details');
+        $('#team-member-modal').fadeIn(200);
+        loadMemberDetails(userId, role);
+    });
+
+    // Close modal
+    $(document).on('click', '#close-member-modal', function () {
+        $('#team-member-modal').fadeOut(200);
+    });
+
+    // Close modal when clicking outside
+    $(document).on('click', '#team-member-modal', function (e) {
+        if ($(e.target).is('#team-member-modal')) {
+            $('#team-member-modal').fadeOut(200);
+        }
+    });
+
+    /**
+     * Load team member details via AJAX
+     */
+    function loadMemberDetails(userId, role) {
+        $('#member-detail-content').html('<p style="text-align: center; padding: 40px; color: #666;">Loading member details...</p>');
+
+        $.ajax({
+            url: ajaxUrl,
+            type: 'POST',
+            data: {
+                action: 'get_team_member_details',
+                nonce: sp_area_dashboard_vars.get_projects_nonce,
+                user_id: userId,
+                role: role
+            },
+            success: function (response) {
+                if (response.success) {
+                    renderMemberDetails(response.data, role);
+                } else {
+                    $('#member-detail-content').html('<p class="error" style="color: #dc2626; text-align: center; padding: 40px;">' + (response.data.message || 'Error loading details') + '</p>');
+                }
+            },
+            error: function () {
+                $('#member-detail-content').html('<p class="error" style="color: #dc2626; text-align: center; padding: 40px;">Network error. Please try again.</p>');
+            }
+        });
+    }
+
+    /**
+     * Render member details based on role
+     */
+    function renderMemberDetails(data, role) {
+        let html = '';
+
+        // User Info Section
+        html += '<div class="detail-section">';
+        html += '<h3>📋 Basic Information</h3>';
+        html += '<div class="member-stats-grid">';
+        html += `<div class="member-stat-card"><h4>${data.user_info.name}</h4><span>Name</span></div>`;
+        html += `<div class="member-stat-card"><h4>${data.user_info.email}</h4><span>Email</span></div>`;
+        if (data.user_info.phone) {
+            html += `<div class="member-stat-card"><h4>${data.user_info.phone}</h4><span>Phone</span></div>`;
+        }
+        if (data.user_info.state) {
+            html += `<div class="member-stat-card"><h4>${data.user_info.state}</h4><span>State</span></div>`;
+        }
+        if (data.user_info.city) {
+            html += `<div class="member-stat-card"><h4>${data.user_info.city}</h4><span>City</span></div>`;
+        }
+        html += '</div></div>';
+
+        // Stats Section
+        html += '<div class="detail-section">';
+        html += '<h3>📊 Performance Stats</h3>';
+        html += '<div class="member-stats-grid">';
+
+        if (role === 'area_manager') {
+            html += `<div class="member-stat-card"><h4>${data.stats.total_projects || 0}</h4><span>Total Projects</span></div>`;
+            html += `<div class="member-stat-card"><h4>${data.stats.total_leads || 0}</h4><span>Total Leads</span></div>`;
+            html += `<div class="member-stat-card"><h4>${data.stats.team_size || 0}</h4><span>Team Size</span></div>`;
+        } else if (role === 'sales_manager') {
+            html += `<div class="member-stat-card"><h4>${data.stats.total_leads || 0}</h4><span>Total Leads</span></div>`;
+            html += `<div class="member-stat-card"><h4>${data.stats.conversions || 0}</h4><span>Conversions</span></div>`;
+            html += `<div class="member-stat-card"><h4>${data.stats.conversion_rate || 0}%</h4><span>Conversion Rate</span></div>`;
+        } else if (role === 'cleaner') {
+            html += `<div class="member-stat-card"><h4>${data.stats.completed_visits || 0}</h4><span>Completed Visits</span></div>`;
+            html += `<div class="member-stat-card"><h4>${data.stats.pending_visits || 0}</h4><span>Pending Visits</span></div>`;
+            html += `<div class="member-stat-card"><h4>${data.stats.completion_rate || 0}%</h4><span>Completion Rate</span></div>`;
+        }
+        html += '</div></div>';
+
+        // Projects Section (for Area Managers)
+        if (role === 'area_manager' && data.projects && data.projects.length > 0) {
+            html += '<div class="detail-section">';
+            html += '<h3>🏗️ Recent Projects</h3>';
+            html += '<div class="table-responsive">';
+            html += '<table class="data-table"><thead><tr><th>Project</th><th>Status</th><th>Location</th><th>Cost</th></tr></thead><tbody>';
+            data.projects.slice(0, 10).forEach(project => {
+                html += `<tr>
+                    <td>${project.title}</td>
+                    <td><span class="badge badge-${project.status}">${project.status}</span></td>
+                    <td>${project.city}, ${project.state}</td>
+                    <td>₹${parseFloat(project.cost || 0).toLocaleString()}</td>
+                </tr>`;
+            });
+            html += '</tbody></table></div></div>';
+        }
+
+        // Leads Section (for AMs and SMs)
+        if ((role === 'area_manager' || role === 'sales_manager') && data.leads && data.leads.length > 0) {
+            html += '<div class="detail-section">';
+            html += '<h3>🎯 Recent Leads</h3>';
+            html += '<div class="table-responsive">';
+            html += '<table class="data-table"><thead><tr><th>Name</th><th>Phone</th><th>Status</th><th>Location</th><th>Created</th></tr></thead><tbody>';
+            data.leads.slice(0, 10).forEach(lead => {
+                html += `<tr>
+                    <td>${lead.name}</td>
+                    <td>${lead.phone}</td>
+                    <td><span class="badge badge-${lead.status}">${lead.status}</span></td>
+                    <td>${lead.city}</td>
+                    <td>${lead.created_date}</td>
+                </tr>`;
+            });
+            html += '</tbody></table></div></div>';
+        }
+
+        // Cleaning Visits (for Cleaners)
+        if (role === 'cleaner' && data.visits && data.visits.length > 0) {
+            html += '<div class="detail-section">';
+            html += '<h3>🧹 Cleaning Visits</h3>';
+            html += '<div class="table-responsive">';
+            html += '<table class="data-table"><thead><tr><th>Date</th><th>Client</th><th>Location</th><th>Status</th></tr></thead><tbody>';
+            data.visits.slice(0, 10).forEach(visit => {
+                html += `<tr>
+                    <td>${visit.visit_date}</td>
+                    <td>${visit.client_name}</td>
+                    <td>${visit.location}</td>
+                    <td><span class="badge badge-${visit.status}">${visit.status}</span></td>
+                </tr>`;
+            });
+            html += '</tbody></table></div></div>';
+        }
+
+        // Activity Timeline
+        if (data.recent_activity && data.recent_activity.length > 0) {
+            html += '<div class="detail-section">';
+            html += '<h3>⏱️ Recent Activity</h3>';
+            html += '<div class="activity-timeline">';
+            data.recent_activity.forEach(activity => {
+                html += `<div class="activity-item">
+                    <div class="activity-time">${activity.time}</div>
+                    <p class="activity-desc">${activity.description}</p>
+                </div>`;
+            });
+            html += '</div></div>';
+        }
+
+        // If no data
+        if (!data.projects?.length && !data.leads?.length && !data.visits?.length && !data.recent_activity?.length) {
+            html += '<div class="detail-section"><p style="text-align: center; color: #999; padding: 40px;">No activity data available.</p></div>';
+        }
+
+        $('#member-detail-content').html(html);
+    }
 
     // Initial Load
     loadDashboardStats();

@@ -481,6 +481,7 @@ function sp_render_leaderboard_view() {
                                     </td>
                                     <td>
                                         <a href="?page=team-analysis&team_tab=manager_leads&manager_id=<?php echo $data['id']; ?>" class="button button-small">Details</a>
+                                        <button class="button button-small assign-states-btn" data-id="<?php echo $data['id']; ?>" data-name="<?php echo esc_attr($data['name']); ?>" data-states="<?php echo esc_attr(json_encode(get_user_meta($data['id'], '_assigned_states', true) ?: [])); ?>">Assign States</button>
                                         <a href="user-edit.php?user_id=<?php echo $data['id']; ?>" class="button button-small">Edit</a>
                                     </td>
                                 </tr>
@@ -1634,6 +1635,97 @@ function sp_render_single_manager_view($manager_id) {
                 </table>
             </div>
             <?php endif; ?>
+            
+            <div class="detail-card wide">
+                <h3>Assigned States</h3>
+                <?php 
+                $assigned_states = get_user_meta($manager->ID, '_assigned_states', true);
+                if (!empty($assigned_states) && is_array($assigned_states)) {
+                    echo '<p>' . implode(', ', $assigned_states) . '</p>';
+                } else {
+                    echo '<p><em>All States (Global View)</em></p>';
+                }
+                ?>
+                <button class="button button-small assign-states-btn" data-id="<?php echo $manager->ID; ?>" data-name="<?php echo esc_attr($manager->display_name); ?>" data-states="<?php echo esc_attr(json_encode($assigned_states ?: [])); ?>">Edit Assignments</button>
+            </div>
+
+            <?php
+            // Fetch Sales Managers (Aggregate from AMs)
+            $all_sms = [];
+            if (!empty($assigned_ams)) {
+                $am_ids = wp_list_pluck($assigned_ams, 'ID');
+                foreach ($am_ids as $aid) {
+                    $sms = get_users([
+                        'role' => 'sales_manager',
+                        'meta_key' => '_assigned_area_manager',
+                        'meta_value' => $aid
+                    ]);
+                    $all_sms = array_merge($all_sms, $sms);
+                }
+            }
+            ?>
+            <?php if (!empty($all_sms)) : ?>
+            <div class="detail-card wide">
+                <h3>Assigned Sales Managers</h3>
+                <table class="wp-list-table widefat striped">
+                    <thead>
+                        <tr><th>Name</th><th>Email</th><th>Phone</th><th>Area Manager</th><th>Actions</th></tr>
+                    </thead>
+                    <tbody>
+                        <?php foreach($all_sms as $sm) : 
+                             $am_id = get_user_meta($sm->ID, '_assigned_area_manager', true);
+                             $am_name = $am_id ? get_userdata($am_id)->display_name : 'Unassigned';
+                        ?>
+                            <tr>
+                                <td><strong><?php echo esc_html($sm->display_name); ?></strong></td>
+                                <td><?php echo esc_html($sm->user_email); ?></td>
+                                <td><?php echo esc_html(get_user_meta($sm->ID, 'phone_number', true)); ?></td>
+                                <td><?php echo esc_html($am_name); ?></td>
+                                <td><a href="user-edit.php?user_id=<?php echo $sm->ID; ?>" class="button button-small">Edit</a></td>
+                            </tr>
+                        <?php endforeach; ?>
+                    </tbody>
+                </table>
+            </div>
+            <?php endif; ?>
+
+            <?php
+            // Fetch Cleaners (Aggregate from AMs)
+            $all_cleaners = [];
+            if (!empty($assigned_ams)) {
+                 foreach ($assigned_ams as $am) {
+                     $cleaners = get_users([
+                        'role' => 'solar_cleaner',
+                        'meta_key' => '_supervised_by_area_manager',
+                        'meta_value' => $am->ID
+                     ]);
+                     $all_cleaners = array_merge($all_cleaners, $cleaners);
+                 }
+            }
+            ?>
+             <?php if (!empty($all_cleaners)) : ?>
+            <div class="detail-card wide">
+                <h3>Assigned Cleaners</h3>
+                <table class="wp-list-table widefat striped">
+                    <thead>
+                        <tr><th>Name</th><th>Phone</th><th>Area Manager</th><th>Actions</th></tr>
+                    </thead>
+                    <tbody>
+                        <?php foreach($all_cleaners as $cl) : 
+                             $am_id = get_user_meta($cl->ID, '_supervised_by_area_manager', true);
+                             $am_name = $am_id ? get_userdata($am_id)->display_name : 'Unassigned';
+                        ?>
+                            <tr>
+                                <td><strong><?php echo esc_html($cl->display_name); ?></strong></td>
+                                <td><?php echo esc_html(get_user_meta($cl->ID, 'phone', true)); ?></td>
+                                <td><?php echo esc_html($am_name); ?></td>
+                                <td><a href="user-edit.php?user_id=<?php echo $cl->ID; ?>" class="button button-small">Edit</a></td>
+                            </tr>
+                        <?php endforeach; ?>
+                    </tbody>
+                </table>
+            </div>
+            <?php endif; ?>
             <div class="detail-card wide">
                 <h3>Associated Vendors</h3>
                 <ul>
@@ -1948,5 +2040,126 @@ function sp_render_single_manager_view($manager_id) {
             </div>
         </div>
     </div>
-    <?php
+
+
+    <!-- Assign States Modal -->
+    <div id="assign-states-modal" class="modal-overlay" style="display: none; position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.5); z-index: 9999; justify-content: center; align-items: center;">
+        <div class="modal-box" style="background: #fff; border-radius: 8px; padding: 25px; width: 400px; max-width: 90%;">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+                <h3 style="margin: 0;">Assign States to <span id="assign-modal-manager-name"></span></h3>
+                <button class="close-modal-btn" style="background:none; border:none; font-size:20px; cursor:pointer;">&times;</button>
+            </div>
+            
+            <form id="assign-states-form">
+                <input type="hidden" id="assign_states_manager_id" name="manager_id">
+                
+                <div class="form-group" style="margin-bottom: 15px;">
+                    <label style="display:flex; align-items:center; font-weight:bold; margin-bottom:10px;">
+                        <input type="checkbox" id="assign_all_states" name="assign_all" value="true">
+                        Assign All States (Manager sees everything)
+                    </label>
+                </div>
+                
+                <div id="states-list-container" style="max-height: 200px; overflow-y: auto; border: 1px solid #ddd; padding: 10px; border-radius: 4px;">
+                    <?php
+                    $indian_states = [
+                        "Andhra Pradesh", "Arunachal Pradesh", "Assam", "Bihar", "Chhattisgarh", "Goa", "Gujarat", 
+                        "Haryana", "Himachal Pradesh", "Jharkhand", "Karnataka", "Kerala", "Madhya Pradesh", 
+                        "Maharashtra", "Manipur", "Meghalaya", "Mizoram", "Nagaland", "Odisha", "Punjab", 
+                        "Rajasthan", "Sikkim", "Tamil Nadu", "Telangana", "Tripura", "Uttar Pradesh", "Uttarakhand", "West Bengal",
+                        "Andaman and Nicobar Islands", "Chandigarh", "Dadra and Nagar Haveli and Daman and Diu", 
+                        "Delhi", "Jammu and Kashmir", "Ladakh", "Lakshadweep", "Puducherry"
+                    ];
+                    
+                    foreach ($indian_states as $state) {
+                        echo '<label style="display:block; margin-bottom:5px;">';
+                        echo '<input type="checkbox" name="states[]" value="' . esc_attr($state) . '" class="state-checkbox"> ' . esc_html($state);
+                        echo '</label>';
+                    }
+                    ?>
+                </div>
+                <div style="margin-top: 5px; font-size: 12px; color: #666;">
+                    * If "Assign All" is unchecked and no states are selected, Manager will see NO projects.
+                </div>
+                
+                <div style="display: flex; justify-content: flex-end; gap: 10px; margin-top: 20px;">
+                    <button type="button" class="button close-modal-btn">Cancel</button>
+                    <button type="submit" class="button button-primary" id="save-states-btn">Save Assignments</button>
+                </div>
+            </form>
+        </div>
+    </div>
+    
+    <script>
+    jQuery(document).ready(function($) {
+        // Open Modal
+        $('.assign-states-btn').on('click', function(e) {
+            e.preventDefault();
+            const managerId = $(this).data('id');
+            const managerName = $(this).data('name');
+            const assignedStates = $(this).data('states') || []; // Array of strings
+            
+            $('#assign_states_manager_id').val(managerId);
+            $('#assign-modal-manager-name').text(managerName);
+            
+            // Reset checkboxes
+            $('.state-checkbox').prop('checked', false);
+            $('#assign_all_states').prop('checked', false);
+            
+            if (assignedStates.length === 0) {
+                // If empty in DB, logic says "Global View" aka "All".
+                // But wait, the button data-states might be empty string if not set?
+                // PHP: json_encode(get_user_meta(...) ?: [])
+                // If user has NEVER been assigned, it is empty array.
+                // In my logic: Empty Array = All.
+                // So default check "All".
+                $('#assign_all_states').prop('checked', true);
+                $('#states-list-container').css('opacity', '0.5').css('pointer-events', 'none');
+            } else {
+                 $('#states-list-container').css('opacity', '1').css('pointer-events', 'auto');
+                 assignedStates.forEach(state => {
+                     $(`input[name="states[]"][value="${state}"]`).prop('checked', true);
+                 });
+            }
+            
+            $('#assign-states-modal').fadeIn(200).css('display', 'flex');
+        });
+        
+        // Toggle All
+        $('#assign_all_states').on('change', function() {
+            if ($(this).is(':checked')) {
+                $('#states-list-container').css('opacity', '0.5').css('pointer-events', 'none');
+                $('.state-checkbox').prop('checked', false);
+            } else {
+                $('#states-list-container').css('opacity', '1').css('pointer-events', 'auto');
+            }
+        });
+        
+        // Close Modal
+        $('.close-modal-btn').on('click', function() {
+            $('#assign-states-modal').fadeOut(200);
+        });
+        
+        // Submit Form
+        $('#assign-states-form').on('submit', function(e) {
+            e.preventDefault();
+            const btn = $('#save-states-btn');
+            btn.text('Saving...').prop('disabled', true);
+            
+            const formData = $(this).serialize();
+            const nonce = '<?php echo wp_create_nonce("admin_manager_action_nonce"); ?>';
+            
+            $.post(ajaxurl, formData + '&action=update_manager_assigned_states&nonce=' + nonce, function(response) {
+                if (response.success) {
+                    alert('States updated successfully!');
+                    location.reload();
+                } else {
+                    alert('Error: ' + (response.data.message || 'Unknown error'));
+                    btn.text('Save Assignments').prop('disabled', false);
+                }
+            });
+        });
+    });
+    </script>
+<?php
 }

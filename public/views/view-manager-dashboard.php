@@ -102,10 +102,10 @@ function sp_manager_dashboard_shortcode() {
                 <a href="javascript:void(0)" class="nav-item" data-section="cleaning-services"><span>🧼</span> Cleaning Services</a>
                 
                 <!-- Manager-Specific Sections -->
-                <div style="margin-top: 15px; border-top: 1px solid rgba(255,255,255,0.1); padding-top: 15px;">
-                    <p style="font-size: 11px; text-transform: uppercase; color: rgba(255,255,255,0.5); margin-bottom: 10px; padding: 0 20px;">Manager Tools</p>
+                <div style="margin-top: 15px; border-top: 1px solid #e2e8f0; padding-top: 15px;">
+                    <p style="font-size: 11px; text-transform: uppercase; color: #94a3b8; margin-bottom: 10px; padding: 0 20px; font-weight: 600;">Manager Tools</p>
                 </div>
-                <a href="javascript:void(0)" class="nav-item" data-section="team-analysis"><span>📊</span> Team Analysis</a>
+                <a href="javascript:void(0)" class="nav-item" data-section="team-analysis"><span>👥</span> Team Overview</a>
                 <a href="javascript:void(0)" class="nav-item" data-section="am-assignment"><span>🗺️</span> AM Assignment</a>
             </nav>
             <div class="sidebar-profile">
@@ -674,11 +674,11 @@ function sp_manager_dashboard_shortcode() {
                     </div>
                 </section>
 
-                <!-- Team Analysis Section (Manager Only) -->
+                <!-- Team Overview Section (Manager Only) -->
                 <section id="team-analysis-section" class="section-content" style="display:none;">
                     <div class="section-header">
-                        <h2 class="section-title">📊 Team Analysis</h2>
-                        <p style="color: #666; margin-top: 8px;">Overview of all Area Managers, Sales Managers, and Cleaners in your assigned states</p>
+                        <h2 class="section-title">👥 Team Overview</h2>
+                        <p style="color: #666; margin-top: 8px;">Complete overview of Area Managers, Sales Managers, and Cleaners across your organization</p>
                     </div>
                     
                     <!-- Team Stats -->
@@ -726,6 +726,7 @@ function sp_manager_dashboard_shortcode() {
                                         <th>State</th>
                                         <th>Projects</th>
                                         <th>Team Size</th>
+                                        <th>Actions</th>
                                     </tr>
                                 </thead>
                                 <tbody id="team-am-tbody">
@@ -747,6 +748,7 @@ function sp_manager_dashboard_shortcode() {
                                         <th>Supervising AM</th>
                                         <th>Leads</th>
                                         <th>Conversions</th>
+                                        <th>Actions</th>
                                     </tr>
                                 </thead>
                                 <tbody id="team-sm-tbody">
@@ -768,6 +770,7 @@ function sp_manager_dashboard_shortcode() {
                                         <th>Supervising AM</th>
                                         <th>Completed Visits</th>
                                         <th>Status</th>
+                                        <th>Actions</th>
                                     </tr>
                                 </thead>
                                 <tbody id="team-cleaners-tbody">
@@ -799,13 +802,30 @@ function sp_manager_dashboard_shortcode() {
                                 <div class="form-group" style="flex: 1; min-width: 200px;">
                                     <label for="assign_state">State *</label>
                                     <select id="assign_state" name="state" required style="width: 100%; padding: 10px; border: 1px solid #ddd; border-radius: 6px;">
-                                        <option value="">Select your assigned state</option>
+                                        <option value="">Select state</option>
                                         <?php
                                         $manager_states = get_user_meta($user->ID, '_assigned_states', true);
+                                        
+                                        // If manager has assigned states, show only those
+                                        // Otherwise, show all Indian states (Manager can assign anywhere)
+                                        $states_to_show = [];
                                         if (!empty($manager_states) && is_array($manager_states)) {
-                                            foreach ($manager_states as $state) {
-                                                echo '<option value="' . esc_attr($state) . '">' . esc_html($state) . '</option>';
-                                            }
+                                            $states_to_show = $manager_states;
+                                        } else {
+                                            // All Indian states
+                                            $states_to_show = [
+                                                'Andhra Pradesh', 'Arunachal Pradesh', 'Assam', 'Bihar', 'Chhattisgarh',
+                                                'Goa', 'Gujarat', 'Haryana', 'Himachal Pradesh', 'Jharkhand',
+                                                'Karnataka', 'Kerala', 'Madhya Pradesh', 'Maharashtra', 'Manipur',
+                                                'Meghalaya', 'Mizoram', 'Nagaland', 'Odisha', 'Punjab',
+                                                'Rajasthan', 'Sikkim', 'Tamil Nadu', 'Telangana', 'Tripura',
+                                                'Uttar Pradesh', 'Uttarakhand', 'West Bengal',
+                                                'Delhi', 'Jammu and Kashmir', 'Ladakh', 'Puducherry'
+                                            ];
+                                        }
+                                        
+                                        foreach ($states_to_show as $state) {
+                                            echo '<option value="' . esc_attr($state) . '">' . esc_html($state) . '</option>';
                                         }
                                         ?>
                                     </select>
@@ -979,8 +999,23 @@ function sp_manager_dashboard_shortcode() {
         </div>
     </div>
 
+
+    <!-- Team Member Detail Modal -->
+    <div id="team-member-modal" class="modal" style="display:none;">
+        <div class="modal-content large-modal">
+            <div class="modal-header">
+                <h2 id="member-modal-name">Team Member Details</h2>
+                <span class="close-modal" id="close-member-modal">&times;</span>
+            </div>
+            <div class="modal-body" id="member-detail-content">
+                <p style="text-align: center; padding: 40px; color: #666;">Loading member details...</p>
+            </div>
+        </div>
+    </div>
+
     <!-- Toast Container -->
     <div class="toast-container" id="toast-container"></div>
+
 
     <?php
     return ob_get_clean();

@@ -98,8 +98,8 @@ function sp_area_manager_dashboard_shortcode() {
                 
                 <?php if (in_array('manager', $user_roles, true) || in_array('administrator', $user_roles, true)) : ?>
                 <!-- Manager-Only Sections -->
-                <div style="margin-top: 15px; border-top: 1px solid rgba(255,255,255,0.1); padding-top: 15px;">
-                    <p style="font-size: 11px; text-transform: uppercase; color: rgba(255,255,255,0.5); margin-bottom: 10px; padding: 0 20px;">Manager Tools</p>
+                <div style="margin-top: 15px; border-top: 1px solid #e2e8f0; padding-top: 15px;">
+                    <p style="font-size: 11px; text-transform: uppercase; color: #94a3b8; margin-bottom: 10px; padding: 0 20px; font-weight: 600;">Manager Tools</p>
                 </div>
                 <a href="javascript:void(0)" class="nav-item" data-section="team-analysis"><span>📊</span> Team Analysis</a>
                 <a href="javascript:void(0)" class="nav-item" data-section="am-assignment"><span>🗺️</span> AM Assignment</a>
@@ -265,7 +265,7 @@ function sp_area_manager_dashboard_shortcode() {
 
 
 
-            </section>
+                </section>
 
                 <!-- Projects List Section -->
                 <section id="projects-section" class="section-content" style="display:none;">
@@ -718,17 +718,8 @@ function sp_area_manager_dashboard_shortcode() {
                                 </div>
                             </div>
                         </div>
-                        </div>
                     </div>
-
                     <!-- Activity Feed Widget -->
-                    <div class="card" style="margin-top: 25px;">
-                        <h3 style="margin-bottom: 20px;">🔔 Recent Team Activity</h3>
-                        <div id="team-activity-feed" style="max-height: 400px; overflow-y: auto;">
-                            <!-- Activity items will be loaded here -->
-                            <p style="text-align: center; color: #666; padding: 20px;">Loading activity...</p>
-                        </div>
-                    </div>
                 </section>
 
                 <!-- Cleaning Services Section -->
@@ -774,12 +765,12 @@ function sp_area_manager_dashboard_shortcode() {
 
                 <!-- My Team Section (for all AMs - shows assigned Sales Managers) -->
                 <section id="my-team-section" class="section-content" style="display:none;">
-                    <div class="section-header">
-                        <h2 class="section-title">👥 My Team</h2>
-                        <p style="color: #666; margin-top: 8px;">View Sales Managers assigned to you and their performance</p>
+                     <div class="section-header">
+                        <h2 class="section-title">👥 My Sales Team</h2>
+                        <p style="color: #666; margin-top: 8px;">Performance overview of your assigned Sales Managers</p>
                     </div>
-                    
-                    <!-- Team Stats -->
+
+                    <!-- Stats Row -->
                     <div class="stats-grid" style="margin-bottom: 30px;">
                         <div class="stat-card">
                             <div class="stat-icon">👥</div>
@@ -803,8 +794,8 @@ function sp_area_manager_dashboard_shortcode() {
                             </div>
                         </div>
                     </div>
-                    
-                    <!-- Sales Managers Table -->
+
+                    <!-- Sales Managers Grid/Table -->
                     <div class="card" style="margin-bottom: 20px;">
                         <h3>👥 My Sales Managers</h3>
                         <p style="color: #666; font-size: 14px; margin-bottom: 15px;">Click on "View Leads" to see all leads and activities for each Sales Manager</p>

@@ -330,5 +330,6 @@ class SP_Admin_Menus {
         
         wp_send_json_success(['message' => 'Location assigned successfully']);
     }
+
 }
 

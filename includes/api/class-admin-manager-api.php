@@ -62,9 +62,13 @@ class KSC_Admin_Manager_API extends KSC_API_Base {
         
         // Team assignment
         add_action('wp_ajax_assign_team_to_area_manager', [$this, 'assign_team_to_area_manager']);
+
+        // Manager State Assignment (Admin)
+        add_action('wp_ajax_update_manager_assigned_states', [$this, 'update_manager_assigned_states']);
         
         // Manager Dashboard APIs (multi-state managers)
         add_action('wp_ajax_get_manager_team_data', [$this, 'get_manager_team_data']);
+        add_action('wp_ajax_get_team_analysis_data', [$this, 'get_team_analysis_data']);
         add_action('wp_ajax_get_unassigned_area_managers', [$this, 'get_unassigned_area_managers']);
         add_action('wp_ajax_get_am_location_assignments', [$this, 'get_am_location_assignments']);
         add_action('wp_ajax_remove_area_manager_location', [$this, 'remove_area_manager_location']);
@@ -78,6 +82,9 @@ class KSC_Admin_Manager_API extends KSC_API_Base {
         
         // Activity Feed
         add_action('wp_ajax_get_team_activity', [$this, 'get_team_activity']);
+        
+        // Team Member Detail Modal
+        add_action('wp_ajax_get_team_member_details', [$this, 'get_team_member_details']);
     }
     
     /**
@@ -89,64 +96,112 @@ class KSC_Admin_Manager_API extends KSC_API_Base {
      * @param int $manager_id The Area Manager's user ID
      * @return array Array of project IDs
      */
-    private function get_am_visible_project_ids($manager_id) {
+    /**
+     * Get project IDs visible to an Area Manager or Manager
+     * Logic: 
+     * - If project has _assigned_area_manager set → show to that specific AM
+     * - If not assigned → show to AM whose location matches project's city/state
+     * - If Manager: Show projects from ALL assigned Area Managers and their regions
+     * 
+     * @param int $user_id The User ID (Manager or Area Manager)
+     * @return array Array of project IDs
+     */
+    private function get_am_visible_project_ids($user_id) {
         $project_ids = [];
         
-        // Get AM's assigned location
-        $am_state = get_user_meta($manager_id, 'state', true);
-        $am_city = get_user_meta($manager_id, 'city', true);
-        
-        // 1. Projects explicitly assigned to this AM (admin override)
-        $assigned_args = [
+        // 0. Projects created by this user (Manager/AM)
+        $own_projects = get_posts([
             'post_type' => 'solar_project',
             'posts_per_page' => -1,
             'post_status' => 'publish',
-            'fields' => 'ids',
-            'meta_query' => [
-                [
-                    'key' => '_assigned_area_manager',
-                    'value' => $manager_id,
-                    'compare' => '='
-                ]
-            ]
-        ];
-        $assigned_ids = get_posts($assigned_args);
-        $project_ids = array_merge($project_ids, $assigned_ids);
+            'author' => $user_id,
+            'fields' => 'ids'
+        ]);
+        $project_ids = array_merge($project_ids, $own_projects);
+
+        $user = get_userdata($user_id);
+        $is_manager = in_array('manager', (array)$user->roles);
         
-        // 2. Projects in AM's area that are NOT assigned to another AM
-        if (!empty($am_state) && !empty($am_city)) {
-            $location_args = [
+        $am_ids = [];
+        
+        if ($is_manager) {
+            // 1. Get projects by State (or Global if no state assigned)
+            $manager_projects = $this->get_manager_visible_project_ids($user_id);
+            $project_ids = array_merge($project_ids, $manager_projects);
+            
+            // 2. Get all assigned AMs
+            $am_ids = get_users([
+                'role' => 'area_manager',
+                'meta_key' => '_supervised_by_manager',
+                'meta_value' => $user_id,
+                'fields' => 'ID'
+            ]);
+            
+            // If no AMs assigned, proceed with empty array (don't return early)
+            if (empty($am_ids)) {
+                $am_ids = []; 
+            }
+        } else {
+            // Single AM
+            $am_ids = [$user_id];
+        }
+        
+        // Loop through relevant AMs to gather projects
+        foreach ($am_ids as $am_id) {
+            // Get AM's assigned location
+            $am_state = get_user_meta($am_id, 'state', true);
+            $am_city = get_user_meta($am_id, 'city', true);
+            
+            // 1. Projects explicitly assigned to this AM
+            $assigned_args = [
                 'post_type' => 'solar_project',
                 'posts_per_page' => -1,
                 'post_status' => 'publish',
                 'fields' => 'ids',
                 'meta_query' => [
-                    'relation' => 'AND',
                     [
-                        'key' => '_project_state',
-                        'value' => $am_state,
-                        'compare' => '='
-                    ],
-                    [
-                        'key' => '_project_city',
-                        'value' => $am_city,
+                        'key' => '_assigned_area_manager',
+                        'value' => $am_id,
                         'compare' => '='
                     ]
                 ]
             ];
-            $location_projects = get_posts($location_args);
+            $assigned_ids = get_posts($assigned_args);
+            $project_ids = array_merge($project_ids, $assigned_ids);
             
-            // Filter out projects that are assigned to a different AM
-            foreach ($location_projects as $pid) {
-                $assigned_am = get_post_meta($pid, '_assigned_area_manager', true);
-                // Include if not assigned to anyone, or assigned to this AM
-                if (empty($assigned_am) || $assigned_am == $manager_id) {
-                    $project_ids[] = $pid;
+            // 2. Projects in AM's area that are NOT assigned to another AM
+            if (!empty($am_state) && !empty($am_city)) {
+                $location_args = [
+                    'post_type' => 'solar_project',
+                    'posts_per_page' => -1,
+                    'post_status' => 'publish',
+                    'fields' => 'ids',
+                    'meta_query' => [
+                        'relation' => 'AND',
+                        [
+                            'key' => '_project_state',
+                            'value' => $am_state,
+                            'compare' => '='
+                        ],
+                        [
+                            'key' => '_project_city',
+                            'value' => $am_city,
+                            'compare' => '='
+                        ]
+                    ]
+                ];
+                $location_projects = get_posts($location_args);
+                
+                foreach ($location_projects as $pid) {
+                    $assigned_am = get_post_meta($pid, '_assigned_area_manager', true);
+                    // Include if not assigned to anyone, or assigned to this AM
+                    if (empty($assigned_am) || $assigned_am == $am_id) {
+                        $project_ids[] = $pid;
+                    }
                 }
             }
         }
         
-        // Remove duplicates and return
         return array_unique($project_ids);
     }
     
@@ -174,7 +229,14 @@ class KSC_Admin_Manager_API extends KSC_API_Base {
         $assigned_states = get_user_meta($manager_id, '_assigned_states', true);
         
         if (empty($assigned_states) || !is_array($assigned_states)) {
-            return [];
+            // Fallback: If no states assigned, Manager sees EVERYTHING (Global View)
+            $args = [
+                'post_type' => 'solar_project',
+                'posts_per_page' => -1,
+                'post_status' => 'publish',
+                'fields' => 'ids'
+            ];
+            return get_posts($args);
         }
         
         // Get all projects in manager's assigned states
@@ -199,26 +261,22 @@ class KSC_Admin_Manager_API extends KSC_API_Base {
      * Get area manager dashboard statistics
      */
     public function get_area_manager_dashboard_stats() {
-        $manager = $this->verify_area_manager_role();
+        $user_data = $this->verify_admin_or_manager();
+        $manager = $user_data['user'];
         
         global $wpdb;
         
-        // Get projects
-        $projects = get_posts([
-            'post_type' => 'solar_project',
-            'posts_per_page' => -1,
-            'author' => $manager->ID,
-            'fields' => 'ids'
-        ]);
+        // Get projects using visibility logic (handles AM & Manager)
+        $project_ids = $this->get_am_visible_project_ids($manager->ID);
         
-        $total_projects = count($projects);
+        $total_projects = count($project_ids);
         $total_revenue = 0;
         $total_costs = 0;
         $total_profit = 0;
         $total_client_payments = 0;
         $total_outstanding = 0;
         
-        foreach ($projects as $project_id) {
+        foreach ($project_ids as $project_id) {
             $total_cost = floatval(get_post_meta($project_id, '_total_project_cost', true) ?: 0);
             $vendor_paid = floatval(get_post_meta($project_id, '_vendor_paid_amount', true) ?: 0);
             $client_paid = floatval(get_post_meta($project_id, '_paid_amount', true) ?: 0);
@@ -234,18 +292,144 @@ class KSC_Admin_Manager_API extends KSC_API_Base {
         $collection_rate = $total_revenue > 0 ? ($total_client_payments / $total_revenue) * 100 : 0;
         
         // Get leads count
-        $total_leads = $wpdb->get_var($wpdb->prepare(
-            "SELECT COUNT(*) FROM {$wpdb->posts} WHERE post_type = 'solar_lead' AND post_author = %d",
-            $manager->ID
-        ));
+        if (in_array('manager', (array)$manager->roles)) {
+             // Manager: Get leads from self AND team
+             $team_ids = [$manager->ID];
+             
+             // Get AMs
+             $ams = get_users([
+                'role' => 'area_manager',
+                'meta_key' => '_supervised_by_manager',
+                'meta_value' => $manager->ID,
+                'fields' => 'ID'
+             ]);
+             if (!empty($ams)) {
+                 $team_ids = array_merge($team_ids, $ams);
+                 
+                 // Get SMs
+                 $sms = get_users([
+                    'role' => 'sales_manager',
+                    'meta_query' => [
+                        ['key' => '_assigned_area_manager', 'value' => $ams, 'compare' => 'IN']
+                    ],
+                    'fields' => 'ID'
+                 ]);
+                 if (!empty($sms)) {
+                     $team_ids = array_merge($team_ids, $sms);
+                 }
+             }
+             
+             $total_leads = $wpdb->get_var("SELECT COUNT(*) FROM {$wpdb->posts} WHERE post_type = 'solar_lead' AND post_author IN (" . implode(',', array_map('intval', $team_ids)) . ")");
+        } else {
+             // AM: Own leads + SM leads (already logic exists? No, generic dashboard usually shows own leads or assigned)
+             // Default behavior:
+             $total_leads = $wpdb->get_var($wpdb->prepare(
+                "SELECT COUNT(*) FROM {$wpdb->posts} WHERE post_type = 'solar_lead' AND post_author = %d",
+                $manager->ID
+            ));
+        }
+
+
+        // Get pending reviews count from ALL visible projects
+        $pending_reviews = 0;
+        if (!empty($project_ids)) {
+            $placeholders = implode(',', array_fill(0, count($project_ids), '%d'));
+            $pending_reviews = $wpdb->get_var($wpdb->prepare(
+                "SELECT COUNT(*) FROM {$wpdb->prefix}solar_process_steps 
+                 WHERE project_id IN ($placeholders) AND admin_status = 'under_review'",
+                ...$project_ids
+            ));
+        }
         
-        // Get pending reviews count
-        $pending_reviews = $wpdb->get_var($wpdb->prepare(
-            "SELECT COUNT(*) FROM {$wpdb->prefix}solar_process_steps ps 
-             JOIN {$wpdb->posts} p ON ps.project_id = p.ID 
-             WHERE p.post_author = %d AND ps.admin_status = 'under_review'",
-            $manager->ID
-        ));
+        // ========================================
+        // Chart Data Preparation
+        // ========================================
+        
+        // 1. Project Status Breakdown
+        $status_counts = ['pending' => 0, 'in_progress' => 0, 'completed' => 0];
+        foreach ($project_ids as $project_id) {
+            $status = get_post_meta($project_id, 'project_status', true) ?: 'pending';
+            if (isset($status_counts[$status])) {
+                $status_counts[$status]++;
+            }
+        }
+        
+        // 2. Monthly Trend Data (Last 6 months)
+        $months = [];
+        $month_labels = [];
+        $current_month = strtotime('first day of this month');
+        
+        for ($i = 5; $i >= 0; $i--) {
+            $month_timestamp = strtotime("-$i month", $current_month);
+            $month_key = date('Y-m', $month_timestamp);
+            $months[$month_key] = 0;
+            $month_labels[] = date('M', $month_timestamp);
+        }
+        
+        // Count projects by month
+        foreach ($project_ids as $project_id) {
+            $project = get_post($project_id);
+            if ($project) {
+                $project_month = date('Y-m', strtotime($project->post_date));
+                if (isset($months[$project_month])) {
+                    $months[$project_month]++;
+                }
+            }
+        }
+        
+        // 3. Financial Data by Month
+        $financial_months = [];
+        foreach (array_keys($months) as $month_key) {
+            $financial_months[$month_key] = [
+                'revenue' => 0,
+                'payments' => 0,
+                'costs' => 0
+            ];
+        }
+        
+        foreach ($project_ids as $project_id) {
+            $project = get_post($project_id);
+            if ($project) {
+                $project_month = date('Y-m', strtotime($project->post_date));
+                if (isset($financial_months[$project_month])) {
+                    $financial_months[$project_month]['revenue'] += floatval(get_post_meta($project_id, '_total_project_cost', true) ?: 0);
+                    $financial_months[$project_month]['payments'] += floatval(get_post_meta($project_id, '_paid_amount', true) ?: 0);
+                    $financial_months[$project_month]['costs'] += floatval(get_post_meta($project_id, '_vendor_paid_amount', true) ?: 0);
+                }
+            }
+        }
+        
+        // Extract arrays for chart
+        $revenue_data = [];
+        $payment_data = [];
+        $costs_data = [];
+        foreach ($financial_months as $data) {
+            $revenue_data[] = round($data['revenue'], 2);
+            $payment_data[] = round($data['payments'], 2);
+            $costs_data[] = round($data['costs'], 2);
+        }
+        
+        // 4. Lead Status Breakdown
+        $lead_counts = ['converted' => 0, 'pending' => 0, 'lost' => 0];
+        
+        if (isset($team_ids) && !empty($team_ids)) {
+            // Get all leads for team
+            $leads_query = "SELECT ID FROM {$wpdb->posts} WHERE post_type = 'solar_lead' AND post_author IN (" . implode(',', array_map('intval', $team_ids)) . ")";
+            $lead_ids = $wpdb->get_col($leads_query);
+            
+            foreach ($lead_ids as $lead_id) {
+                $lead_status = get_post_meta($lead_id, '_lead_status', true) ?: 'new';
+                
+                if ($lead_status === 'converted') {
+                    $lead_counts['converted']++;
+                } elseif (in_array($lead_status, ['lost', 'dead', 'rejected'])) {
+                    $lead_counts['lost']++;
+                } else {
+                    // new, contacted, qualified, proposal_sent, etc
+                    $lead_counts['pending']++;
+                }
+            }
+        }
         
         wp_send_json_success([
             'total_projects' => $total_projects,
@@ -257,7 +441,28 @@ class KSC_Admin_Manager_API extends KSC_API_Base {
             'total_outstanding' => round($total_outstanding, 2),
             'collection_rate' => round($collection_rate, 2),
             'total_leads' => intval($total_leads),
-            'pending_reviews' => intval($pending_reviews)
+            'pending_reviews' => intval($pending_reviews),
+            
+            // Chart Data
+            'project_status' => [
+                'pending' => $status_counts['pending'],
+                'in_progress' => $status_counts['in_progress'],
+                'completed' => $status_counts['completed']
+            ],
+            'monthly_data' => [
+                'labels' => $month_labels,
+                'values' => array_values($months)
+            ],
+            'financial_data' => [
+                'revenue' => $revenue_data,
+                'payments' => $payment_data,
+                'costs' => $costs_data
+            ],
+            'lead_data' => [
+                'converted' => $lead_counts['converted'],
+                'pending' => $lead_counts['pending'],
+                'lost' => $lead_counts['lost']
+            ]
         ]);
     }
     
@@ -457,6 +662,7 @@ class KSC_Admin_Manager_API extends KSC_API_Base {
      */
     public function award_project_to_vendor() {
         check_ajax_referer('award_bid_nonce', 'nonce');
+
         
         $auth = $this->verify_admin_or_manager();
         $current_user = $auth['user'];
@@ -1499,15 +1705,16 @@ class KSC_Admin_Manager_API extends KSC_API_Base {
         }
     }
     
-    /**
-     * Assign location to area manager
-     */
     public function assign_area_manager_location() {
         // check_ajax_referer('assign_location_nonce', 'nonce');
         
-        // Only admins can assign locations
-        if (!current_user_can('manage_options')) {
-            wp_send_json_error(['message' => 'Permission denied. Admin access required.']);
+        $current_user = wp_get_current_user();
+        $is_admin = in_array('administrator', (array)$current_user->roles);
+        $is_manager = in_array('manager', (array)$current_user->roles);
+    
+        // Only admins or managers can assign locations/teams
+        if (!$is_admin && !$is_manager) {
+            wp_send_json_error(['message' => 'Permission denied. Admin or Manager access required.']);
         }
         
         $manager_id = isset($_POST['manager_id']) ? intval($_POST['manager_id']) : 0;
@@ -1531,7 +1738,12 @@ class KSC_Admin_Manager_API extends KSC_API_Base {
         update_user_meta($manager_id, 'state', $state);
         update_user_meta($manager_id, 'city', $city);
         
-        wp_send_json_success(['message' => 'Location assigned successfully']);
+        // If assigned by a Manager, link the AM to the Manager
+        if ($is_manager) {
+            update_user_meta($manager_id, '_supervised_by_manager', $current_user->ID);
+        }
+        
+        wp_send_json_success(['message' => 'Location and Team assigned successfully']);
     }
     
     /**
@@ -2207,5 +2419,426 @@ class KSC_Admin_Manager_API extends KSC_API_Base {
     private function get_user_display_name_safe($user_id, $fallback_role) {
         $user = get_userdata($user_id);
         return $user ? $user->display_name : ucfirst($fallback_role);
+    }
+    /**
+     * Get Team Analysis Data for Manager Dashboard
+     */
+    public function get_team_analysis_data() {
+        if (!is_user_logged_in()) {
+            wp_send_json_error(['message' => 'Unauthorized']);
+        }
+        
+        $user = wp_get_current_user();
+        $is_admin = in_array('administrator', (array)$user->roles);
+        $is_manager = in_array('manager', (array)$user->roles);
+        
+        if (!$is_admin && !$is_manager) {
+            wp_send_json_error(['message' => 'Access denied']);
+        }
+
+        // 1. Get Area Managers
+        // Admin sees ALL AMs, Manager sees only their supervised AMs
+        if ($is_admin) {
+            $ams = get_users([
+                'role' => 'area_manager',
+                'orderby' => 'display_name',
+                'number' => -1
+            ]);
+        } else {
+            $ams = get_users([
+                'role' => 'area_manager',
+                'meta_key' => '_supervised_by_manager',
+                'meta_value' => $user->ID,
+                'orderby' => 'display_name'
+            ]);
+        }
+
+        $am_data = [];
+        $sm_data = [];
+        $cleaner_data = [];
+        $total_projects = 0;
+
+        foreach ($ams as $am) {
+            $project_ids = $this->get_am_visible_project_ids($am->ID);
+            $total_projects += count($project_ids);
+            
+            // Get SMs for this AM
+            $sms = get_users([
+                'role' => 'sales_manager',
+                'meta_key' => '_assigned_area_manager',
+                'meta_value' => $am->ID
+            ]);
+            
+            // Get Cleaners for this AM
+            $cleaners = get_users([
+                'role' => 'solar_cleaner',
+                'meta_key' => '_supervised_by_area_manager',
+                'meta_value' => $am->ID
+            ]);
+
+            $am_data[] = [
+                'id' => $am->ID,
+                'display_name' => $am->display_name,
+                'email' => $am->user_email,
+                'city' => get_user_meta($am->ID, 'city', true) ?: '-',
+                'state' => get_user_meta($am->ID, 'state', true) ?: '-',
+                'project_count' => count($project_ids),
+                'team_size' => count($sms) + count($cleaners)
+            ];
+
+            foreach ($sms as $sm) {
+                // Get Lead stats for SM
+                global $wpdb;
+                $lead_count = $wpdb->get_var($wpdb->prepare(
+                    "SELECT COUNT(*) FROM {$wpdb->posts} WHERE post_type = 'solar_lead' AND post_author = %d",
+                    $sm->ID
+                ));
+                $converted = $wpdb->get_var($wpdb->prepare(
+                    "SELECT COUNT(*) FROM {$wpdb->posts} WHERE post_type = 'solar_lead' AND post_author = %d AND post_status = 'publish' AND ID IN (SELECT post_id FROM {$wpdb->postmeta} WHERE meta_key = 'lead_status' AND meta_value = 'converted')",
+                    $sm->ID
+                ));
+
+                $sm_data[] = [
+                    'id' => $sm->ID,
+                    'display_name' => $sm->display_name,
+                    'email' => $sm->user_email,
+                    'supervising_am' => $am->display_name,
+                    'lead_count' => intval($lead_count),
+                    'conversion_count' => intval($converted)
+                ];
+            }
+
+            foreach ($cleaners as $c) {
+                 // Get completed visits
+                 global $wpdb;
+                 $completed_visits = $wpdb->get_var($wpdb->prepare(
+                     "SELECT COUNT(*) FROM {$wpdb->prefix}solar_cleaning_visits WHERE cleaner_id = %d AND status = 'completed'",
+                     $c->ID
+                 ));
+
+                $cleaner_data[] = [
+                    'id' => $c->ID,
+                    'name' => $c->display_name,
+                    'phone' => get_user_meta($c->ID, 'phone', true) ?: '-',
+                    'supervising_am' => $am->display_name,
+                    'completed_visits' => intval($completed_visits),
+                    'status' => 'active' // Simplified for now
+                ];
+            }
+        }
+
+        wp_send_json_success([
+            'area_managers' => $am_data,
+            'sales_managers' => $sm_data,
+            'cleaners' => $cleaner_data,
+            'total_projects' => $total_projects
+        ]);
+    }
+
+
+    /**
+     * Update Manager's assigned states (Admin Only)
+     */
+    public function update_manager_assigned_states() {
+        check_ajax_referer('admin_manager_action_nonce', 'nonce');
+        
+        if (!current_user_can('manage_options')) {
+            wp_send_json_error(['message' => 'Unauthorized']);
+        }
+        
+        $manager_id = intval($_POST['manager_id']);
+        $states = isset($_POST['states']) ? $_POST['states'] : [];
+        $is_all = isset($_POST['assign_all']) && filter_var($_POST['assign_all'], FILTER_VALIDATE_BOOLEAN);
+        
+        if (!$manager_id) {
+            wp_send_json_error(['message' => 'Invalid Manager ID']);
+        }
+        
+        if ($is_all) {
+             delete_user_meta($manager_id, '_assigned_states');
+        } else {
+            $sanitized_states = array_map('sanitize_text_field', (array)$states);
+            update_user_meta($manager_id, '_assigned_states', $sanitized_states);
+        }
+        
+        wp_send_json_success(['message' => 'Manager states updated successfully']);
+    }
+    
+    /**
+     * Get detailed information about a team member
+     * Shows comprehensive activity data based on role
+     */
+    public function get_team_member_details() {
+        check_ajax_referer('get_projects_nonce', 'nonce');
+        
+        $current_user = wp_get_current_user();
+        $is_admin = in_array('administrator', (array)$current_user->roles);
+        $is_manager = in_array('manager', (array)$current_user->roles);
+        
+        if (!$is_admin && !$is_manager) {
+            wp_send_json_error(['message' => 'Access denied']);
+        }
+        
+        $user_id = isset($_POST['user_id']) ? intval($_POST['user_id']) : 0;
+        $role = isset($_POST['role']) ? sanitize_text_field($_POST['role']) : '';
+        
+        if (!$user_id || !$role) {
+            wp_send_json_error(['message' => 'Missing user ID or role']);
+        }
+        
+        $user = get_userdata($user_id);
+        if (!$user) {
+            wp_send_json_error(['message' => 'User not found']);
+        }
+        
+        // Build response based on role
+        $response = [
+            'user_info' => [
+                'id' => $user->ID,
+                'name' => $user->display_name,
+                'email' => $user->user_email,
+                'phone' => get_user_meta($user->ID, 'phone_number', true) ?: get_user_meta($user->ID, 'phone', true),
+                'state' => get_user_meta($user->ID, 'state', true),
+                'city' => get_user_meta($user->ID, 'city', true),
+                'joined_date' => date('M Y', strtotime($user->user_registered))
+            ],
+            'stats' => [],
+            'projects' => [],
+            'leads' => [],
+            'visits' => [],
+            'recent_activity' => []
+        ];
+        
+        global $wpdb;
+        
+        // Role-specific data fetching
+        switch ($role) {
+            case 'area_manager':
+                $response = array_merge($response, $this->get_am_detail_data($user_id));
+                break;
+                
+            case 'sales_manager':
+                $response = array_merge($response, $this->get_sm_detail_data($user_id));
+                break;
+                
+            case 'cleaner':
+                $response = array_merge($response, $this->get_cleaner_detail_data($user_id));
+                break;
+                
+            default:
+                wp_send_json_error(['message' => 'Invalid role']);
+        }
+        
+        wp_send_json_success($response);
+    }
+    
+    /**
+     * Get detailed data for Area Manager
+     */
+    private function get_am_detail_data($user_id) {
+        global $wpdb;
+        
+        // Get projects
+        $project_ids = $this->get_am_visible_project_ids($user_id);
+        $projects = [];
+        
+        foreach ($project_ids as $pid) {
+            $projects[] = [
+                'id' => $pid,
+                'title' => get_the_title($pid),
+                'status' => get_post_meta($pid, 'project_status', true) ?: 'pending',
+                'city' => get_post_meta($pid, '_project_city', true),
+                'state' => get_post_meta($pid, '_project_state', true),
+                'cost' => get_post_meta($pid, '_total_project_cost', true) ?: 0
+            ];
+        }
+        
+        // Get leads (own + team SM leads)
+        $sm_ids = get_users([
+            'role' => 'sales_manager',
+            'meta_key' => '_assigned_area_manager',
+            'meta_value' => $user_id,
+            'fields' => 'ID'
+        ]);
+        
+        $all_ids = array_merge([$user_id], $sm_ids);
+        $leads_query = "SELECT * FROM {$wpdb->posts} WHERE post_type = 'solar_lead' AND post_author IN (" . implode(',', array_map('intval', $all_ids)) . ") ORDER BY post_date DESC LIMIT 20";
+        $leads_raw = $wpdb->get_results($leads_query);
+        
+        $leads = [];
+        foreach ($leads_raw as $lead) {
+            $leads[] = [
+                'id' => $lead->ID,
+                'name' => $lead->post_title,
+                'phone' => get_post_meta($lead->ID, '_lead_phone', true),
+                'status' => get_post_meta($lead->ID, '_lead_status', true) ?: 'new',
+                'city' => get_post_meta($lead->ID, '_lead_city', true),
+                'created_date' => date('M d, Y', strtotime($lead->post_date))
+            ];
+        }
+        
+        // Get team size
+        $team_size = count($sm_ids);
+        
+        // Stats
+        $stats = [
+            'total_projects' => count($project_ids),
+            'total_leads' => count($leads_raw),
+            'team_size' => $team_size
+        ];
+        
+        // Recent activity from logs
+        $activity = $wpdb->get_results($wpdb->prepare(
+            "SELECT * FROM {$wpdb->prefix}solar_activity_logs 
+             WHERE user_id = %d 
+             ORDER BY created_at DESC LIMIT 10",
+            $user_id
+        ));
+        
+        $recent_activity = [];
+        foreach ($activity as $act) {
+            $recent_activity[] = [
+                'time' => human_time_diff(strtotime($act->created_at), current_time('timestamp')) . ' ago',
+                'description' => $act->details ?: ucfirst(str_replace('_', ' ', $act->action_type))
+            ];
+        }
+        
+        return [
+            'stats' => $stats,
+            'projects' => $projects,
+            'leads' => $leads,
+            'recent_activity' => $recent_activity
+        ];
+    }
+    
+    /**
+     * Get detailed data for Sales Manager
+     */
+    private function get_sm_detail_data($user_id) {
+        global $wpdb;
+        
+        // Get leads
+        $leads_query = $wpdb->prepare(
+            "SELECT * FROM {$wpdb->posts} WHERE post_type = 'solar_lead' AND post_author = %d ORDER BY post_date DESC LIMIT 20",
+            $user_id
+        );
+        $leads_raw = $wpdb->get_results($leads_query);
+        
+        $leads = [];
+        $conversions = 0;
+        
+        foreach ($leads_raw as $lead) {
+            $status = get_post_meta($lead->ID, '_lead_status', true) ?: 'new';
+            if ($status === 'converted') {
+                $conversions++;
+            }
+            
+            $leads[] = [
+                'id' => $lead->ID,
+                'name' => $lead->post_title,
+                'phone' => get_post_meta($lead->ID, '_lead_phone', true),
+                'status' => $status,
+                'city' => get_post_meta($lead->ID, '_lead_city', true),
+                'created_date' => date('M d, Y', strtotime($lead->post_date))
+            ];
+        }
+        
+        $total_leads = count($leads_raw);
+        $conversion_rate = $total_leads > 0 ? round(($conversions / $total_leads) * 100, 1) : 0;
+        
+        // Stats
+        $stats = [
+            'total_leads' => $total_leads,
+            'conversions' => $conversions,
+            'conversion_rate' => $conversion_rate
+        ];
+        
+        // Recent activity
+        $activity = $wpdb->get_results($wpdb->prepare(
+            "SELECT * FROM {$wpdb->prefix}solar_activity_logs 
+             WHERE user_id = %d 
+             ORDER BY created_at DESC LIMIT 10",
+            $user_id
+        ));
+        
+        $recent_activity = [];
+        foreach ($activity as $act) {
+            $recent_activity[] = [
+                'time' => human_time_diff(strtotime($act->created_at), current_time('timestamp')) . ' ago',
+                'description' => $act->details ?: ucfirst(str_replace('_', ' ', $act->action_type))
+            ];
+        }
+        
+        return [
+            'stats' => $stats,
+            'leads' => $leads,
+            'recent_activity' => $recent_activity
+        ];
+    }
+    
+    /**
+     * Get detailed data for Cleaner
+     */
+    private function get_cleaner_detail_data($user_id) {
+        global $wpdb;
+        
+        // Get cleaning visits
+        $visits_query = $wpdb->prepare(
+            "SELECT * FROM {$wpdb->prefix}cleaning_visits WHERE cleaner_id = %d ORDER BY visit_date DESC LIMIT 20",
+            $user_id
+        );
+        $visits_raw = $wpdb->get_results($visits_query);
+        
+        $visits = [];
+        $completed = 0;
+        $pending = 0;
+        
+        foreach ($visits_raw as $visit) {
+            if ($visit->status === 'completed') {
+                $completed++;
+            } else {
+                $pending++;
+            }
+            
+            $visits[] = [
+                'id' => $visit->id,
+                'visit_date' => date('M d, Y', strtotime($visit->visit_date)),
+                'client_name' => $visit->client_name ?: 'N/A',
+                'location' => $visit->location ?: 'N/A',
+                'status' => $visit->status
+            ];
+        }
+        
+        $total_visits = count($visits_raw);
+        $completion_rate = $total_visits > 0 ? round(($completed / $total_visits) * 100, 1) : 0;
+        
+        // Stats
+        $stats = [
+            'completed_visits' => $completed,
+            'pending_visits' => $pending,
+            'completion_rate' => $completion_rate
+        ];
+        
+        // Recent activity
+        $activity = $wpdb->get_results($wpdb->prepare(
+            "SELECT * FROM {$wpdb->prefix}solar_activity_logs 
+             WHERE user_id = %d 
+             ORDER BY created_at DESC LIMIT 10",
+            $user_id
+        ));
+        
+        $recent_activity = [];
+        foreach ($activity as $act) {
+            $recent_activity[] = [
+                'time' => human_time_diff(strtotime($act->created_at), current_time('timestamp')) . ' ago',
+                'description' => $act->details ?: ucfirst(str_replace('_', ' ', $act->action_type))
+            ];
+        }
+        
+        return [
+            'stats' => $stats,
+            'visits' => $visits,
+            'recent_activity' => $recent_activity
+        ];
     }
 }

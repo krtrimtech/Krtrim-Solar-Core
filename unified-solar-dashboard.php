@@ -3,7 +3,7 @@
  * Plugin Name:       Krtrim Solar Core
  * Plugin URI:        https://krtrim.tech/tool
  * Description:       A comprehensive project management and bidding platform for solar companies, developed by Krtrim.
- * Version:           1.2.0
+ * Version:           1.3.0
  * Author:            Krtrim
  * Author URI:        https://krtrim.tech
  * License:           GPL-2.0+
@@ -385,7 +385,9 @@ final class Krtrim_Solar_Core {
 
 		// ✅ MANAGER DASHBOARD (Regional Manager with multi-state access)
 		global $post;
-        if ( is_a( $post, 'WP_Post' ) && ( has_shortcode( $post->post_content, 'manager_dashboard' ) || is_page( 'manager-dashboard' ) || is_page( 'area-manager-dashboard' ) && has_shortcode($post->post_content, 'area_manager_dashboard') ) ) {
+		$is_manager_dash = is_a( $post, 'WP_Post' ) && ( has_shortcode( $post->post_content, 'manager_dashboard' ) || is_page( 'manager-dashboard' ) );
+		
+        if ( $is_manager_dash ) {
 			wp_enqueue_style('area-manager-modern', $this->dir_url . 'assets/css/area-manager-modern.css', [], '1.0.0');
 			wp_enqueue_style('lead-component-css', $this->dir_url . 'assets/css/components/lead-component.css', [], '1.0.1');
             wp_enqueue_style('leads-clients-enhanced', $this->dir_url . 'assets/css/leads-clients-enhanced.css', [], '1.0.0');
@@ -393,6 +395,7 @@ final class Krtrim_Solar_Core {
             wp_enqueue_style('date-picker-enhanced', $this->dir_url . 'assets/css/date-picker-enhanced.css', [], '1.0.0');
             wp_enqueue_style('toast-css', $this->dir_url . 'assets/css/toast.css', [], '1.0.0');
             wp_enqueue_style('password-field-css', $this->dir_url . 'assets/css/password-field.css', [], '1.0.0');
+            wp_enqueue_style('manager-dashboard-overrides', $this->dir_url . 'assets/css/manager-dashboard-overrides.css', [], '1.0.0');
             wp_enqueue_script( 'chart-js', 'https://cdn.jsdelivr.net/npm/chart.js', [], '3.7.0', true );
             wp_enqueue_script('project-modal-js', $this->dir_url . 'assets/js/project-modal.js', ['jquery'], '1.0.0', true);
             wp_enqueue_script('lead-component-js', $this->dir_url . 'assets/js/components/lead-component.js', ['jquery'], '1.0.1', true);
@@ -765,7 +768,7 @@ function sp_create_plugin_essentials() {
 		['title' => 'Dashboard', 'slug' => 'solar-dashboard', 'content' => '[unified_solar_dashboard]'],
 		['title' => 'Area Manager Dashboard', 'slug' => 'area-manager-dashboard', 'content' => '[area_manager_dashboard]'],
 		['title' => 'Sales Manager Dashboard', 'slug' => 'sales-manager-dashboard', 'content' => '[sales_manager_dashboard]'],
-		['title' => 'Manager Dashboard', 'slug' => 'manager-dashboard', 'content' => '[area_manager_dashboard]'],
+		['title' => 'Manager Dashboard', 'slug' => 'manager-dashboard', 'content' => '[manager_dashboard]'],
 		['title' => 'Cleaner Dashboard', 'slug' => 'cleaner-dashboard', 'content' => '[cleaner_dashboard]'],
 		['title' => 'Vendor Registration', 'slug' => 'vendor-registration', 'content' => '[vendor_registration_form]'],
 		['title' => 'Project Marketplace', 'slug' => 'project-marketplace', 'content' => '[solar_project_marketplace]'],
