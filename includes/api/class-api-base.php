@@ -69,16 +69,17 @@ abstract class KSC_API_Base {
         
         $user = wp_get_current_user();
         $is_admin = current_user_can('manage_options');
-        $is_manager = in_array('area_manager', (array)$user->roles);
+        $is_area_manager = in_array('area_manager', (array)$user->roles);
+        $is_manager = in_array('manager', (array)$user->roles);
         
-        if (!$is_admin && !$is_manager) {
+        if (!$is_admin && !$is_area_manager && !$is_manager) {
             wp_send_json_error(['message' => 'Permission denied. Admin or Area Manager role required.']);
         }
         
         return [
             'user' => $user,
             'is_admin' => $is_admin,
-            'is_manager' => $is_manager
+            'is_manager' => $is_area_manager || $is_manager
         ];
     }
     

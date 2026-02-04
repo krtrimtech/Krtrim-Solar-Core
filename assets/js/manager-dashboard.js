@@ -278,7 +278,12 @@
     }
 
     function updateDashboardStats(stats) {
-        console.log('Updating stats:', stats);
+        console.log('=== UPDATING DASHBOARD STATS ===');
+        console.log('Stats object received:', stats);
+        console.log('Total Projects:', stats.total_projects);
+        console.log('Total Revenue:', stats.total_revenue);
+        console.log('DOM element #total-projects-stat exists:', $('#total-projects-stat').length > 0);
+
         $('#total-projects-stat').text(stats.total_projects || 0);
         $('#total-revenue-stat').text('₹' + (stats.total_revenue || 0).toLocaleString('en-IN'));
         $('#client-payments-stat').text('₹' + (stats.total_client_payments || 0).toLocaleString('en-IN'));
@@ -288,6 +293,11 @@
         $('#profit-margin-stat').text((stats.profit_margin || 0).toFixed(1) + '%');
         $('#collection-rate-stat').text((stats.collection_rate || 0).toFixed(1) + '%');
         $('#total-leads-stat').text(stats.total_leads || 0);
+
+        console.log('Stats updated. Checking DOM values:');
+        console.log('  Projects stat now shows:', $('#total-projects-stat').text());
+        console.log('  Revenue stat now shows:', $('#total-revenue-stat').text());
+        console.log('=== END STATS UPDATE ===');
     }
 
     function initializeCharts(stats) {
@@ -805,23 +815,108 @@
                 if (response.success) {
                     let html = '';
                     if (response.data.reviews.length > 0) {
+                        // Group reviews by project
+                        const projectGroups = {};
                         response.data.reviews.forEach(review => {
+                            if (!projectGroups[review.project_id]) {
+                                projectGroups[review.project_id] = {
+                                    project_title: review.project_title || `Project #${review.project_id}`,
+                                    project_city: review.project_city,
+                                    project_state: review.project_state,
+                                    system_size: review.system_size,
+                                    reviews: []
+                                };
+                            }
+                            projectGroups[review.project_id].reviews.push(review);
+                        });
+
+                        // Render each project card
+                        Object.keys(projectGroups).forEach(projectId => {
+                            const group = projectGroups[projectId];
                             html += `
-                                <div class="review-item">
-                                    <h4>Project: ${review.project_id}</h4>
-                                    <p><strong>Step ${review.step_number}:</strong> ${review.step_name}</p>
-                                    ${review.image_url ? `<a href="${review.image_url}" target="_blank">View Submission</a>` : ''}
-                                    <p><em>${review.vendor_comment || ''}</em></p>
-                                    <div class="review-form">
-                                        <textarea class="review-comment" placeholder="Add a comment..."></textarea>
-                                        <button class="btn btn-success review-btn" data-decision="approved" data-step-id="${review.id}">Approve</button>
-                                        <button class="btn btn-danger review-btn" data-decision="rejected" data-step-id="${review.id}">Reject</button>
+                                <div class="card" style="margin-bottom: 20px;">
+                                    <div class="bid-project-header" style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
+                                        <div>
+                                            <h3 style="margin: 0 0 5px 0;">${group.project_title}</h3>
+                                            <small style="color: #666;">
+                                                📍 ${group.project_city || ''}, ${group.project_state || ''}
+                                                ${group.system_size ? ` • ⚡ ${group.system_size} kW` : ''}
+                                            </small>
+                                        </div>
+                                        <span class="status-badge" style="background: #fef3c7; color: #b45309; padding: 6px 12px; border-radius: 6px;">
+                                            ${group.reviews.length} Pending Review${group.reviews.length !== 1 ? 's' : ''}
+                                        </span>
+                                    </div>
+                                    
+                                    <div class="reviews-list">
+                                        <table class="data-table" style="width: 100%;">
+                                            <thead>
+                                                <tr>
+                                                    <th>Step</th>
+                                                    <th>Vendor Comment</th>
+                                                    <th>Submission</th>
+                                                    <th>Your Comment</th>
+                                                    <th>Action</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody>
+                            `;
+
+                            group.reviews.forEach(review => {
+                                html += `
+                                    <tr>
+                                        <td>
+                                            <strong>Step ${review.step_number}</strong><br>
+                                            <small style="color: #666;">${review.step_name}</small>
+                                        </td>
+                                        <td>
+                                            <em style="color: #666;">${review.vendor_comment || 'No comment'}</em>
+                                        </td>
+                                        <td>
+                                            ${review.image_url ?
+                                        `<a href="${review.image_url}" target="_blank" class="btn btn-sm" style="background: #e0f2fe; color: #0369a1; padding: 4px 12px;">
+                                                    📷 View
+                                                </a>`
+                                        : '<span style="color: #999;">No image</span>'}
+                                        </td>
+                                        <td>
+                                            <textarea class="review-comment" data-step-id="${review.id}" 
+                                                      placeholder="Add comment..." 
+                                                      style="width: 100%; min-height: 60px; padding: 8px; border: 1px solid #ddd; border-radius: 4px; font-size: 13px;"></textarea>
+                                        </td>
+                                        <td style="white-space: nowrap;">
+                                            <button class="btn btn-success review-btn" 
+                                                    data-decision="approved" 
+                                                    data-step-id="${review.id}"
+                                                    style="margin-right: 5px; padding: 8px 16px;">
+                                                ✓ Approve
+                                            </button>
+                                            <button class="btn btn-danger review-btn" 
+                                                    data-decision="rejected" 
+                                                    data-step-id="${review.id}"
+                                                    style="padding: 8px 16px;">
+                                                ✗ Reject
+                                            </button>
+                                        </td>
+                                    </tr>
+                                `;
+                            });
+
+                            html += `
+                                            </tbody>
+                                        </table>
                                     </div>
                                 </div>
                             `;
                         });
                     } else {
-                        html = '<p>No pending reviews.</p>';
+                        html = `
+                            <div class="empty-state">
+                                <div class="icon">✅</div>
+                                <h3>No Pending Reviews</h3>
+                                <p>All vendor submissions have been reviewed. New submissions will appear here.</p>
+                            </div>
+                        `;
                     }
                     $('#project-reviews-container').html(html);
                 } else {

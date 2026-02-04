@@ -2151,7 +2151,12 @@ function sp_render_single_manager_view($manager_id) {
             
             $.post(ajaxurl, formData + '&action=update_manager_assigned_states&nonce=' + nonce, function(response) {
                 if (response.success) {
-                    alert('States updated successfully!');
+                    const data = response.data;
+                    let message = 'States updated successfully!\n';
+                    message += `✅ Total Area Managers supervised: ${data.total_supervised_ams || 0}\n`;
+                    message += `➕ Newly assigned: ${data.assigned_count || 0}\n`;
+                    message += `➖ Unassigned: ${data.unassigned_count || 0}`;
+                    alert(message);
                     location.reload();
                 } else {
                     alert('Error: ' + (response.data.message || 'Unknown error'));

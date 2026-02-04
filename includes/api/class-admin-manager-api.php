@@ -682,8 +682,29 @@ class KSC_Admin_Manager_API extends KSC_API_Base {
             wp_send_json_error(['message' => 'Project not found.']);
         }
         
-        // Area managers can only award their own projects
-        if (!$is_admin && $project->post_author != $current_user->ID) {
+        // Permission check: Admin, project author, OR Manager supervising the project's AM
+        $can_award = false;
+        
+        if ($is_admin) {
+            $can_award = true;
+        } elseif ($project->post_author == $current_user->ID) {
+            // Project author (AM) can award their own project
+            $can_award = true;
+        } else {
+            // Check if current user is a Manager supervising the AM who created this project
+            $is_manager = in_array('manager', (array)$current_user->roles);
+            if ($is_manager) {
+                // Check if project's author (AM) is supervised by this manager
+                $project_author_id = $project->post_author;
+                $project_author_supervisor = get_user_meta($project_author_id, '_supervised_by_manager', true);
+                
+                if ($project_author_supervisor == $current_user->ID) {
+                    $can_award = true;
+                }
+            }
+        }
+        
+        if (!$can_award) {
             wp_send_json_error(['message' => 'You do not have permission to award this project.']);
         }
         
@@ -825,12 +846,33 @@ class KSC_Admin_Manager_API extends KSC_API_Base {
         }
         
         $project = get_post($submission->project_id);
+        // Permission check: Admin can review all, AM reviews their own projects, Manager reviews subordinate AM projects
+        $can_review = false;
         
-        if (!$project || $project->post_author != $manager->ID) {
+        if ($is_admin) {
+            $can_review = true;
+        } elseif ($project->post_author == $current_user->ID) {
+            // Project author (AM) can review their own project
+            $can_review = true;
+        } else {
+            // Check if current user is a Manager supervising the AM who created this project
+            $is_manager = in_array('manager', (array)$current_user->roles);
+            if ($is_manager) {
+                // Check if project's author (AM) is supervised by this manager
+                $project_author_id = $project->post_author;
+                $project_author_supervisor = get_user_meta($project_author_id, '_supervised_by_manager', true);
+                
+                if ($project_author_supervisor == $current_user->ID) {
+                    $can_review = true;
+                }
+            }
+        }
+        
+        if (!$can_review) {
             wp_send_json_error(['message' => 'You do not have permission to review this submission.']);
         }
         
-        $result = SP_Process_Steps_Manager::process_step_review($step_id, $decision, $comment, $manager->ID);
+        $result = SP_Process_Steps_Manager::process_step_review($step_id, $decision, $comment, $current_user->ID);
         
         if ($result['success']) {
             wp_send_json_success([
@@ -2554,14 +2596,75 @@ class KSC_Admin_Manager_API extends KSC_API_Base {
             wp_send_json_error(['message' => 'Invalid Manager ID']);
         }
         
+        // Validate user is a Manager
+        $manager = get_userdata($manager_id);
+        if (!$manager || !in_array('manager', (array)$manager->roles)) {
+            wp_send_json_error(['message' => 'User is not a Manager']);
+        }
+        
+        // Update manager's assigned states
         if ($is_all) {
-             delete_user_meta($manager_id, '_assigned_states');
+            delete_user_meta($manager_id, '_assigned_states');
+            $assigned_states = []; // Empty array means ALL states
         } else {
             $sanitized_states = array_map('sanitize_text_field', (array)$states);
             update_user_meta($manager_id, '_assigned_states', $sanitized_states);
+            $assigned_states = $sanitized_states;
         }
         
-        wp_send_json_success(['message' => 'Manager states updated successfully']);
+        // =========================================
+        // AUTO-ASSIGNMENT LOGIC
+        // =========================================
+        
+        // 1. Get ALL Area Managers currently supervised by this Manager
+        $current_ams = get_users([
+            'role' => 'area_manager',
+            'meta_key' => '_supervised_by_manager',
+            'meta_value' => $manager_id,
+            'fields' => 'ID'
+        ]);
+        
+        // 2. Get ALL Area Managers in the newly assigned states
+        $ams_in_states = [];
+        if (!empty($assigned_states)) {
+            foreach ($assigned_states as $state) {
+                $state_ams = get_users([
+                    'role' => 'area_manager',
+                    'meta_key' => 'state',
+                    'meta_value' => $state,
+                    'fields' => 'ID'
+                ]);
+                $ams_in_states = array_merge($ams_in_states, $state_ams);
+            }
+            $ams_in_states = array_unique($ams_in_states);
+        } elseif ($is_all) {
+            // If "assign all" is checked, get ALL area managers
+            $all_ams = get_users([
+                'role' => 'area_manager',
+                'fields' => 'ID'
+            ]);
+            $ams_in_states = $all_ams;
+        }
+        
+        // 3. Assign new AMs (those in states but not currently supervised)
+        $newly_assigned = array_diff($ams_in_states, $current_ams);
+        foreach ($newly_assigned as $am_id) {
+            update_user_meta($am_id, '_supervised_by_manager', $manager_id);
+        }
+        
+        // 4. Unassign AMs no longer in manager's states
+        $to_unassign = array_diff($current_ams, $ams_in_states);
+        foreach ($to_unassign as $am_id) {
+            delete_user_meta($am_id, '_supervised_by_manager');
+        }
+        
+        wp_send_json_success([
+            'message' => 'Manager states updated successfully',
+            'assigned_count' => count($newly_assigned),
+            'unassigned_count' => count($to_unassign),
+            'total_supervised_ams' => count($ams_in_states),
+            'states' => $assigned_states
+        ]);
     }
     
     /**
