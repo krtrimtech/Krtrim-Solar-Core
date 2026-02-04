@@ -846,6 +846,11 @@ class KSC_Admin_Manager_API extends KSC_API_Base {
         }
         
         $project = get_post($submission->project_id);
+        
+        // Extract user variables from auth
+        $current_user = $auth['user'];
+        $is_admin = $auth['is_admin'];
+        
         // Permission check: Admin can review all, AM reviews their own projects, Manager reviews subordinate AM projects
         $can_review = false;
         
