@@ -207,8 +207,8 @@
                             const bgColor = n.type === 'approved' ? '#f8fff9' : n.type === 'rejected' ? '#fff5f5' : '#f0f7ff';
 
                             html += `<div class="notification-item" style="padding:12px;position:relative; border-radius:8px; border-left:4px solid ${borderColor}; background:${bgColor}; margin-bottom:10px;">`;
-                            html += `<div style="font-weight:600; color:#333;">${n.icon || '🔔'} ${n.title}</div>`;
-                            html += `<div style="font-size:12px; color:#666; margin-top:4px;">${n.message}</div>`;
+                            html += `<div style="font-weight:600; color:#333;">🔔 ${n.type.replace('_', ' ').toUpperCase()}</div>`;
+                            html += `<div style="font-size:13px; color:#333; margin-top:4px;">${n.message}</div>`;
                             if (n.time_ago) {
                                 html += `<div style="font-size:10px; color:#999; margin-top:4px;">${n.time_ago}</div>`;
                             }

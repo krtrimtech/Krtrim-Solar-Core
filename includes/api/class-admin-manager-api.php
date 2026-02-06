@@ -1537,16 +1537,62 @@ class KSC_Admin_Manager_API extends KSC_API_Base {
         $limit = isset($_POST['limit']) ? intval($_POST['limit']) : 10;
         $offset = isset($_POST['offset']) ? intval($_POST['offset']) : 0;
         
-        $reviews = $wpdb->get_results($wpdb->prepare(
-            "SELECT ps.*, p.post_title, p.ID as project_id
-             FROM {$steps_table} ps
-             JOIN {$wpdb->posts} p ON ps.project_id = p.ID
-             WHERE p.post_author = %d 
-             AND ps.admin_status = 'under_review'
-             ORDER BY ps.updated_at DESC
-             LIMIT %d OFFSET %d",
-            $manager->ID, $limit, $offset
-        ), ARRAY_A);
+        // Check if user is a Manager supervising AMs
+        $is_manager = in_array('manager', (array)$manager->roles);
+        
+        if ($is_manager) {
+            // Get all Area Managers supervised by this Manager
+            $supervised_ams = get_users([
+                'role' => 'area_manager',
+                'meta_key' => '_supervised_by_manager',
+                'meta_value' => $manager->ID,
+                'fields' => 'ID'
+            ]);
+            
+            if (empty($supervised_ams)) {
+                // Manager has no subordinates, return empty
+                wp_send_json_success(['reviews' => []]);
+                return;
+            }
+            
+            $am_ids = array_map('intval', $supervised_ams);
+            $placeholders = implode(',', array_fill(0, count($am_ids), '%d'));
+            
+            $query = "SELECT ps.*, p.post_title, p.ID as project_id,
+                             p.post_author as am_id,
+                             pm_city.meta_value as project_city,
+                             pm_state.meta_value as project_state,
+                             pm_size.meta_value as system_size
+                      FROM {$steps_table} ps
+                      JOIN {$wpdb->posts} p ON ps.project_id = p.ID
+                      LEFT JOIN {$wpdb->postmeta} pm_city ON p.ID = pm_city.post_id AND pm_city.meta_key = '_project_city'
+                      LEFT JOIN {$wpdb->postmeta} pm_state ON p.ID = pm_state.post_id AND pm_state.meta_key = '_project_state'
+                      LEFT JOIN {$wpdb->postmeta} pm_size ON p.ID = pm_size.post_id AND pm_size.meta_key = 'solar_system_size_kw'
+                      WHERE p.post_author IN ($placeholders)
+                      AND ps.admin_status = 'under_review'
+                      ORDER BY ps.updated_at DESC
+                      LIMIT %d OFFSET %d";
+            
+            $reviews = $wpdb->get_results($wpdb->prepare($query, array_merge($am_ids, [$limit, $offset])), ARRAY_A);
+        } else {
+            // Area Manager - show only their own projects
+            $reviews = $wpdb->get_results($wpdb->prepare(
+                "SELECT ps.*, p.post_title as project_title, p.ID as project_id,
+                        pm_city.meta_value as project_city,
+                        pm_state.meta_value as project_state,
+                        pm_size.meta_value as system_size
+                 FROM {$steps_table} ps
+                 JOIN {$wpdb->posts} p ON ps.project_id = p.ID
+                 LEFT JOIN {$wpdb->postmeta} pm_city ON p.ID = pm_city.post_id AND pm_city.meta_key = '_project_city'
+                 LEFT JOIN {$wpdb->postmeta} pm_state ON p.ID = pm_state.post_id AND pm_state.meta_key = '_project_state'
+                 LEFT JOIN {$wpdb->postmeta} pm_size ON p.ID = pm_size.post_id AND pm_size.meta_key = 'solar_system_size_kw'
+                 WHERE p.post_author = %d 
+                 AND ps.admin_status = 'under_review'
+                 ORDER BY ps.updated_at DESC
+                 LIMIT %d OFFSET %d",
+                $manager->ID, $limit, $offset
+            ), ARRAY_A);
+        }
         
         wp_send_json_success(['reviews' => $reviews]);
     }

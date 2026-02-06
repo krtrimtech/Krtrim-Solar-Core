@@ -58,13 +58,27 @@ function sp_render_leaderboard_view() {
             $mgr->ID
         ));
 
+
         // Get assigned Area Managers
-        $assigned_ams = get_users([
-            'role' => 'area_manager',
-            'meta_key' => '_supervised_by_manager',
-            'meta_value' => $mgr->ID,
-            'fields' => ['ID', 'display_name']
-        ]);
+        // Logic: If manager has NO assigned states, they see ALL AMs (global access)
+        //        If manager has assigned states, they only see AMs in those states
+        $manager_assigned_states = get_user_meta($mgr->ID, '_assigned_states', true);
+        
+        if (empty($manager_assigned_states)) {
+            // No states assigned = Global access to ALL Area Managers
+            $assigned_ams = get_users([
+                'role' => 'area_manager',
+                'fields' => ['ID', 'display_name']
+            ]);
+        } else {
+            // Has assigned states = Only show AMs supervised by this manager
+            $assigned_ams = get_users([
+                'role' => 'area_manager',
+                'meta_key' => '_supervised_by_manager',
+                'meta_value' => $mgr->ID,
+                'fields' => ['ID', 'display_name']
+            ]);
+        }
         
         $regions = [];
         $total_team_size = count($assigned_ams); // Start with AM count
@@ -105,7 +119,8 @@ function sp_render_leaderboard_view() {
             'conversion_rate' => $total_mgr_leads > 0 ? round(($mgr_lead_statuses['converted'] / $total_mgr_leads) * 100, 1) : 0,
             'assigned_ams_count' => count($assigned_ams),
             'regions' => array_unique($regions),
-            'team_size' => $total_team_size
+            'team_size' => $total_team_size,
+            'assigned_states' => $manager_assigned_states ?: []
         ];
     }
     
@@ -430,7 +445,6 @@ function sp_render_leaderboard_view() {
                         <tr>
                             <th>Manager</th>
                             <th>Contact</th>
-                            <th>Regions</th>
                             <th>Team Size</th>
                             <th>Leads (Direct)</th>
                             <th>Lead Status</th>
@@ -449,17 +463,6 @@ function sp_render_leaderboard_view() {
                                     <td>
                                         <?php echo esc_html($data['email']); ?><br>
                                         <small><?php echo esc_html($data['phone'] ?: 'No phone'); ?></small>
-                                    </td>
-                                    <td>
-                                        <?php 
-                                        if (!empty($data['regions'])) {
-                                            echo '<small>' . implode(', ', array_slice($data['regions'], 0, 3));
-                                            if (count($data['regions']) > 3) echo '...';
-                                            echo '</small>';
-                                        } else {
-                                            echo '<span style="color:#999;">-</span>';
-                                        }
-                                        ?>
                                     </td>
                                     <td>
                                         <span class="team-badge" style="background:#f3e5f5; color:#7b1fa2; padding:2px 6px; border-radius:4px;">
@@ -481,7 +484,7 @@ function sp_render_leaderboard_view() {
                                     </td>
                                     <td>
                                         <a href="?page=team-analysis&team_tab=manager_leads&manager_id=<?php echo $data['id']; ?>" class="button button-small">Details</a>
-                                        <button class="button button-small assign-states-btn" data-id="<?php echo $data['id']; ?>" data-name="<?php echo esc_attr($data['name']); ?>" data-states="<?php echo esc_attr(json_encode(get_user_meta($data['id'], '_assigned_states', true) ?: [])); ?>">Assign States</button>
+                                        <button class="button button-small assign-states-btn" data-id="<?php echo $data['id']; ?>" data-name="<?php echo esc_attr($data['name']); ?>" data-states="<?php echo esc_attr(json_encode($data['assigned_states'])); ?>">Assign States</button>
                                         <a href="user-edit.php?user_id=<?php echo $data['id']; ?>" class="button button-small">Edit</a>
                                     </td>
                                 </tr>
@@ -494,7 +497,130 @@ function sp_render_leaderboard_view() {
                     </tbody>
                 </table>
             </div>
+            <!-- Assign States Modal -->
+            <div id="assign-states-modal" class="modal-overlay" style="display: none; position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.5); z-index: 9999; justify-content: center; align-items: center;">
+                <div class="modal-box" style="background: #fff; border-radius: 8px; padding: 25px; width: 400px; max-width: 90%;">
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+                        <h3 style="margin: 0;">Assign States to <span id="assign-modal-manager-name"></span></h3>
+                        <button class="close-modal-btn" style="background:none; border:none; font-size:20px; cursor:pointer;">&times;</button>
+                    </div>
+                    
+                    <form id="assign-states-form">
+                        <input type="hidden" id="assign_states_manager_id" name="manager_id">
+                        
+                        <div class="form-group" style="margin-bottom: 15px;">
+                            <label style="display:flex; align-items:center; font-weight:bold; margin-bottom:10px;">
+                                <input type="checkbox" id="assign_all_states" name="assign_all" value="true">
+                                Assign All States (Manager sees everything)
+                            </label>
+                        </div>
+                        
+                        <div id="states-list-container" style="max-height: 200px; overflow-y: auto; border: 1px solid #ddd; padding: 10px; border-radius: 4px;">
+                            <?php
+                            $indian_states = [
+                                "Andhra Pradesh", "Arunachal Pradesh", "Assam", "Bihar", "Chhattisgarh", "Goa", "Gujarat", 
+                                "Haryana", "Himachal Pradesh", "Jharkhand", "Karnataka", "Kerala", "Madhya Pradesh", 
+                                "Maharashtra", "Manipur", "Meghalaya", "Mizoram", "Nagaland", "Odisha", "Punjab", 
+                                "Rajasthan", "Sikkim", "Tamil Nadu", "Telangana", "Tripura", "Uttar Pradesh", "Uttarakhand", "West Bengal",
+                                "Andaman and Nicobar Islands", "Chandigarh", "Dadra and Nagar Haveli and Daman and Diu", 
+                                "Delhi", "Jammu and Kashmir", "Ladakh", "Lakshadweep", "Puducherry"
+                            ];
+                            
+                            foreach ($indian_states as $state) {
+                                echo '<label style="display:block; margin-bottom:5px;">';
+                                echo '<input type="checkbox" name="states[]" value="' . esc_attr($state) . '" class="state-checkbox"> ' . esc_html($state);
+                                echo '</label>';
+                            }
+                            ?>
+                        </div>
+                        <div style="margin-top: 5px; font-size: 12px; color: #666;">
+                            * If "Assign All" is unchecked and no states are selected, Manager will see NO projects.
+                        </div>
+                        
+                        <div style="display: flex; justify-content: flex-end; gap: 10px; margin-top: 20px;">
+                            <button type="button" class="button close-modal-btn">Cancel</button>
+                            <button type="submit" class="button button-primary" id="save-states-btn">Save Assignments</button>
+                        </div>
+                    </form>
+                </div>
+            </div>
             
+            <script>
+            jQuery(document).ready(function($) {
+                // Open Modal
+                $('.assign-states-btn').on('click', function(e) {
+                    e.preventDefault();
+                    const managerId = $(this).data('id');
+                    const managerName = $(this).data('name');
+                    const assignedStates = $(this).data('states') || []; // Array of strings
+                    
+                    $('#assign_states_manager_id').val(managerId);
+                    $('#assign-modal-manager-name').text(managerName);
+                    
+                    // Reset checkboxes
+                    $('.state-checkbox').prop('checked', false);
+                    $('#assign_all_states').prop('checked', false);
+                    
+                    if (assignedStates.length === 0) {
+                        // If empty in DB, logic says "Global View" aka "All".
+                        // But wait, the button data-states might be empty string if not set?
+                        // PHP: json_encode(get_user_meta(...) ?: [])
+                        // If user has NEVER been assigned, it is empty array.
+                        // In my logic: Empty Array = All.
+                        // So default check "All".
+                        $('#assign_all_states').prop('checked', true);
+                        $('#states-list-container').css('opacity', '0.5').css('pointer-events', 'none');
+                    } else {
+                        $('#states-list-container').css('opacity', '1').css('pointer-events', 'auto');
+                        assignedStates.forEach(state => {
+                            $(`input[name="states[]"][value="${state}"]`).prop('checked', true);
+                        });
+                    }
+                    
+                    $('#assign-states-modal').fadeIn(200).css('display', 'flex');
+                });
+                
+                // Toggle All
+                $('#assign_all_states').on('change', function() {
+                    if ($(this).is(':checked')) {
+                        $('#states-list-container').css('opacity', '0.5').css('pointer-events', 'none');
+                        $('.state-checkbox').prop('checked', false);
+                    } else {
+                        $('#states-list-container').css('opacity', '1').css('pointer-events', 'auto');
+                    }
+                });
+                
+                // Close Modal
+                $('.close-modal-btn').on('click', function() {
+                    $('#assign-states-modal').fadeOut(200);
+                });
+                
+                // Submit Form
+                $('#assign-states-form').on('submit', function(e) {
+                    e.preventDefault();
+                    const btn = $('#save-states-btn');
+                    btn.text('Saving...').prop('disabled', true);
+                    
+                    const formData = $(this).serialize();
+                    const nonce = '<?php echo wp_create_nonce("admin_manager_action_nonce"); ?>';
+                    
+                    $.post(ajaxurl, formData + '&action=update_manager_assigned_states&nonce=' + nonce, function(response) {
+                        if (response.success) {
+                            const data = response.data;
+                            let message = 'States updated successfully!\n';
+                            message += `✅ Total Area Managers supervised: ${data.total_supervised_ams || 0}\n`;
+                            message += `➕ Newly assigned: ${data.assigned_count || 0}\n`;
+                            message += `➖ Unassigned: ${data.unassigned_count || 0}`;
+                            alert(message);
+                            location.reload();
+                        } else {
+                            alert('Error: ' + (response.data.message || 'Unknown error'));
+                            btn.text('Save Assignments').prop('disabled', false);
+                        }
+                    });
+                });
+            });
+            </script>
             <?php elseif ($active_tab == 'cleaning_services') : ?>
             <!-- CLEANING SERVICES TAB -->
             <div class="leaderboard-container" style="grid-column: span 2;">
@@ -1579,6 +1705,29 @@ function sp_render_single_manager_view($manager_id) {
             $vendors[$vendor_id] = get_userdata($vendor_id);
         }
     }
+    
+    // Fetch assigned Area Managers for this Manager
+    // MUST match main table logic (lines 63-81)
+    $assigned_ams = [];
+    if (in_array('manager', (array)$manager->roles)) {
+        $manager_assigned_states = get_user_meta($manager_id, '_assigned_states', true);
+        
+        if (empty($manager_assigned_states)) {
+            // No states = Global access to ALL AMs
+            $assigned_ams = get_users([
+                'role' => 'area_manager',
+                'fields' => 'all'
+            ]);
+        } else {
+            // Has states = Only AMs supervised by this manager
+            $assigned_ams = get_users([
+                'role' => 'area_manager',
+                'meta_key' => '_supervised_by_manager',
+                'meta_value' => $manager_id,
+                'fields' => 'all'
+            ]);
+        }
+    }
     ?>
     <div class="wrap">
         <h1 class="wp-heading-inline">Manager Analysis: <?php echo esc_html($manager->display_name); ?></h1>
@@ -1636,17 +1785,55 @@ function sp_render_single_manager_view($manager_id) {
             </div>
             <?php endif; ?>
             
+            <!-- Regions Section -->
             <div class="detail-card wide">
-                <h3>Assigned States</h3>
-                <?php 
-                $assigned_states = get_user_meta($manager->ID, '_assigned_states', true);
-                if (!empty($assigned_states) && is_array($assigned_states)) {
-                    echo '<p>' . implode(', ', $assigned_states) . '</p>';
+                <h3>📍 Regions Covered</h3>
+                <?php
+                // DEBUG: Show what we're working with
+                echo '<pre style="background:#f0f0f0; padding:10px; margin:10px 0; font-size:11px;">';
+                echo '<strong>DEBUG INFO:</strong><br>';
+                echo 'Manager ID: ' . $manager_id . '<br>';
+                echo 'Assigned AMs count: ' . count($assigned_ams) . '<br>';
+                if (!empty($assigned_ams)) {
+                    echo 'AMs found:<br>';
+                    foreach ($assigned_ams as $am) {
+                        echo '  - ' . $am->display_name . ' (ID: ' . $am->ID . ')<br>';
+                        $state = get_user_meta($am->ID, 'state', true);
+                        $city = get_user_meta($am->ID, 'city', true);
+                        echo '    State: ' . ($state ?: 'EMPTY') . ', City: ' . ($city ?: 'EMPTY') . '<br>';
+                    }
                 } else {
-                    echo '<p><em>All States (Global View)</em></p>';
+                    echo 'No AMs found!<br>';
+                    echo 'Checking meta key "_supervised_by_manager" with value: ' . $manager_id . '<br>';
+                }
+                echo '</pre>';
+                
+                // Get regions from assigned AMs
+                $regions = [];
+                if (!empty($assigned_ams)) {
+                    foreach ($assigned_ams as $am) {
+                        $state = get_user_meta($am->ID, 'state', true);
+                        $city = get_user_meta($am->ID, 'city', true);
+                        if ($city && $state) {
+                            $regions[] = $city . ', ' . $state;
+                        } elseif ($state) {
+                            $regions[] = $state;
+                        }
+                    }
+                    $regions = array_unique($regions);
+                }
+                
+                if (!empty($regions)) {
+                    echo '<div style="display: flex; flex-wrap: wrap; gap: 8px; margin-top: 10px;">';
+                    foreach ($regions as $region) {
+                        echo '<span style="background: #e3f2fd; color: #1565c0; padding: 5px 12px; border-radius: 15px; font-size: 13px;">' . esc_html($region) . '</span>';
+                    }
+                    echo '</div>';
+                    echo '<p style="margin-top: 15px; color: #666;"><small><strong>Total Regions:</strong> ' . count($regions) . '</small></p>';
+                } else {
+                    echo '<p style="color: #999;">No regions assigned yet.</p>';
                 }
                 ?>
-                <button class="button button-small assign-states-btn" data-id="<?php echo $manager->ID; ?>" data-name="<?php echo esc_attr($manager->display_name); ?>" data-states="<?php echo esc_attr(json_encode($assigned_states ?: [])); ?>">Edit Assignments</button>
             </div>
 
             <?php
@@ -2042,129 +2229,6 @@ function sp_render_single_manager_view($manager_id) {
     </div>
 
 
-    <!-- Assign States Modal -->
-    <div id="assign-states-modal" class="modal-overlay" style="display: none; position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.5); z-index: 9999; justify-content: center; align-items: center;">
-        <div class="modal-box" style="background: #fff; border-radius: 8px; padding: 25px; width: 400px; max-width: 90%;">
-            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
-                <h3 style="margin: 0;">Assign States to <span id="assign-modal-manager-name"></span></h3>
-                <button class="close-modal-btn" style="background:none; border:none; font-size:20px; cursor:pointer;">&times;</button>
-            </div>
-            
-            <form id="assign-states-form">
-                <input type="hidden" id="assign_states_manager_id" name="manager_id">
-                
-                <div class="form-group" style="margin-bottom: 15px;">
-                    <label style="display:flex; align-items:center; font-weight:bold; margin-bottom:10px;">
-                        <input type="checkbox" id="assign_all_states" name="assign_all" value="true">
-                        Assign All States (Manager sees everything)
-                    </label>
-                </div>
-                
-                <div id="states-list-container" style="max-height: 200px; overflow-y: auto; border: 1px solid #ddd; padding: 10px; border-radius: 4px;">
-                    <?php
-                    $indian_states = [
-                        "Andhra Pradesh", "Arunachal Pradesh", "Assam", "Bihar", "Chhattisgarh", "Goa", "Gujarat", 
-                        "Haryana", "Himachal Pradesh", "Jharkhand", "Karnataka", "Kerala", "Madhya Pradesh", 
-                        "Maharashtra", "Manipur", "Meghalaya", "Mizoram", "Nagaland", "Odisha", "Punjab", 
-                        "Rajasthan", "Sikkim", "Tamil Nadu", "Telangana", "Tripura", "Uttar Pradesh", "Uttarakhand", "West Bengal",
-                        "Andaman and Nicobar Islands", "Chandigarh", "Dadra and Nagar Haveli and Daman and Diu", 
-                        "Delhi", "Jammu and Kashmir", "Ladakh", "Lakshadweep", "Puducherry"
-                    ];
-                    
-                    foreach ($indian_states as $state) {
-                        echo '<label style="display:block; margin-bottom:5px;">';
-                        echo '<input type="checkbox" name="states[]" value="' . esc_attr($state) . '" class="state-checkbox"> ' . esc_html($state);
-                        echo '</label>';
-                    }
-                    ?>
-                </div>
-                <div style="margin-top: 5px; font-size: 12px; color: #666;">
-                    * If "Assign All" is unchecked and no states are selected, Manager will see NO projects.
-                </div>
-                
-                <div style="display: flex; justify-content: flex-end; gap: 10px; margin-top: 20px;">
-                    <button type="button" class="button close-modal-btn">Cancel</button>
-                    <button type="submit" class="button button-primary" id="save-states-btn">Save Assignments</button>
-                </div>
-            </form>
-        </div>
-    </div>
     
-    <script>
-    jQuery(document).ready(function($) {
-        // Open Modal
-        $('.assign-states-btn').on('click', function(e) {
-            e.preventDefault();
-            const managerId = $(this).data('id');
-            const managerName = $(this).data('name');
-            const assignedStates = $(this).data('states') || []; // Array of strings
-            
-            $('#assign_states_manager_id').val(managerId);
-            $('#assign-modal-manager-name').text(managerName);
-            
-            // Reset checkboxes
-            $('.state-checkbox').prop('checked', false);
-            $('#assign_all_states').prop('checked', false);
-            
-            if (assignedStates.length === 0) {
-                // If empty in DB, logic says "Global View" aka "All".
-                // But wait, the button data-states might be empty string if not set?
-                // PHP: json_encode(get_user_meta(...) ?: [])
-                // If user has NEVER been assigned, it is empty array.
-                // In my logic: Empty Array = All.
-                // So default check "All".
-                $('#assign_all_states').prop('checked', true);
-                $('#states-list-container').css('opacity', '0.5').css('pointer-events', 'none');
-            } else {
-                 $('#states-list-container').css('opacity', '1').css('pointer-events', 'auto');
-                 assignedStates.forEach(state => {
-                     $(`input[name="states[]"][value="${state}"]`).prop('checked', true);
-                 });
-            }
-            
-            $('#assign-states-modal').fadeIn(200).css('display', 'flex');
-        });
-        
-        // Toggle All
-        $('#assign_all_states').on('change', function() {
-            if ($(this).is(':checked')) {
-                $('#states-list-container').css('opacity', '0.5').css('pointer-events', 'none');
-                $('.state-checkbox').prop('checked', false);
-            } else {
-                $('#states-list-container').css('opacity', '1').css('pointer-events', 'auto');
-            }
-        });
-        
-        // Close Modal
-        $('.close-modal-btn').on('click', function() {
-            $('#assign-states-modal').fadeOut(200);
-        });
-        
-        // Submit Form
-        $('#assign-states-form').on('submit', function(e) {
-            e.preventDefault();
-            const btn = $('#save-states-btn');
-            btn.text('Saving...').prop('disabled', true);
-            
-            const formData = $(this).serialize();
-            const nonce = '<?php echo wp_create_nonce("admin_manager_action_nonce"); ?>';
-            
-            $.post(ajaxurl, formData + '&action=update_manager_assigned_states&nonce=' + nonce, function(response) {
-                if (response.success) {
-                    const data = response.data;
-                    let message = 'States updated successfully!\n';
-                    message += `✅ Total Area Managers supervised: ${data.total_supervised_ams || 0}\n`;
-                    message += `➕ Newly assigned: ${data.assigned_count || 0}\n`;
-                    message += `➖ Unassigned: ${data.unassigned_count || 0}`;
-                    alert(message);
-                    location.reload();
-                } else {
-                    alert('Error: ' + (response.data.message || 'Unknown error'));
-                    btn.text('Save Assignments').prop('disabled', false);
-                }
-            });
-        });
-    });
-    </script>
 <?php
 }
