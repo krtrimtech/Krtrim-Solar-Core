@@ -1,3 +1,71 @@
+/* ===================================
+   CURSOR FIXES - Pointer on all clickable elements
+   =================================== */
+
+/* All buttons */
+.btn,
+button,
+.btn-primary,
+.btn-secondary,
+.btn-success,
+.btn-danger,
+.btn-warning,
+.btn-sm,
+.action-btn,
+input[type="button"],
+input[type="submit"],
+input[type="reset"] {
+    cursor: pointer !important;
+}
+
+/* Modal close buttons and controls */
+.close-modal,
+.modal-close,
+#close-member-modal,
+#close-create-client-modal,
+.close-btn,
+#close-notification-panel {
+    cursor: pointer !important;
+}
+
+/* Navigation and menu items */
+.nav-item,
+.sidebar-nav a {
+    cursor: pointer !important;
+}
+
+/* View/action buttons in tables */
+.view-member-detail,
+.edit-btn,
+.delete-btn,
+.view-btn,
+.remove-am-assignment,
+.action-btn-danger,
+.action-btn-success {
+    cursor: pointer !important;
+}
+
+/* Toggles and interactive controls */
+.toggle-password,
+.generate-password-btn {
+    cursor: pointer !important;
+}
+
+/* Table rows that are clickable */
+.lead-row-clickable,
+tr[data-project-id],
+[data-vendor-id],
+[onclick] {
+    cursor: pointer !important;
+}
+
+/* General clickable indicators */
+[data-toggle],
+[data-dismiss],
+.clickable {
+    cursor: pointer !important;
+}
+
 /* Manager Dashboard Specific Overrides */
 #team-analysis-section {
     margin-bottom: 20px !important;

@@ -773,7 +773,7 @@ class KSC_Admin_Manager_API extends KSC_API_Base {
         ]);
         
         if (empty($default_steps)) {
-            error_log("No default process steps found for project {$project_id}");
+            // error_log("No default process steps found for project {$project_id}");
             return false;
         }
         
@@ -787,7 +787,7 @@ class KSC_Admin_Manager_API extends KSC_API_Base {
         ));
         
         if ($existing_steps > 0) {
-            error_log("Steps already exist for project {$project_id}, skipping creation");
+            // error_log("Steps already exist for project {$project_id}, skipping creation");
             return false;
         }
         
@@ -809,11 +809,11 @@ class KSC_Admin_Manager_API extends KSC_API_Base {
             if ($result) {
                 $success_count++;
             } else {
-                error_log("Failed to create step: {$step_name} for project {$project_id}");
+                // error_log("Failed to create step: {$step_name} for project {$project_id}");
             }
         }
         
-        error_log("Created {$success_count} steps for project {$project_id}");
+        // error_log("Created {$success_count} steps for project {$project_id}");
         
         return $success_count > 0;
     }
@@ -1543,25 +1543,25 @@ class KSC_Admin_Manager_API extends KSC_API_Base {
         $is_manager = in_array('manager', (array)$manager->roles);
         
         // DEBUG LOG
-        error_log('=== GET_AREA_MANAGER_REVIEWS DEBUG ===');
-        error_log('User ID: ' . $manager->ID);
-        error_log('User roles: ' . print_r($manager->roles, true));
-        error_log('Is Manager: ' . ($is_manager ? 'YES' : 'NO'));
+        // error_log('=== GET_AREA_MANAGER_REVIEWS DEBUG ===');
+        // error_log('User ID: ' . $manager->ID);
+        // error_log('User roles: ' . print_r($manager->roles, true));
+        // error_log('Is Manager: ' . ($is_manager ? 'YES' : 'NO'));
         
         if ($is_manager) {
             // Check if manager has assigned states (global access logic)
             $manager_assigned_states = get_user_meta($manager->ID, '_assigned_states', true);
-            error_log('Manager assigned states: ' . print_r($manager_assigned_states, true));
+            // error_log('Manager assigned states: ' . print_r($manager_assigned_states, true));
             
             if (empty($manager_assigned_states)) {
-                error_log('GLOBAL ACCESS: Fetching ALL Area Managers');
+                // error_log('GLOBAL ACCESS: Fetching ALL Area Managers');
                 // No states = Global access to ALL Area Managers
                 $supervised_ams = get_users([
                     'role' => 'area_manager',
                     'fields' => 'ID'
                 ]);
             } else {
-                error_log('LIMITED ACCESS: Fetching only supervised AMs');
+                // error_log('LIMITED ACCESS: Fetching only supervised AMs');
                 // Has states = Only supervised Area Managers
                 $supervised_ams = get_users([
                     'role' => 'area_manager',
@@ -1571,12 +1571,12 @@ class KSC_Admin_Manager_API extends KSC_API_Base {
                 ]);
             }
             
-            error_log('Supervised AMs count: ' . count($supervised_ams));
-            error_log('AM IDs: ' . print_r($supervised_ams, true));
+            // error_log('Supervised AMs count: ' . count($supervised_ams));
+            // error_log('AM IDs: ' . print_r($supervised_ams, true));
             
             if (empty($supervised_ams)) {
                 // Manager has no subordinates, return empty
-                error_log('ERROR: No AMs found, returning empty');
+                // error_log('ERROR: No AMs found, returning empty');
                 wp_send_json_success(['reviews' => []]);
                 return;
             }
@@ -1587,7 +1587,7 @@ class KSC_Admin_Manager_API extends KSC_API_Base {
             $all_author_ids = array_merge([$manager->ID], $am_ids);
             $placeholders = implode(',', array_fill(0, count($all_author_ids), '%d'));
             
-            error_log('Author IDs to search (Manager + AMs): ' . print_r($all_author_ids, true));
+            // error_log('Author IDs to search (Manager + AMs): ' . print_r($all_author_ids, true));
             
             $query = "SELECT ps.*, p.post_title, p.ID as project_id,
                              p.post_author as am_id,
@@ -1614,7 +1614,7 @@ class KSC_Admin_Manager_API extends KSC_API_Base {
                       ORDER BY ps.updated_at DESC
                       LIMIT %d OFFSET %d";
             
-            error_log('SQL Query: ' . $wpdb->prepare($query, array_merge($all_author_ids, [$limit, $offset])));
+            // error_log('SQL Query: ' . $wpdb->prepare($query, array_merge($all_author_ids, [$limit, $offset])));
             $reviews = $wpdb->get_results($wpdb->prepare($query, array_merge($all_author_ids, [$limit, $offset])), ARRAY_A);
             
             // Calculate progress for each unique project
@@ -1633,10 +1633,10 @@ class KSC_Admin_Manager_API extends KSC_API_Base {
                 }
             }
             
-            error_log('Reviews found: ' . count($reviews));
+            // error_log('Reviews found: ' . count($reviews));
         } else {
             // Area Manager - show only their own projects
-            error_log('AREA MANAGER MODE: Fetching own projects only');
+            // error_log('AREA MANAGER MODE: Fetching own projects only');
             $reviews = $wpdb->get_results($wpdb->prepare(
                 "SELECT ps.*, p.post_title as project_title, p.ID as project_id,
                         pm_city.meta_value as project_city,
@@ -1653,11 +1653,11 @@ class KSC_Admin_Manager_API extends KSC_API_Base {
                  LIMIT %d OFFSET %d",
                 $manager->ID, $limit, $offset
             ), ARRAY_A);
-            error_log('Reviews found (AM): ' . count($reviews));
+            // error_log('Reviews found (AM): ' . count($reviews));
         }
         
-        error_log('Final reviews count: ' . count($reviews));
-        error_log('=== END DEBUG ===');
+        // error_log('Final reviews count: ' . count($reviews));
+        // error_log('=== END DEBUG ===');
         wp_send_json_success(['reviews' => $reviews]);
     }
     

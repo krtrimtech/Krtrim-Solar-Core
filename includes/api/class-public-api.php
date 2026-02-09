@@ -19,7 +19,7 @@ class KSC_Public_API {
     
     public function __construct() {
         // Debug logging
-        error_log('KSC_Public_API: Constructor called');
+        // error_log('KSC_Public_API: Constructor called');
         
         // Vendor registration
         add_action('wp_ajax_complete_vendor_registration', [$this, 'complete_vendor_registration']);
@@ -28,7 +28,7 @@ class KSC_Public_API {
         // Razorpay order creation
         add_action('wp_ajax_create_razorpay_order', [$this, 'create_razorpay_order']);  // ✅ Add this
         add_action('wp_ajax_nopriv_create_razorpay_order', [$this, 'create_razorpay_order']);  // ✅ Keep this
-        error_log('KSC_Public_API: Razorpay action registered');
+        // error_log('KSC_Public_API: Razorpay action registered');
         
         // Email verification
         add_action('init', [$this, 'verify_vendor_email']);
@@ -47,7 +47,7 @@ class KSC_Public_API {
      * Complete vendor registration
      */
     public function complete_vendor_registration() {
-        error_log('KSC_Public_API: complete_vendor_registration called');
+        // error_log('KSC_Public_API: complete_vendor_registration called');
         check_ajax_referer('vendor_registration_nonce', 'nonce');
         
         // Parse registration data
@@ -55,7 +55,7 @@ class KSC_Public_API {
         $payment_response = isset($_POST['payment_response']) ? json_decode(stripslashes($_POST['payment_response']), true) : [];
         
         if (empty($registration_data)) {
-            error_log('KSC_Public_API: No registration data found');
+            // error_log('KSC_Public_API: No registration data found');
             wp_send_json_error(['message' => 'Invalid registration data']);
         }
         
@@ -85,7 +85,7 @@ class KSC_Public_API {
         $cities = $coverage['cities'] ?? [];
         $amount = floatval($registration_data['total_amount'] ?? 0);
         
-        error_log("KSC_Public_API: Attempting to register user: $email with username: $username");
+        // error_log("KSC_Public_API: Attempting to register user: $email with username: $username");
         
         if (email_exists($email)) {
             wp_send_json_error(['message' => 'Email already registered.']);
@@ -94,7 +94,7 @@ class KSC_Public_API {
         $user_id = wp_create_user($username, $password, $email);
         
         if (is_wp_error($user_id)) {
-            error_log('KSC_Public_API: wp_create_user failed: ' . $user_id->get_error_message());
+            // error_log('KSC_Public_API: wp_create_user failed: ' . $user_id->get_error_message());
             wp_send_json_error(['message' => $user_id->get_error_message()]);
         }
         
@@ -151,7 +151,7 @@ class KSC_Public_API {
         // 'admin' argument sends email ONLY to admin, not the user (since we sent custom email above)
         wp_new_user_notification($user_id, null, 'admin');
         
-        error_log("KSC_Public_API: Registration successful for user $user_id");
+        // error_log("KSC_Public_API: Registration successful for user $user_id");
         
         wp_send_json_success([
             'message' => 'Registration successful! Please check your email to verify your account.',
@@ -268,19 +268,19 @@ class KSC_Public_API {
      * Create Razorpay order for vendor registration payment
      */
     public function create_razorpay_order() {
-        error_log('=== KSC_Public_API: create_razorpay_order() START ===');
-        error_log('KSC_Public_API: POST data: ' . print_r($_POST, true));
-        error_log('KSC_Public_API: User logged in: ' . (is_user_logged_in() ? 'YES' : 'NO'));
-        error_log('KSC_Public_API: Current user ID: ' . get_current_user_id());
+        // error_log('=== KSC_Public_API: create_razorpay_order() START ===');
+        // error_log('KSC_Public_API: POST data: ' . print_r($_POST, true));
+        // error_log('KSC_Public_API: User logged in: ' . (is_user_logged_in() ? 'YES' : 'NO'));
+        // error_log('KSC_Public_API: Current user ID: ' . get_current_user_id());
         
         check_ajax_referer('vendor_registration_nonce', 'nonce');
-        error_log('KSC_Public_API: Nonce verified');
+        // error_log('KSC_Public_API: Nonce verified');
         
         $amount = isset($_POST['amount']) ? floatval($_POST['amount']) : 0;
-        error_log('KSC_Public_API: Amount: ' . $amount);
+        // error_log('KSC_Public_API: Amount: ' . $amount);
         
         if ($amount <= 0) {
-            error_log('KSC_Public_API: Amount validation failed');
+            // error_log('KSC_Public_API: Amount validation failed');
             wp_send_json_error(['message' => 'Invalid amount']);
         }
         
@@ -326,7 +326,7 @@ class KSC_Public_API {
                 wp_send_json_error(['message' => $error_msg]);
             }
         } catch (Exception $e) {
-            error_log('Razorpay order creation error: ' . $e->getMessage());
+            // error_log('Razorpay order creation error: ' . $e->getMessage());
             wp_send_json_error(['message' => 'Payment order creation failed: ' . $e->getMessage()]);
         }
     }
@@ -366,7 +366,7 @@ class KSC_Public_API {
             
             do_action('sp_vendor_approved', $user_id);
             
-            error_log("Vendor $user_id auto-approved after email verification");
+            // error_log("Vendor $user_id auto-approved after email verification");
         }
     }
 }

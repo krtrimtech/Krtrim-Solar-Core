@@ -23,7 +23,7 @@ if ( ! defined( 'WPINC' ) ) {
 final class Krtrim_Solar_Core {
 
 	private static $instance = null;
-	public $version = '1.2.0';
+	public $version = '1.3.1';
 	public $file = __FILE__;
 	public $dir_path;
 	public $dir_url;

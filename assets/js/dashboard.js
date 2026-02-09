@@ -183,7 +183,7 @@ function loadNotifications(restUrl) {
             }
         })
         .catch(error => {
-            console.error('Notification Error:', error);
+            // console.error('Notification Error:', error);
             document.getElementById('notif-list').innerHTML = '<p style="color:#dc3545; text-align:center; padding: 20px; margin:0;">Error loading notifications</p>';
         });
 }
@@ -307,7 +307,7 @@ document.addEventListener('DOMContentLoaded', function () {
                 })
                 .catch(error => {
                     alert('Error deleting notification');
-                    console.error('Delete notification error:', error);
+                    // console.error('Delete notification error:', error);
                 });
         }
     });
@@ -397,27 +397,27 @@ jQuery(document).ready(function ($) {
     // Load coverage data when Profile section is opened
     window.loadCoverageData = function () {
         if (coverageData) {
-            console.log('Coverage data already loaded', coverageData);
+            // console.log('Coverage data already loaded', coverageData);
             return; // Already loaded
         }
 
-        console.log('Loading coverage data from server...');
+        // console.log('Loading coverage data from server...');
         $.ajax({
             url: ksc_dashboard_vars.admin_ajax_url,
             type: 'GET',
             data: { action: 'get_coverage_areas' },
             success: function (response) {
-                console.log('Coverage areas response:', response);
+                // console.log('Coverage areas response:', response);
                 if (response.success) {
                     coverageData = response.data;
-                    console.log('Coverage data loaded:', coverageData);
+                    // console.log('Coverage data loaded:', coverageData);
                     initializeCoverageSelection();
                 } else {
-                    console.error('Coverage areas error:', response.data);
+                    // console.error('Coverage areas error:', response.data);
                 }
             },
             error: function (xhr, status, error) {
-                console.error('AJAX error loading coverage:', error, xhr);
+                // console.error('AJAX error loading coverage:', error, xhr);
             }
         });
     };
@@ -432,17 +432,17 @@ jQuery(document).ready(function ($) {
     };
 
     function initializeCoverageSelection() {
-        console.log('initializeCoverageSelection called');
-        console.log('coverageData:', coverageData);
-        console.log('vendorCoverage:', typeof vendorCoverage !== 'undefined' ? vendorCoverage : 'UNDEFINED');
+        // console.log('initializeCoverageSelection called');
+        // console.log('coverageData:', coverageData);
+        // console.log('vendorCoverage:', typeof vendorCoverage !== 'undefined' ? vendorCoverage : 'UNDEFINED');
 
         if (!coverageData || typeof vendorCoverage === 'undefined') {
-            console.error('Missing data - coverageData:', coverageData, 'vendorCoverage:', typeof vendorCoverage);
+            // console.error('Missing data - coverageData:', coverageData, 'vendorCoverage:', typeof vendorCoverage);
             return;
         }
 
         const stateSelect = $('#coverage-state-select');
-        console.log('State select element:', stateSelect.length);
+        // console.log('State select element:', stateSelect.length);
         stateSelect.empty().append(new Option('-- Choose a State --', ''));
 
         // Populate ALL States
@@ -450,7 +450,7 @@ jQuery(document).ready(function ($) {
             stateSelect.append(new Option(stateObj.state, stateObj.state));
         });
 
-        console.log('States populated:', coverageData.length);
+        // console.log('States populated:', coverageData.length);
 
         // Handle State Selection
         stateSelect.on('change', handleStateChange);

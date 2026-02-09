@@ -615,7 +615,7 @@
         if (typeof window.showToast === 'function') {
             window.showToast(message, type);
         } else {
-            console.log(`[${type}] ${message}`);
+            // console.log(`[${type}] ${message}`);
         }
     }
 

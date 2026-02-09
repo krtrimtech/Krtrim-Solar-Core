@@ -3,7 +3,7 @@
     'use strict';
 
     function openProjectModal(projectId) {
-        console.log('Opening modal for project:', projectId);
+        // console.log('Opening modal for project:', projectId);
 
         // Show modal with loading state
         $('#projectDetailModal').addClass('active');
@@ -108,7 +108,7 @@
     // Close modal button - multiple selectors for compatibility
     $(document).on('click', '.modal-close, .project-modal .modal-close, button.modal-close', function (e) {
         e.preventDefault();
-        console.log('Close button clicked');
+        // console.log('Close button clicked');
         closeProjectModal();
     });
 

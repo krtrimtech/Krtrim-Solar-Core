@@ -4,7 +4,7 @@
 (function ($) {
     'use strict';
 
-    console.log('Area Manager Dashboard Script Initialized');
+    // console.log('Area Manager Dashboard Script Initialized');
 
     // Password Toggle
     $(document).on('click', '.toggle-password', function () {
@@ -78,35 +78,35 @@
     });
 
     //Navigation (Global) ---
-    console.log('Attaching click handler to .area-manager-dashboard .nav-item');
+    // console.log('Attaching click handler to .area-manager-dashboard .nav-item');
     $(document).on('click', '.area-manager-dashboard .nav-item', function (e) {
-        console.log('=== NAV CLICK DETECTED ===');
+        // console.log('=== NAV CLICK DETECTED ===');
         e.preventDefault();
         e.stopPropagation();
 
         const section = $(this).data('section');
         const sectionId = '#' + section + '-section';
 
-        console.log('Clicked section:', section);
-        console.log('Target selector:', sectionId);
-        console.log('Target element exists:', $(sectionId).length > 0);
-        console.log('All .section-content elements:', $('.section-content').length);
+        // console.log('Clicked section:', section);
+        // console.log('Target selector:', sectionId);
+        // console.log('Target element exists:', $(sectionId).length > 0);
+        // console.log('All .section-content elements:', $('.section-content').length);
 
         // Remove active class
         $('.area-manager-dashboard .nav-item').removeClass('active');
         $(this).addClass('active');
-        console.log('Active class updated');
+        // console.log('Active class updated');
 
         // Hide all sections
         $('.section-content').each(function () {
-            console.log('Hiding:', this.id, 'Current display:', $(this).css('display'));
+            // console.log('Hiding:', this.id, 'Current display:', $(this).css('display'));
             $(this).hide();
         });
 
         // Show target section
-        console.log('Showing section:', sectionId);
+        // console.log('Showing section:', sectionId);
         $(sectionId).show();
-        console.log('Target section display after show():', $(sectionId).css('display'));
+        // console.log('Target section display after show():', $(sectionId).css('display'));
 
         $('#section-title').text($(this).text());
 
@@ -117,7 +117,7 @@
             $(document).trigger('area-manager-nav-click', [section]);
         }
 
-        console.log('=== NAV CLICK COMPLETE ===');
+        // console.log('=== NAV CLICK COMPLETE ===');
     });
 
     // --- Toast Notification Helper ---
@@ -162,7 +162,7 @@
     const ajaxUrl = (typeof sp_area_dashboard_vars !== 'undefined') ? sp_area_dashboard_vars.ajax_url : '';
 
     if (!ajaxUrl) {
-        console.error('Area Manager Dashboard: sp_area_dashboard_vars is undefined or missing ajax_url.');
+        // console.error('Area Manager Dashboard: sp_area_dashboard_vars is undefined or missing ajax_url.');
         return;
     }
 
@@ -253,7 +253,7 @@
     let projectStatusChart, monthlyTrendChart, financialChart, leadChart;
 
     function loadDashboardStats() {
-        console.log('Loading dashboard stats...');
+        // console.log('Loading dashboard stats...');
         $.ajax({
             url: ajaxUrl,
             type: 'POST',
@@ -262,22 +262,22 @@
                 nonce: sp_area_dashboard_vars.get_dashboard_stats_nonce,
             },
             success: function (response) {
-                console.log('Stats response:', response);
+                // console.log('Stats response:', response);
                 if (response.success) {
                     updateDashboardStats(response.data);
                     initializeCharts(response.data);
                 } else {
-                    console.error('Stats error:', response);
+                    // console.error('Stats error:', response);
                 }
             },
             error: function (xhr, status, error) {
-                console.error('AJAX error loading stats:', error);
+                // console.error('AJAX error loading stats:', error);
             }
         });
     }
 
     function updateDashboardStats(stats) {
-        console.log('Updating stats:', stats);
+        // console.log('Updating stats:', stats);
         $('#total-projects-stat').text(stats.total_projects || 0);
         $('#total-revenue-stat').text('₹' + (stats.total_revenue || 0).toLocaleString('en-IN'));
         $('#client-payments-stat').text('₹' + (stats.total_client_payments || 0).toLocaleString('en-IN'));
@@ -291,10 +291,10 @@
 
     function initializeCharts(stats) {
         if (typeof Chart === 'undefined') {
-            console.log('Chart.js not loaded');
+            // console.log('Chart.js not loaded');
             return;
         }
-        console.log('Charts would be initialized here with:', stats);
+        // console.log('Charts would be initialized here with:', stats);
         // Destroy existing charts if they exist
         if (projectStatusChart) projectStatusChart.destroy();
         if (monthlyTrendChart) monthlyTrendChart.destroy();
@@ -444,7 +444,7 @@
 
     // Global section data loader
     window.loadSectionData = function (section) {
-        console.log('Loading section data for:', section);
+        // console.log('Loading section data for:', section);
         if (section === 'dashboard') {
             loadDashboardStats();
         } else if (section === 'projects') {
@@ -456,7 +456,7 @@
         } else if (section === 'vendor-approvals') {
             loadVendorApprovals();
         } else if (section === 'leads') {
-            console.log('Triggering shared lead component...');
+            // console.log('Triggering shared lead component...');
             initLeadComponent();
         } else if (section === 'my-clients') {
             loadMyClients();
@@ -476,7 +476,7 @@
     // Load data when section becomes visible
     $(document).on('click', '.nav-item', function () {
         const section = $(this).data('section');
-        console.log('Nav clicked, section:', section);
+        // console.log('Nav clicked, section:', section);
 
         // Reset create form when navigating to it (unless we're in edit mode)
         if (section === 'create-project' && !$('#edit_project_id').val()) {
@@ -490,14 +490,14 @@
 
     // Initial load - check if dashboard is visible and load it
     $(document).ready(function () {
-        console.log('Document ready, checking initial section');
+        // console.log('Document ready, checking initial section');
         setTimeout(function () {
             if ($('#dashboard-section').is(':visible')) {
-                console.log('Dashboard visible on load, loading stats');
+                // console.log('Dashboard visible on load, loading stats');
                 loadDashboardStats();
             }
             if ($('#leads-section').is(':visible')) {
-                console.log('Leads visible on load, initializing lead component');
+                // console.log('Leads visible on load, initializing lead component');
                 initLeadComponent();
             }
         }, 500);
@@ -511,7 +511,7 @@
     // Initial load if dashboard is visible
     setTimeout(function () {
         if ($('#dashboard-section').is(':visible')) {
-            console.log('Initial dashboard stats load');
+            // console.log('Initial dashboard stats load');
             loadDashboardStats();
         }
     }, 500);
@@ -660,7 +660,7 @@
     // Trigger filter when custom date is changed via calendar
     $(document).on('change', '#filter-custom-date', function () {
         if ($('#filter-date-preset').val() === 'custom') {
-            console.log('Custom date selected:', $(this).val());
+            // console.log('Custom date selected:', $(this).val());
             filterProjects();
         }
     });
@@ -671,11 +671,11 @@
     // View project details button handler
     $(document).on('click', '.view-project-details', function () {
         const projectId = $(this).data('id');
-        console.log('View project details:', projectId);
+        // console.log('View project details:', projectId);
         if (typeof openProjectModal === 'function') {
             openProjectModal(projectId);
         } else {
-            console.error('openProjectModal function not found');
+            // console.error('openProjectModal function not found');
         }
     });
 
@@ -692,7 +692,7 @@
 
     // Load Project Data for Editing (reuses create form)
     function loadProjectForEdit(projectId) {
-        console.log('Loading project for edit:', projectId);
+        // console.log('Loading project for edit:', projectId);
 
         // Show loading state
         const submitBtn = $('#create-project-form button[type="submit"]');
@@ -717,7 +717,7 @@
                 }
             },
             error: function (xhr, status, error) {
-                console.error('Error fetching project:', error);
+                // console.error('Error fetching project:', error);
                 showToast('Failed to load project data', 'error');
                 submitBtn.prop('disabled', false).text(originalText);
             }
@@ -729,7 +729,7 @@
         const project = data.project;
         const meta = data.meta;
 
-        console.log('Populating create form for edit:', data);
+        // console.log('Populating create form for edit:', data);
 
         // Add hidden field to track edit mode
         if ($('#edit_project_id').length === 0) {
@@ -1135,7 +1135,7 @@
                 }
             },
             error: function (xhr, status, error) {
-                console.error('Project save error:', error, xhr.responseText);
+                // console.error('Project save error:', error, xhr.responseText);
                 feedback.text('AJAX error: ' + error).addClass('text-danger');
                 showToast('Failed to save project. Check console.', 'error');
             },
@@ -1149,7 +1149,7 @@
 
     // --- Lead Management ---
     function loadLeads() {
-        console.log('🔄 Loading leads...');
+        // console.log('🔄 Loading leads...');
         $('#area-leads-container').html('<p>Loading leads...</p>');
         $.ajax({
             url: ajaxUrl,
@@ -1159,7 +1159,7 @@
                 nonce: sp_area_dashboard_vars.get_leads_nonce,
             },
             success: function (response) {
-                console.log('✅ Leads loaded:', response);
+                // console.log('✅ Leads loaded:', response);
                 if (response.success) {
                     let html = '';
                     if (response.data.leads.length > 0) {
@@ -1187,12 +1187,12 @@
                     }
                     $('#area-leads-container').html(html);
                 } else {
-                    console.error('❌ Lead loading failed:', response);
+                    // console.error('❌ Lead loading failed:', response);
                     $('#area-leads-container').html('<p class="text-danger">Error loading leads.</p>');
                 }
             },
             error: function (xhr, status, error) {
-                console.error('❌ AJAX error:', error);
+                // console.error('❌ AJAX error:', error);
                 $('#area-leads-container').html('<p class="text-danger">AJAX error. Check console.</p>');
             }
         });
@@ -1532,7 +1532,7 @@
                 nonce: sp_area_dashboard_vars.get_clients_nonce,
             },
             success: function (response) {
-                console.log('Clients loaded:', response);
+                // console.log('Clients loaded:', response);
                 if (response.success) {
                     let html = '';
                     if (response.data.clients && response.data.clients.length > 0) {
@@ -1559,7 +1559,7 @@
                 }
             },
             error: function (xhr, status, error) {
-                console.error('Client load AJAX error:', error);
+                // console.error('Client load AJAX error:', error);
                 $('#my-clients-container').html('<p class="text-danger">Error loading clients. Please try again.</p>');
             }
         });
@@ -2166,7 +2166,7 @@
     // ========================================
 
     function loadMyTeam() {
-        console.log('Loading my team data...');
+        // console.log('Loading my team data...');
 
         $.ajax({
             url: ajaxUrl,
@@ -2179,12 +2179,12 @@
                 if (response.success) {
                     renderMyTeam(response.data);
                 } else {
-                    console.error('Failed to load team data:', response);
+                    // console.error('Failed to load team data:', response);
                     $('#my-team-sm-tbody').html('<tr><td colspan="7">Error loading team. ' + (response.data?.message || '') + '</td></tr>');
                 }
             },
             error: function (xhr, status, error) {
-                console.error('AJAX error loading team data:', error);
+                // console.error('AJAX error loading team data:', error);
                 $('#my-team-sm-tbody').html('<tr><td colspan="7">Error loading team. Please try again.</td></tr>');
             }
         });
@@ -2451,7 +2451,7 @@
 
     // --- Team Analysis Functions ---
     function loadTeamAnalysis() {
-        console.log('Loading team analysis data...');
+        // console.log('Loading team analysis data...');
 
         $.ajax({
             url: ajaxUrl,
@@ -2464,12 +2464,12 @@
                 if (response.success) {
                     renderTeamAnalysis(response.data);
                 } else {
-                    console.error('Failed to load team data:', response);
+                    // console.error('Failed to load team data:', response);
                     $('#team-am-tbody').html('<tr><td colspan="6">Error loading data. ' + (response.data?.message || '') + '</td></tr>');
                 }
             },
             error: function (xhr, status, error) {
-                console.error('AJAX error loading team data:', error);
+                // console.error('AJAX error loading team data:', error);
                 $('#team-am-tbody').html('<tr><td colspan="6">Error loading data. Please try again.</td></tr>');
             }
         });
@@ -2544,7 +2544,7 @@
 
     // --- AM Assignment Functions ---
     function loadAMAssignments() {
-        console.log('Loading AM assignments...');
+        // console.log('Loading AM assignments...');
         loadAMDropdown();
         loadAssignmentsTable();
     }

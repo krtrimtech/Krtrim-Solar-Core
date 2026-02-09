@@ -148,7 +148,7 @@
                 showFeedback('Email is available!', 'success');
             }
         } catch (error) {
-            console.error('Email check error:', error);
+            // console.error('Email check error:', error);
             showFeedback('Unable to verify email. Please check your connection and try again.', 'error');
             return false; // Block progression on network failure
         }

@@ -11,7 +11,7 @@ function sp_get_project_details() {
     
     // Verify nonce - be lenient for now
     if (isset($_POST['nonce']) && !wp_verify_nonce($_POST['nonce'], 'sp_project_details_nonce')) {
-        error_log('Project details nonce failed');
+        // error_log('Project details nonce failed');
         // Don't fail, just log
     }
     
@@ -105,7 +105,7 @@ function sp_get_project_details() {
             $project_id
         ), ARRAY_A);
         $data['steps'] = $steps ?: [];
-        error_log('Project ' . $project_id . ' steps count: ' . count($data['steps']));
+        // error_log('Project ' . $project_id . ' steps count: ' . count($data['steps']));
     }
     
     wp_send_json_success($data);

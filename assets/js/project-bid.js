@@ -4,7 +4,7 @@
  */
 
 jQuery(document).ready(function ($) {
-    console.log('🎯 Project Bid JS Loaded');
+    // console.log('🎯 Project Bid JS Loaded');
 
     // Handle bid form submission
     $('#place-bid-form').on('submit', function (e) {
@@ -27,7 +27,7 @@ jQuery(document).ready(function ($) {
             submit_bid_nonce: form.find('input[name="submit_bid_nonce"]').val()
         };
 
-        console.log('📤 Submitting bid:', formData);
+        // console.log('📤 Submitting bid:', formData);
 
         // Send AJAX request
         $.ajax({
@@ -35,7 +35,7 @@ jQuery(document).ready(function ($) {
             type: 'POST',
             data: formData,
             success: function (response) {
-                console.log('📥 Bid response:', response);
+                // console.log('📥 Bid response:', response);
 
                 if (response.success) {
                     // Show success message
@@ -88,8 +88,8 @@ jQuery(document).ready(function ($) {
                 }
             },
             error: function (xhr, status, error) {
-                console.error('❌ AJAX Error:', status, error);
-                console.error('Response:', xhr.responseText);
+                // console.error('❌ AJAX Error:', status, error);
+                // console.error('Response:', xhr.responseText);
 
                 feedbackDiv
                     .removeClass('success')

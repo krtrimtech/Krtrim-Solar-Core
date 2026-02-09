@@ -48,7 +48,7 @@ class KSC_WhatsApp_Handler {
      */
     private function send_via_official($phone, $message) {
         if (!class_exists('KSC_Official_WhatsApp')) {
-            error_log('[KSC WhatsApp] Official integration class not found.');
+            // error_log('[KSC WhatsApp] Official integration class not found.');
             return false;
         }
         
@@ -73,7 +73,7 @@ class KSC_WhatsApp_Handler {
             $api_key = $old_options['api_key'] ?? '';
 
             if (empty($api_url)) {
-                error_log('[KSC WAHA] API URL not configured');
+                // error_log('[KSC WAHA] API URL not configured');
                 return false;
             }
         }
@@ -106,7 +106,7 @@ class KSC_WhatsApp_Handler {
         ]);
 
         if (is_wp_error($response)) {
-            error_log('[KSC WAHA] Error: ' . $response->get_error_message());
+            // error_log('[KSC WAHA] Error: ' . $response->get_error_message());
             return false;
         }
 
@@ -115,7 +115,7 @@ class KSC_WhatsApp_Handler {
         if ($code >= 200 && $code < 300) {
             return true;
         } else {
-            error_log('[KSC WAHA] Failed (' . $code . '): ' . wp_remote_retrieve_body($response));
+            // error_log('[KSC WAHA] Failed (' . $code . '): ' . wp_remote_retrieve_body($response));
             return false;
         }
     }
