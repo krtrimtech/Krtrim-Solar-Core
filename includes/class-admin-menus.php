@@ -9,7 +9,8 @@ class SP_Admin_Menus {
      */
     public function __construct() {
         add_action( 'admin_menu', [ $this, 'register_menus' ] );
-        add_action( 'wp_ajax_assign_area_manager_location', [ $this, 'ajax_assign_location' ] );
+        // Disabled - duplicate of action in class-admin-manager-api.php
+        // add_action( 'wp_ajax_assign_area_manager_location', [ $this, 'ajax_assign_location' ] );
         
         // Manager Report AJAX Handlers
         add_action( 'wp_ajax_generate_manager_report', [ $this, 'ajax_generate_manager_report' ] );

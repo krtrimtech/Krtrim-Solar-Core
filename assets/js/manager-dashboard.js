@@ -2560,6 +2560,7 @@
             type: 'POST',
             data: {
                 action: 'assign_area_manager_location',
+                nonce: sp_area_dashboard_vars.get_projects_nonce,
                 manager_id: $('#assign_am_id').val(),
                 state: $('#assign_state').val(),
                 city: $('#assign_city').val()

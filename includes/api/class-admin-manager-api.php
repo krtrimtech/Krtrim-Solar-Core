@@ -2345,8 +2345,17 @@ class KSC_Admin_Manager_API extends KSC_API_Base {
         $data = json_decode($json_content, true);
         
         $cities = [];
-        if (isset($data[$state]) && is_array($data[$state])) {
-            $cities = $data[$state];
+        
+        // JSON structure: { "states": [ {"state": "StateName", "districts": [...]} ] }
+        if (isset($data['states']) && is_array($data['states'])) {
+            foreach ($data['states'] as $state_data) {
+                if (isset($state_data['state']) && $state_data['state'] === $state) {
+                    if (isset($state_data['districts']) && is_array($state_data['districts'])) {
+                        $cities = $state_data['districts'];
+                    }
+                    break;
+                }
+            }
         }
         
         wp_send_json_success(['cities' => $cities]);
@@ -2647,21 +2656,41 @@ class KSC_Admin_Manager_API extends KSC_API_Base {
             wp_send_json_error(['message' => 'Access denied']);
         }
 
-        // 1. Get Area Managers
-        // Admin sees ALL AMs, Manager sees only their supervised AMs
+
+        // 1. Get Area Managers based on Manager's assigned states
+        // Admin sees ALL AMs, Manager sees AMs based on their assigned states
         if ($is_admin) {
+            // Admin sees everyone
             $ams = get_users([
                 'role' => 'area_manager',
                 'orderby' => 'display_name',
                 'number' => -1
             ]);
         } else {
-            $ams = get_users([
-                'role' => 'area_manager',
-                'meta_key' => '_supervised_by_manager',
-                'meta_value' => $user->ID,
-                'orderby' => 'display_name'
-            ]);
+            // Manager: Check assigned states
+            $manager_states = get_user_meta($user->ID, '_assigned_states', true);
+            
+            if (empty($manager_states)) {
+                // No assigned states = Global access, see ALL AMs
+                $ams = get_users([
+                    'role' => 'area_manager',
+                    'orderby' => 'display_name',
+                    'number' => -1
+                ]);
+            } else {
+                // Manager has specific assigned states - filter AMs by state
+                $ams = get_users([
+                    'role' => 'area_manager',
+                    'orderby' => 'display_name',
+                    'number' => -1
+                ]);
+                
+                // Filter AMs to only those in Manager's assigned states
+                $ams = array_filter($ams, function($am) use ($manager_states) {
+                    $am_state = get_user_meta($am->ID, 'state', true);
+                    return !empty($am_state) && in_array($am_state, $manager_states);
+                });
+            }
         }
 
         $am_data = [];
