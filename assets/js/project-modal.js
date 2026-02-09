@@ -59,7 +59,7 @@
         }
 
         let steps = data.steps || [];
-        let completedSteps = steps.filter(function (s) { return s.status === 'approved'; }).length;
+        let completedSteps = steps.filter(function (s) { return s.admin_status === 'approved'; }).length;
         let progressPercentage = steps.length > 0 ? Math.round((completedSteps / steps.length) * 100) : 0;
 
         $('#modalProgressPercentage').text(progressPercentage + '%');
@@ -68,8 +68,8 @@
         if (steps.length > 0) {
             let stepsHtml = '';
             steps.forEach(function (step, index) {
-                let statusClass = step.status === 'approved' ? 'completed' : step.status === 'submitted' ? 'in-progress' : 'pending';
-                let icon = step.status === 'approved' ? '✓' : step.status === 'submitted' ? '⏳' : (index + 1);
+                let statusClass = step.admin_status === 'approved' ? 'completed' : step.admin_status === 'under_review' ? 'in-progress' : 'pending';
+                let icon = step.admin_status === 'approved' ? '✓' : step.admin_status === 'under_review' ? ' ⏳' : (index + 1);
 
                 stepsHtml += '<div class="step-item ' + statusClass + '">';
                 stepsHtml += '<div class="step-icon">' + icon + '</div>';
@@ -82,6 +82,20 @@
                 stepsHtml += '</div></div>';
             });
             $('#modalProgressSteps').html(stepsHtml);
+
+            // Add "View Reviews" button if there are pending reviews
+            let pendingReviews = steps.filter(s => s.admin_status === 'under_review').length;
+            if (pendingReviews > 0) {
+                $('#modalProgressSteps').append(`
+                    <button id="viewProjectReviewsBtn" 
+                            data-project-id="${data.project_id}" 
+                            style="width: 100%; margin-top: 15px; padding: 12px; background: #3b82f6; color: white; border: none; border-radius: 8px; font-weight: 600; cursor: pointer; font-size: 14px; transition: background 0.2s;"
+                            onmouseover="this.style.background='#2563eb'"
+                            onmouseout="this.style.background='#3b82f6'">
+                        📝 View Pending Reviews (${pendingReviews})
+                    </button>
+                `);
+            }
         } else {
             $('#modalProgressSteps').html('<p style="color: var(--text-secondary);">No progress steps configured</p>');
         }
@@ -166,6 +180,33 @@
         openProjectModal(projectId);
     });
 
+
+    // View project reviews button handler
+    $(document).on('click', '#viewProjectReviewsBtn', function () {
+        const projectId = $(this).data('project-id');
+        
+        // Close the modal
+        closeProjectModal();
+        
+        // Switch to project reviews tab
+        $('.nav-btn[data-tab="project-reviews"]').click();
+        
+        // Wait for reviews to load, then expand the specific project
+        setTimeout(function () {
+            const projectCard = $('.project-review-card[data-project-id="' + projectId + '"]');
+            if (projectCard.length) {
+                // Scroll to the project card
+                $('html, body').animate({
+                    scrollTop: projectCard.offset().top - 100
+                }, 500);
+                
+                // Expand the reviews
+                if (typeof toggleProjectReviews === 'function') {
+                    toggleProjectReviews(projectId);
+                }
+            }
+        }, 700);
+    });
     // Make functions globally available
     window.openProjectModal = openProjectModal;
     window.closeProjectModal = closeProjectModal;

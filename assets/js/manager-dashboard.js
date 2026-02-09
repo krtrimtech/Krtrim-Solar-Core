@@ -802,19 +802,41 @@
     }
 
     // --- Load Reviews ---
-    function loadReviews() {
-        $('#project-reviews-container').html('<p>Loading reviews...</p>');
+    function loadReviews(filter = 'pending') {
+        const container = $('#project-reviews-container');
+
+        // Add filter buttons if not already added
+        if (!$('#review-filter-buttons').length) {
+            container.before(`
+                <div id="review-filter-buttons" style="margin-bottom: 20px; display: flex; gap: 10px;">
+                    <button class="review-filter-btn" data-filter="pending" style="padding: 10px 20px; border-radius: 8px; font-weight: 600; cursor: pointer; font-size: 14px; transition: all 0.2s; background: #3b82f6; color: white; border: none;">
+                        📝 Pending Reviews
+                    </button>
+                    <button class="review-filter-btn" data-filter="all" style="padding: 10px 20px; border-radius: 8px; font-weight: 600; cursor: pointer; font-size: 14px; transition: all 0.2s; background: white; color: #6b7280; border: 2px solid #e5e7eb;">
+                        📋 All Reviews
+                    </button>
+                </div>
+            `);
+        }
+
+        // Update active button styling
+        $('.review-filter-btn').css({ background: 'white', color: '#6b7280', border: '2px solid #e5e7eb' });
+        $('.review-filter-btn[data-filter="' + filter + '"]').css({ background: '#3b82f6', color: 'white', border: 'none' });
+
+        container.html('<p>Loading reviews...</p>');
         $.ajax({
             url: ajaxUrl,
             type: 'POST',
             data: {
                 action: 'get_area_manager_reviews',
                 nonce: sp_area_dashboard_vars.get_reviews_nonce,
+                filter: filter
             },
             success: function (response) {
                 if (response.success) {
                     let html = '';
                     if (response.data.reviews.length > 0) {
+                        console.log('Reviews data:', response.data.reviews);
                         // Group reviews by project
                         const projectGroups = {};
                         response.data.reviews.forEach(review => {
@@ -824,97 +846,221 @@
                                     project_city: review.project_city,
                                     project_state: review.project_state,
                                     system_size: review.system_size,
+                                    total_cost: review.total_cost,
+                                    project_status: review.project_status,
+                                    client_name: review.client_name,
+                                    vendor_name: review.vendor_name,
+                                    progress: review.progress,
+                                    am_id: review.am_id,
                                     reviews: []
                                 };
                             }
                             projectGroups[review.project_id].reviews.push(review);
                         });
 
-                        // Render each project card
+                        // Render each collapsible project card
                         Object.keys(projectGroups).forEach(projectId => {
                             const group = projectGroups[projectId];
+                            const reviewCount = group.reviews.length;
+
+                            // Status badge styling
+                            const statusColors = {
+                                'pending': { bg: '#fef3c7', text: '#b45309' },
+                                'in_progress': { bg: '#dbeafe', text: '#1e40af' },
+                                'completed': { bg: '#d1fae5', text: '#065f46' }
+                            };
+                            const status = group.project_status || 'pending';
+                            const statusColor = statusColors[status] || statusColors['pending'];
+                            const statusLabel = status.replace('_', ' ').toUpperCase();
+
                             html += `
-                                <div class="card" style="margin-bottom: 20px;">
-                                    <div class="bid-project-header" style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
-                                        <div>
-                                            <h3 style="margin: 0 0 5px 0;">${group.project_title}</h3>
-                                            <small style="color: #666;">
-                                                📍 ${group.project_city || ''}, ${group.project_state || ''}
-                                                ${group.system_size ? ` • ⚡ ${group.system_size} kW` : ''}
-                                            </small>
+                                <div class="project-review-card" data-project-id="${projectId}" style="background: white; border-radius: 12px; box-shadow: 0 2px 8px rgba(0,0,0,0.1); margin-bottom: 20px; overflow: hidden;">
+                                    <!-- Project Summary (Always Visible) -->
+                                    <div class="project-summary" style="padding: 20px; border-bottom: 2px solid #f0f0f0;">
+                                        <!-- Header with Title and Status -->
+                                        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
+                                            <h3 style="margin: 0; font-size: 18px; color: #1f2937;">${group.project_title}</h3>
+                                            <span style="background: ${statusColor.bg}; color: ${statusColor.text}; padding: 6px 14px; border-radius: 20px; font-size: 12px; font-weight: 700;">
+                                                ${statusLabel}
+                                            </span>
                                         </div>
-                                        <span class="status-badge" style="background: #fef3c7; color: #b45309; padding: 6px 12px; border-radius: 6px;">
-                                            ${group.reviews.length} Pending Review${group.reviews.length !== 1 ? 's' : ''}
-                                        </span>
+                                        
+                                        <!-- Info Grid (Like Admin) -->
+                                        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 12px; margin-bottom: 15px;">
+                                            ${group.client_name ? `
+                                                <div style="display: flex; align-items: center; gap: 8px;">
+                                                    <span style="font-size: 20px;">👤</span>
+                                                    <div>
+                                                        <div style="font-size: 11px; color: #9ca3af; font-weight: 600; text-transform: uppercase;">Client</div>
+                                                        <div style="font-size: 14px; color: #1f2937; font-weight: 600;">${group.client_name}</div>
+                                                    </div>
+                                                </div>
+                                            ` : ''}
+                                            
+                                            ${group.vendor_name ? `
+                                                <div style="display: flex; align-items: center; gap: 8px;">
+                                                    <span style="font-size: 20px;">🏢</span>
+                                                    <div>
+                                                        <div style="font-size: 11px; color: #9ca3af; font-weight: 600; text-transform: uppercase;">Vendor</div>
+                                                        <div style="font-size: 14px; color: #1f2937; font-weight: 600;">${group.vendor_name}</div>
+                                                    </div>
+                                                </div>
+                                            ` : ''}
+                                            
+                                            ${group.project_city || group.project_state ? `
+                                                <div style="display: flex; align-items: center; gap: 8px;">
+                                                    <span style="font-size: 20px;">📍</span>
+                                                    <div>
+                                                        <div style="font-size: 11px; color: #9ca3af; font-weight: 600; text-transform: uppercase;">Location</div>
+                                                        <div style="font-size: 14px; color: #1f2937; font-weight: 600;">${group.project_city || ''}${group.project_city && group.project_state ? ', ' : ''}${group.project_state || ''}</div>
+                                                    </div>
+                                                </div>
+                                            ` : ''}
+                                            
+                                            ${group.system_size ? `
+                                                <div style="display: flex; align-items: center; gap: 8px;">
+                                                    <span style="font-size: 20px;">⚡</span>
+                                                    <div>
+                                                        <div style="font-size: 11px; color: #9ca3af; font-weight: 600; text-transform: uppercase;">System Size</div>
+                                                        <div style="font-size: 14px; color: #1f2937; font-weight: 600;">${group.system_size} kW</div>
+                                                    </div>
+                                                </div>
+                                            ` : ''}
+                                            
+                                            ${group.total_cost ? `
+                                                <div style="display: flex; align-items: center; gap: 8px;">
+                                                    <span style="font-size: 20px;">💰</span>
+                                                    <div>
+                                                        <div style="font-size: 11px; color: #9ca3af; font-weight: 600; text-transform: uppercase;">Total Cost</div>
+                                                        <div style="font-size: 14px; color: #1f2937; font-weight: 600;">₹${parseFloat(group.total_cost).toLocaleString('en-IN')}</div>
+                                                    </div>
+                                                </div>
+                                            ` : ''}
+                                            
+                                            ${group.progress !== undefined ? `
+                                                <div style="display: flex; align-items: center; gap: 8px;">
+                                                    <span style="font-size: 20px;">📊</span>
+                                                    <div>
+                                                        <div style="font-size: 11px; color: #9ca3af; font-weight: 600; text-transform: uppercase;">Progress</div>
+                                                        <div style="font-size: 14px; color: #1f2937; font-weight: 600;">${group.progress}%</div>
+                                                    </div>
+                                                </div>
+                                            ` : ''}
+                                        </div>
+                                        
+                                        <!-- Pending Reviews Badge and Button -->
+                                        <div style="display: flex; justify-content: space-between; align-items: center; padding-top: 12px; border-top: 1px solid #f0f0f0;">
+                                            <span style="background: #fef3c7; color: #b45309; padding: 6px 14px; border-radius: 20px; font-size: 13px; font-weight: 600;">
+                                                🟡 ${reviewCount} pending review${reviewCount !== 1 ? 's' : ''}
+                                            </span>
+                                            <button class="btn-review-toggle" onclick="toggleProjectReviews(${projectId})" style="background: #3b82f6; color: white; border: none; padding: 10px 20px; border-radius: 8px; font-weight: 600; cursor: pointer; font-size: 14px; transition: background 0.2s;">
+                                                Review Project →
+                                            </button>
+                                        </div>
                                     </div>
                                     
-                                    <div class="reviews-list">
-                                        <table class="data-table" style="width: 100%;">
-                                            <thead>
-                                                <tr>
-                                                    <th>Step</th>
-                                                    <th>Vendor Comment</th>
-                                                    <th>Submission</th>
-                                                    <th>Your Comment</th>
-                                                    <th>Action</th>
-                                                </tr>
-                                            </thead>
-                                            <tbody>
+                                    <!-- Review Details (Initially Hidden) -->
+                                    <div class="reviews-details" id="reviews-${projectId}" style="display: none; padding: 20px; background: #fafafa;">
+                                        <div style="margin-bottom: 15px; text-align: right;">
+                                            <button onclick="toggleProjectReviews(${projectId})" style="background: #6b7280; color: white; border: none; padding: 8px 16px; border-radius: 6px; cursor: pointer; font-size: 13px;">
+                                                ▲ Hide Reviews
+                                            </button>
+                                        </div>
                             `;
 
-                            group.reviews.forEach(review => {
+                            // Render each step as a card
+                            group.reviews.forEach((review, index) => {
                                 html += `
-                                    <tr>
-                                        <td>
-                                            <strong>Step ${review.step_number}</strong><br>
-                                            <small style="color: #666;">${review.step_name}</small>
-                                        </td>
-                                        <td>
-                                            <em style="color: #666;">${review.vendor_comment || 'No comment'}</em>
-                                        </td>
-                                        <td>
-                                            ${review.image_url ?
-                                        `<a href="${review.image_url}" target="_blank" class="btn btn-sm" style="background: #e0f2fe; color: #0369a1; padding: 4px 12px;">
-                                                    📷 View
-                                                </a>`
-                                        : '<span style="color: #999;">No image</span>'}
-                                        </td>
-                                        <td>
+                                    <div class="step-review-card" style="background: white; padding: 20px; border-radius: 10px; margin-bottom: 15px; border-left: 4px solid #3b82f6; box-shadow: 0 1px 3px rgba(0,0,0,0.1);">
+                                        <h4 style="margin: 0 0 15px 0; color: #1f2937; font-size: 16px; display: flex; align-items: center; gap: 10px;">
+                                            <span style="background: #3b82f6; color: white; width: 28px; height: 28px; border-radius: 50%; display: inline-flex; align-items: center; justify-content: center; font-size: 14px; font-weight: bold;">
+                                                ${review.step_number}
+                                            </span>
+                                            ${review.step_name}
+                                        </h4>
+                                        
+                                        ${review.image_url ? `
+                                            <div style="margin: 15px 0;">
+                                                <label style="display: block; font-weight: 600; color: #4b5563; margin-bottom: 8px; font-size: 13px;">📷 Vendor Submission:</label>
+                                                <a href="${review.image_url}" target="_blank">
+                                                    <img src="${review.image_url}" alt="Step ${review.step_number}" style="max-width: 350px; width: 100%; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); cursor: pointer; transition: transform 0.2s;" onmouseover="this.style.transform='scale(1.02)'" onmouseout="this.style.transform='scale(1)'">
+                                                </a>
+                                            </div>
+                                        ` : `
+                                            <div style="margin: 15px 0; padding: 12px; background: #fef2f2; border-left: 3px solid #ef4444; border-radius: 6px; color: #991b1b; font-size: 13px;">
+                                                ⚠️ No image submitted
+                                            </div>
+                                        `}
+                                        
+                                        ${review.vendor_comment ? `
+                                            <div style="margin: 15px 0;">
+                                                <label style="display: block; font-weight: 600; color: #4b5563; margin-bottom: 6px; font-size: 13px;">💬 Vendor Comment:</label>
+                                                <p style="background: #f0f9ff; padding: 12px; border-radius: 6px; margin: 0; color: #0c4a6e; font-size: 14px; line-height: 1.5;">
+                                                    "${review.vendor_comment}"
+                                                </p>
+                                            </div>
+                                        ` : ''}
+                                        
+                                        <div style="margin: 15px 0;">
+                                            <label style="display: block; font-weight: 600; color: #4b5563; margin-bottom: 6px; font-size: 13px;">✍️ Your Review Comment:</label>
                                             <textarea class="review-comment" data-step-id="${review.id}" 
-                                                      placeholder="Add comment..." 
-                                                      style="width: 100%; min-height: 60px; padding: 8px; border: 1px solid #ddd; border-radius: 4px; font-size: 13px;"></textarea>
-                                        </td>
-                                        <td style="white-space: nowrap;">
-                                            <button class="btn btn-success review-btn" 
-                                                    data-decision="approved" 
-                                                    data-step-id="${review.id}"
-                                                    style="margin-right: 5px; padding: 8px 16px;">
-                                                ✓ Approve
-                                            </button>
-                                            <button class="btn btn-danger review-btn" 
-                                                    data-decision="rejected" 
-                                                    data-step-id="${review.id}"
-                                                    style="padding: 8px 16px;">
-                                                ✗ Reject
-                                            </button>
-                                        </td>
-                                    </tr>
+                                                      placeholder="Add your review comment here..."
+                                                      style="width: 100%; min-height: 80px; padding: 12px; border: 2px solid #e5e7eb; border-radius: 8px; font-size: 14px; font-family: inherit; resize: vertical; transition: border-color 0.2s;" 
+                                                      onfocus="this.style.borderColor='#3b82f6'" 
+                                                      onblur="this.style.borderColor='#e5e7eb'"></textarea>
+                                        </div>
+                                        
+                                        <div style="display: flex; gap: 10px; margin-top: 20px;">
+                                            ${review.admin_status === 'under_review' ? `
+                                                <button class="btn btn-success review-btn" 
+                                                        data-decision="approved" 
+                                                        data-step-id="${review.id}"
+                                                        style="flex: 1; background: #10b981; color: white; border: none; padding: 12px 24px; border-radius: 8px; font-weight: 600; cursor: pointer; font-size: 14px; transition: background 0.2s;"
+                                                        onmouseover="this.style.background='#059669'"
+                                                        onmouseout="this.style.background='#10b981'">
+                                                    ✓ Approve Step
+                                                </button>
+                                                <button class="btn btn-danger review-btn" 
+                                                        data-decision="rejected" 
+                                                        data-step-id="${review.id}"
+                                                        style="flex: 1; background: #ef4444; color: white; border: none; padding: 12px 24px; border-radius: 8px; font-weight: 600; cursor: pointer; font-size: 14px; transition: background 0.2s;"
+                                                        onmouseover="this.style.background='#dc2626'"
+                                                        onmouseout="this.style.background='#ef4444'">
+                                                    ✗ Reject Step
+                                                </button>
+                                            ` : `
+                                                <div style="padding: 12px; background: ${review.admin_status === 'approved' ? '#d1fae5' : '#fef2f2'}; border-radius: 8px; text-align: center;">
+                                                    <div style="font-weight: 700; font-size: 16px; color: ${review.admin_status === 'approved' ? '#065f46' : '#991b1b'}; margin-bottom: 5px;">
+                                                        ${review.admin_status === 'approved' ? '✅ APPROVED' : '❌ REJECTED'}
+                                                    </div>
+                                                    ${review.admin_comment ? `
+                                                        <div style="font-size: 13px; color: #4b5563; margin-top: 8px;">
+                                                            <strong>Manager Comment:</strong> "${review.admin_comment}"
+                                                        </div>
+                                                    ` : ''}
+                                                    ${review.reviewed_at ? `
+                                                        <div style="font-size: 12px; color: #9ca3af; margin-top: 4px;">
+                                                            Reviewed: ${new Date(review.reviewed_at).toLocaleDateString()}
+                                                        </div>
+                                                    ` : ''}
+                                                </div>
+                                            `}
+                                        </div>
+                                    </div>
                                 `;
                             });
 
                             html += `
-                                            </tbody>
-                                        </table>
                                     </div>
                                 </div>
                             `;
                         });
                     } else {
                         html = `
-                            <div class="empty-state">
-                                <div class="icon">✅</div>
-                                <h3>No Pending Reviews</h3>
-                                <p>All vendor submissions have been reviewed. New submissions will appear here.</p>
+                            <div class="empty-state" style="text-align: center; padding: 60px 20px; background: white; border-radius: 12px; box-shadow: 0 2px 8px rgba(0,0,0,0.1);">
+                                <div class="icon" style="font-size: 64px; margin-bottom: 20px;">✅</div>
+                                <h3 style="margin: 0 0 10px 0; color: #1f2937; font-size: 20px;">No Pending Reviews</h3>
+                                <p style="margin: 0; color: #6b7280; font-size: 14px;">All vendor submissions have been reviewed. New submissions will appear here.</p>
                             </div>
                         `;
                     }
@@ -925,6 +1071,64 @@
             }
         });
     }
+
+    // Toggle function for expanding/collapsing project reviews (Global scope)
+    window.toggleProjectReviews = function (projectId) {
+        const detailsDiv = $('#reviews-' + projectId);
+        detailsDiv.slideToggle(300);
+    };
+
+    // Review Button Handler for Project Reviews Tab
+    $(document).on('click', '#project-reviews-container .review-btn', function () {
+        const button = $(this);
+        const stepId = button.data('step-id');
+        const decision = button.data('decision');
+        const comment = button.closest('.step-review-card').find('.review-comment[data-step-id="' + stepId + '"]').val();
+
+        console.log('Review clicked:', { stepId, decision, comment });
+
+        $.ajax({
+            url: ajaxUrl,
+            type: 'POST',
+            data: {
+                action: 'review_vendor_submission',
+                nonce: sp_area_dashboard_vars.review_submission_nonce,
+                step_id: stepId,
+                decision: decision,
+                comment: comment,
+            },
+            beforeSend: function () {
+                button.prop('disabled', true);
+                const originalText = button.text();
+                button.data('original-text', originalText);
+                button.text('Processing...');
+            },
+            success: function (response) {
+                console.log('Review response:', response);
+                if (response.success) {
+                    showToast(response.data.message || 'Review submitted successfully!', 'success');
+                    // Reload reviews to refresh the list
+                    loadReviews();
+                } else {
+                    showToast(response.data.message || 'Error submitting review', 'error');
+                    button.prop('disabled', false);
+                    button.text(button.data('original-text'));
+                }
+            },
+            error: function (xhr, status, error) {
+                console.error('AJAX error:', error);
+                showToast('Network error. Please try again.', 'error');
+                button.prop('disabled', false);
+                button.text(button.data('original-text'));
+            }
+        });
+    });
+
+    // Filter Button Handler
+    $(document).on('click', '.review-filter-btn', function () {
+        const filter = $(this).data('filter');
+        loadReviews(filter);
+    });
 
     // --- Load Bids for Area Manager Projects ---
     loadBids = function () {
@@ -1425,6 +1629,11 @@
                     // Close modal and refresh clients list
                     $('#create-client-modal').css('display', 'none');
                     loadMyClients();
+
+                    // Auto-convert lead to 'converted' status if created from lead
+                    if (typeof window.autoConvertLeadToClient === 'function') {
+                        window.autoConvertLeadToClient();
+                    }
                 } else {
                     feedback.html('<div style="background:#f8d7da;color:#721c24;padding:10px;border-radius:6px;">❌ ' + response.data.message + '</div>');
                 }

@@ -1331,6 +1331,11 @@
                     // Close modal and refresh clients list
                     $('#create-client-modal').css('display', 'none');
                     loadMyClients();
+
+                    // Auto-convert lead to 'converted' status if created from lead
+                    if (typeof window.autoConvertLeadToClient === 'function') {
+                        window.autoConvertLeadToClient();
+                    }
                 } else {
                     feedback.html('<div style="background:#f8d7da;color:#721c24;padding:10px;border-radius:6px;">❌ ' + response.data.message + '</div>');
                 }

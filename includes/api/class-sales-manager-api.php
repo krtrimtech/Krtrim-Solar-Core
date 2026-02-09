@@ -23,7 +23,6 @@ class KSC_Sales_Manager_API {
         add_action('wp_ajax_get_sales_manager_leads', [$this, 'get_sales_manager_leads']);
         add_action('wp_ajax_create_lead_by_sales_manager', [$this, 'create_lead_by_sales_manager']);
         add_action('wp_ajax_update_lead_by_sales_manager', [$this, 'update_lead_by_sales_manager']);
-        add_action('wp_ajax_get_lead_details_for_sm', [$this, 'get_lead_details']);
         
         // Follow-up management
         add_action('wp_ajax_add_lead_followup', [$this, 'add_lead_followup']);
@@ -149,6 +148,15 @@ class KSC_Sales_Manager_API {
         $meta_query = [
             ['key' => '_created_by_sales_manager', 'value' => $user_id],
         ];
+        
+        // Exclude 'converted' leads by default (unless specifically filtering for them)
+        if ($status_filter !== 'converted') {
+            $meta_query[] = [
+                'key' => '_lead_status',
+                'value' => 'converted',
+                'compare' => '!='
+            ];
+        }
 
         if (!empty($status_filter)) {
             $meta_query[] = ['key' => '_lead_status', 'value' => $status_filter];
@@ -317,52 +325,6 @@ class KSC_Sales_Manager_API {
         wp_send_json_success(['message' => 'Lead updated']);
     }
 
-    /**
-     * Get lead details
-     */
-    public function get_lead_details() {
-        if (!$this->verify_sales_manager()) {
-            wp_send_json_error(['message' => 'Unauthorized']);
-        }
-
-        $lead_id = intval($_POST['lead_id']);
-        $user_id = get_current_user_id();
-
-        // Verify ownership or admin/AM oversight
-        $created_by = get_post_meta($lead_id, '_created_by_sales_manager', true);
-        if ($created_by != $user_id && !current_user_can('administrator')) {
-            wp_send_json_error(['message' => 'Access denied']);
-        }
-
-        global $wpdb;
-        $table_followups = $wpdb->prefix . 'solar_lead_followups';
-
-        // Get follow-ups
-        $followups = $wpdb->get_results($wpdb->prepare(
-            "SELECT * FROM {$table_followups} WHERE lead_id = %d ORDER BY activity_date DESC",
-            $lead_id
-        ));
-
-        $lead = get_post($lead_id);
-
-        wp_send_json_success([
-            'lead' => [
-                'id' => $lead_id,
-                'name' => $lead->post_title,
-                'phone' => get_post_meta($lead_id, '_lead_phone', true),
-                'email' => get_post_meta($lead_id, '_lead_email', true),
-                'address' => get_post_meta($lead_id, '_lead_address', true),
-                'status' => get_post_meta($lead_id, '_lead_status', true) ?: 'new',
-                'lead_type' => get_post_meta($lead_id, '_lead_type', true) ?: 'solar_project',
-                'project_type' => get_post_meta($lead_id, '_lead_project_type', true),
-                'system_size' => get_post_meta($lead_id, '_lead_system_size', true),
-                'source' => get_post_meta($lead_id, '_lead_source', true),
-                'notes' => get_post_meta($lead_id, '_lead_notes', true),
-                'created_date' => $lead->post_date,
-            ],
-            'followups' => $followups,
-        ]);
-    }
 
     /**
      * Add follow-up activity

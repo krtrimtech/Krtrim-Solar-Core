@@ -41,6 +41,7 @@
 
     // Current state
     let currentLeadId = null;
+    let leadIdToConvert = null;  // Track lead being converted to client
     let canCreateClient = false;
     let canDelete = false;
     let dashboardType = 'sales_manager';
@@ -294,7 +295,7 @@
         $('#lead-followup-thread').html('<p>Loading follow-ups...</p>');
         openModal('#lead-detail-modal');
 
-        const action = dashboardType === 'area_manager' ? 'get_lead_details_for_am' : 'get_lead_details_for_sm';
+        const action = 'get_lead_details';  // Unified API for all roles
 
         $.ajax({
             url: window.leadAjax.url,
@@ -443,11 +444,14 @@
 
     // Update lead status
     function updateLeadStatus(leadId, status) {
+        // Use role-specific action
+        const action = dashboardType === 'area_manager' ? 'update_solar_lead_status' : 'update_lead_by_sales_manager';
+
         $.ajax({
             url: window.leadAjax.url,
             type: 'POST',
             data: {
-                action: 'update_lead_by_sales_manager',
+                action: action,
                 nonce: window.leadAjax.nonce,
                 lead_id: leadId,
                 lead_status: status
@@ -460,7 +464,12 @@
                         .text(formatStatus(status))
                         .css({ background: statusStyle.bg, color: statusStyle.color });
                     loadLeads();
+                } else {
+                    showToast(response.data?.message || 'Failed to update status', 'error');
                 }
+            },
+            error: function () {
+                showToast('Network error while updating status', 'error');
             }
         });
     }
@@ -468,16 +477,73 @@
     // Navigate to create client (Area Manager only)
     function navigateToCreateClient(lead) {
         closeModal('#lead-detail-modal');
-        // Switch to Create Client section
-        $('.nav-item[data-section="create-client"]').click();
-        // Pre-fill form
-        setTimeout(() => {
-            $('#client_name').val(lead.name);
-            $('#client_email').val(lead.email || '');
-            const username = (lead.email || lead.name).split('@')[0].toLowerCase().replace(/\s/g, '_');
-            $('#client_username').val(username);
-        }, 100);
+
+        // Store lead ID for auto-conversion after client creation
+        leadIdToConvert = lead.id;
+        window.leadIdToConvert = lead.id;  // Make globally accessible for dashboard scripts
+
+        // Try to navigate to Create Client section
+        const $createClientNav = $('.nav-item[data-section="create-client"]');
+        if ($createClientNav.length) {
+            // Section navigation exists
+            $createClientNav.click();
+            // Pre-fill form after navigation
+            setTimeout(() => {
+                $('#client_name').val(lead.name);
+                $('#client_email').val(lead.email || '');
+                const username = (lead.email || lead.name).split('@')[0].toLowerCase().replace(/\s/g, '_');
+                $('#client_username').val(username);
+            }, 100);
+        } else {
+            // Fallback: Open client creation modal if it exists
+            const $createClientModal = $('#create-client-modal');
+            if ($createClientModal.length) {
+                $('#client_name').val(lead.name);
+                $('#client_email').val(lead.email || '');
+                const username = (lead.email || lead.name).split('@')[0].toLowerCase().replace(/\s/g, '_');
+                $('#client_username').val(username);
+                $createClientModal.css('display', 'flex');
+            } else {
+                showToast('Create Client feature not available in this view', 'error');
+            }
+        }
     }
+
+    // Auto-convert lead to 'converted' status when client is created
+    // This function should be called from dashboard scripts after successful client creation
+    window.autoConvertLeadToClient = function () {
+        if (window.leadIdToConvert && window.leadAjax) {
+            const leadId = window.leadIdToConvert;
+
+            // Determine the correct action based on dashboard type
+            const action = dashboardType === 'area_manager' ? 'update_solar_lead_status' : 'update_lead_by_sales_manager';
+
+            $.ajax({
+                url: window.leadAjax.url,
+                type: 'POST',
+                data: {
+                    action: action,
+                    nonce: window.leadAjax.nonce,
+                    lead_id: leadId,
+                    lead_status: 'converted'
+                },
+                success: function (response) {
+                    if (response.success) {
+                        showToast('Lead automatically marked as converted! 🎉', 'success');
+                        // Refresh leads list
+                        if (typeof loadLeads === 'function') {
+                            loadLeads();
+                        }
+                    }
+                },
+                complete: function () {
+                    // Clear the stored lead ID
+                    window.leadIdToConvert = null;
+                    leadIdToConvert = null;
+                }
+            });
+        }
+    };
 
     // Helper functions
     function openModal(selector) {
