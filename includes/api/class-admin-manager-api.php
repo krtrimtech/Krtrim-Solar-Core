@@ -2855,7 +2855,10 @@ class KSC_Admin_Manager_API extends KSC_API_Base {
                 'phone' => get_user_meta($user->ID, 'phone_number', true) ?: get_user_meta($user->ID, 'phone', true),
                 'state' => get_user_meta($user->ID, 'state', true),
                 'city' => get_user_meta($user->ID, 'city', true),
-                'joined_date' => date('M Y', strtotime($user->user_registered))
+                'joined_date' => date('M Y', strtotime($user->user_registered)),
+                'photo_url' => get_user_meta($user->ID, '_photo_url', true),
+                'aadhaar_number' => get_user_meta($user->ID, '_aadhaar_number', true),
+                'aadhaar_image_url' => get_user_meta($user->ID, '_aadhaar_image_url', true)
             ],
             'stats' => [],
             'projects' => [],

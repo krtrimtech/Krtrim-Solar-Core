@@ -619,6 +619,27 @@ function sp_manager_dashboard_shortcode() {
                                 <label for="cleaner_address">Address</label>
                                 <textarea id="cleaner_address" name="cleaner_address" rows="2"></textarea>
                             </div>
+                            
+                            <div class="form-group">
+                                <label for="assigned_area_manager">Assign to Area Manager <span style="color:#666; font-weight:normal;">(Optional - for Team Overview)</span></label>
+                                <select id="assigned_area_manager" name="assigned_area_manager" style="width:100%; padding:10px; border:1px solid #ddd; border-radius:4px;">
+                                    <option value="">-- Select Area Manager --</option>
+                                    <?php
+                                    $all_ams = get_users([
+                                        'role' => 'area_manager',
+                                        'orderby' => 'display_name',
+                                        'order' => 'ASC',
+                                    ]);
+                                    foreach ($all_ams as $am_user) {
+                                        $am_city = get_user_meta($am_user->ID, 'city', true);
+                                        $am_state = get_user_meta($am_user->ID, 'state', true);
+                                        $loc = $am_city ? " ($am_city, $am_state)" : "";
+                                        echo '<option value="' . esc_attr($am_user->ID) . '">' . esc_html($am_user->display_name . $loc) . '</option>';
+                                    }
+                                    ?>
+                                </select>
+                                <p class="description">If selected, this cleaner will appear in this Area Manager's team.</p>
+                            </div>
                             <button type="submit" class="btn btn-primary">➕ Create Cleaner Account</button>
                             <div id="create-cleaner-feedback" style="margin-top:15px;"></div>
                         </form>

@@ -99,10 +99,26 @@ class KSC_Cleaner_API {
         ]);
 
         // Save meta data
+        // Determine Supervisor (Area Manager)
+        $supervisor_id = get_current_user_id();
+        
+        // If Admin/Manager is creating, allow assigning to specific AM
+        if (isset($_POST['assigned_area_manager']) && !empty($_POST['assigned_area_manager'])) {
+             $current_user = wp_get_current_user();
+             if (in_array('administrator', (array)$current_user->roles) || in_array('manager', (array)$current_user->roles)) {
+                 $assigned_am_id = intval($_POST['assigned_area_manager']);
+                 // Verify the assigned user is actually an AM
+                 $assigned_user = get_userdata($assigned_am_id);
+                 if ($assigned_user && in_array('area_manager', (array)$assigned_user->roles)) {
+                     $supervisor_id = $assigned_am_id;
+                 }
+             }
+        }
+
         update_user_meta($user_id, 'phone', $phone);
         update_user_meta($user_id, '_aadhaar_number', $aadhaar);
         update_user_meta($user_id, '_cleaner_address', $address);
-        update_user_meta($user_id, '_supervised_by_area_manager', get_current_user_id());
+        update_user_meta($user_id, '_supervised_by_area_manager', $supervisor_id);
         update_user_meta($user_id, '_created_by', get_current_user_id());
         update_user_meta($user_id, '_created_at', current_time('mysql'));
 
@@ -203,20 +219,23 @@ class KSC_Cleaner_API {
             wp_send_json_error(['message' => 'You can only update your own cleaners']);
         }
 
-        // Update fields
-        if (!empty($_POST['cleaner_name'])) {
-            wp_update_user([
-                'ID' => $cleaner_id,
-                'display_name' => sanitize_text_field($_POST['cleaner_name']),
-            ]);
-        }
-
-        if (!empty($_POST['cleaner_phone'])) {
-            update_user_meta($cleaner_id, 'phone', sanitize_text_field($_POST['cleaner_phone']));
-        }
-
         if (!empty($_POST['cleaner_address'])) {
             update_user_meta($cleaner_id, '_cleaner_address', sanitize_textarea_field($_POST['cleaner_address']));
+        }
+
+        // Allow Admin/Manager to update Assigned Area Manager
+        if (isset($_POST['assigned_area_manager'])) {
+             $current_user = wp_get_current_user();
+             if (in_array('administrator', (array)$current_user->roles) || in_array('manager', (array)$current_user->roles)) {
+                 $new_am_id = intval($_POST['assigned_area_manager']);
+                 if ($new_am_id > 0) {
+                     // Verify the assigned user is actually an AM
+                     $assigned_user = get_userdata($new_am_id);
+                     if ($assigned_user && in_array('area_manager', (array)$assigned_user->roles)) {
+                         update_user_meta($cleaner_id, '_supervised_by_area_manager', $new_am_id);
+                     }
+                 }
+             }
         }
 
         // Log Activity

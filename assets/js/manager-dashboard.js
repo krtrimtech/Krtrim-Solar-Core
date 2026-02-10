@@ -1918,6 +1918,13 @@
                                 </div>
                                 <div style="margin-top: 15px; display: flex; gap: 10px;">
                                     <a href="tel:${cleaner.phone}" class="btn btn-sm" style="padding: 6px 12px; font-size: 12px;">📞 Call</a>
+                                    <button class="btn btn-info btn-sm edit-cleaner" 
+                                        data-id="${cleaner.id}" 
+                                        data-name="${cleaner.name}" 
+                                        data-phone="${cleaner.phone}" 
+                                        data-address="${cleaner.address || ''}"
+                                        data-supervisor="${cleaner.supervisor_id || ''}"
+                                        style="padding: 6px 12px; font-size: 12px;">✏️ Edit</button>
                                     <button class="btn btn-danger btn-sm delete-cleaner" data-id="${cleaner.id}" style="padding: 6px 12px; font-size: 12px;">🗑️ Delete</button>
                                 </div>
                             </div>
@@ -1934,6 +1941,70 @@
             }
         });
     }
+
+    // Open Edit Cleaner Modal
+    $(document).on('click', '.edit-cleaner', function () {
+        const id = $(this).data('id');
+        const name = $(this).data('name');
+        const phone = $(this).data('phone');
+        const address = $(this).data('address');
+        const supervisor = $(this).data('supervisor');
+
+        $('#edit_cleaner_id').val(id);
+        $('#edit_cleaner_name').val(name);
+        $('#edit_cleaner_phone').val(phone);
+        $('#edit_cleaner_address').val(address);
+        $('#edit_assigned_area_manager').val(supervisor);
+
+        $('#edit-cleaner-feedback').html('');
+        $('#edit-cleaner-modal').show();
+    });
+
+    // Close Edit Modal
+    $(document).on('click', '#edit-cleaner-modal .close-modal', function () {
+        $('#edit-cleaner-modal').hide();
+    });
+
+    // Handle Edit Form Submission
+    $(document).on('submit', '#edit-cleaner-form', function (e) {
+        e.preventDefault();
+
+        const form = $(this);
+        const submitBtn = form.find('button[type="submit"]');
+        const feedback = $('#edit-cleaner-feedback');
+
+        const formData = new FormData(this);
+        formData.append('action', 'update_cleaner');
+
+        submitBtn.prop('disabled', true).text('Updating...');
+        feedback.html('');
+
+        $.ajax({
+            url: ajaxUrl,
+            type: 'POST',
+            data: formData,
+            processData: false,
+            contentType: false,
+            success: function (response) {
+                if (response.success) {
+                    feedback.html('<div class="alert alert-success">✅ Cleaner updated successfully!</div>');
+                    loadCleanersList(); // Refresh list
+                    setTimeout(() => {
+                        $('#edit-cleaner-modal').hide();
+                        form[0].reset();
+                    }, 1500);
+                } else {
+                    feedback.html(`<div class="alert alert-danger">❌ ${response.data.message}</div>`);
+                }
+            },
+            error: function () {
+                feedback.html('<div class="alert alert-danger">❌ Server error. Please try again.</div>');
+            },
+            complete: function () {
+                submitBtn.prop('disabled', false).text('Update Cleaner');
+            }
+        });
+    });
 
     // Load cleaning services
     function loadCleaningServices() {
@@ -2659,6 +2730,14 @@
         if (data.user_info.phone) {
             html += `<div class="member-stat-card"><h4>${data.user_info.phone}</h4><span>Phone</span></div>`;
         }
+        // Show Photo if available
+        if (data.user_info.photo_url) {
+            html += `<div class="member-stat-card">
+                <img src="${data.user_info.photo_url}" style="width:50px; height:50px; border-radius:50%; object-fit:cover; margin-bottom:5px;">
+                <span>Photo</span>
+             </div>`;
+        }
+
         if (data.user_info.state) {
             html += `<div class="member-stat-card"><h4>${data.user_info.state}</h4><span>State</span></div>`;
         }
@@ -2666,6 +2745,23 @@
             html += `<div class="member-stat-card"><h4>${data.user_info.city}</h4><span>City</span></div>`;
         }
         html += '</div></div>';
+
+        // Documents Section (Mainly for Cleaners)
+        if (data.user_info.aadhaar_number || data.user_info.aadhaar_image_url) {
+            html += '<div class="detail-section">';
+            html += '<h3>📑 Documents</h3>';
+            html += '<div class="member-stats-grid">';
+            if (data.user_info.aadhaar_number) {
+                html += `<div class="member-stat-card"><h4>${data.user_info.aadhaar_number}</h4><span>Aadhaar Number</span></div>`;
+            }
+            if (data.user_info.aadhaar_image_url) {
+                html += `<div class="member-stat-card">
+                    <a href="${data.user_info.aadhaar_image_url}" target="_blank" class="btn btn-sm btn-info">👁️ View Aadhaar Card</a>
+                    <span style="margin-top:5px;">Document</span>
+                 </div>`;
+            }
+            html += '</div></div>';
+        }
 
         // Stats Section
         html += '<div class="detail-section">';

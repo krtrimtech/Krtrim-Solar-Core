@@ -407,7 +407,7 @@ final class Krtrim_Solar_Core {
             wp_enqueue_script('ksc-project-modal-component', $this->dir_url . 'assets/js/components/project-modal-component.js', ['jquery', 'ksc-dashboard-utils'], $this->version, true);
             wp_enqueue_script('project-modal-js', $this->dir_url . 'assets/js/project-modal.js', ['jquery'], '1.0.0', true);
             wp_enqueue_script('lead-component-js', $this->dir_url . 'assets/js/components/lead-component.js', ['jquery', 'ksc-dashboard-utils'], '1.0.6', true);
-			wp_enqueue_script( 'manager-dashboard-js', $this->dir_url . 'assets/js/manager-dashboard.js', [ 'jquery', 'chart-js', 'lead-component-js', 'ksc-dashboard-utils', 'ksc-project-modal-component' ], '1.0.1', true );
+			wp_enqueue_script( 'manager-dashboard-js', $this->dir_url . 'assets/js/manager-dashboard.js', [ 'jquery', 'chart-js', 'lead-component-js', 'ksc-dashboard-utils', 'ksc-project-modal-component' ], '1.0.3', true );
 			wp_localize_script('manager-dashboard-js', 'sp_area_dashboard_vars', [
 				'ajax_url' => admin_url('admin-ajax.php'),
 				'create_project_nonce' => wp_create_nonce('sp_create_project_nonce_field'),
