@@ -129,7 +129,11 @@ class KSC_Lead_Component {
                 <span class="close-lead-modal">&times;</span>
                 <h3>➕ Add New Lead</h3>
                 <form id="create-lead-form">
-                    <?php wp_nonce_field('sp_lead_nonce', 'lead_nonce'); ?>
+                    <?php 
+                    // Add both nonces to support Area Manager and Sales Manager
+                    wp_nonce_field('sp_lead_nonce', 'lead_nonce'); 
+                    wp_nonce_field('sp_sales_manager_nonce', 'sm_nonce'); 
+                    ?>
                     
                     <!-- Lead Type Selection -->
                     <div class="form-group">

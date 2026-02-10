@@ -58,6 +58,10 @@ final class Krtrim_Solar_Core {
 		require_once $this->dir_path . 'includes/class-process-steps-manager.php';
 		require_once $this->dir_path . 'includes/class-notifications-manager.php';
 		require_once $this->dir_path . 'includes/class-error-logger.php';
+        
+        // Components
+        require_once $this->dir_path . 'includes/components/class-lead-manager-component.php';
+
 		require_once $this->dir_path . 'includes/post-types/class-cleaning-cpts.php';
         require_once $this->dir_path . 'includes/post-types/class-coupon-cpt.php';
 		require_once $this->dir_path . 'includes/api/class-cleaner-api.php';
@@ -358,9 +362,11 @@ final class Krtrim_Solar_Core {
             wp_enqueue_style('toast-css', $this->dir_url . 'assets/css/toast.css', [], '1.0.0');
             wp_enqueue_style('password-field-css', $this->dir_url . 'assets/css/password-field.css', [], '1.0.0');
             wp_enqueue_script( 'chart-js', 'https://cdn.jsdelivr.net/npm/chart.js', [], '3.7.0', true );
+            wp_enqueue_script('ksc-dashboard-utils', $this->dir_url . 'assets/js/components/dashboard-utils.js', ['jquery'], $this->version, true);
+            wp_enqueue_script('ksc-project-modal-component', $this->dir_url . 'assets/js/components/project-modal-component.js', ['jquery', 'ksc-dashboard-utils'], $this->version, true);
             wp_enqueue_script('project-modal-js', $this->dir_url . 'assets/js/project-modal.js', ['jquery'], '1.0.0', true);
-            wp_enqueue_script('lead-component-js', $this->dir_url . 'assets/js/components/lead-component.js', ['jquery'], '1.0.1', true);
-			wp_enqueue_script( 'area-manager-dashboard-js', $this->dir_url . 'assets/js/area-manager-dashboard.js', [ 'jquery', 'chart-js', 'lead-component-js' ], '1.0.7', true );
+            wp_enqueue_script('lead-component-js', $this->dir_url . 'assets/js/components/lead-component.js', ['jquery', 'ksc-dashboard-utils'], '1.0.6', true);
+			wp_enqueue_script( 'area-manager-dashboard-js', $this->dir_url . 'assets/js/area-manager-dashboard.js', [ 'jquery', 'chart-js', 'lead-component-js', 'ksc-dashboard-utils', 'ksc-project-modal-component' ], '1.0.8', true );
 			wp_localize_script('area-manager-dashboard-js', 'sp_area_dashboard_vars', [
 				'ajax_url' => admin_url('admin-ajax.php'),
 				'create_project_nonce' => wp_create_nonce('sp_create_project_nonce_field'),
@@ -397,9 +403,11 @@ final class Krtrim_Solar_Core {
             wp_enqueue_style('password-field-css', $this->dir_url . 'assets/css/password-field.css', [], '1.0.0');
             wp_enqueue_style('manager-dashboard-overrides', $this->dir_url . 'assets/css/manager-dashboard-overrides.css', [], '1.0.0');
             wp_enqueue_script( 'chart-js', 'https://cdn.jsdelivr.net/npm/chart.js', [], '3.7.0', true );
+            wp_enqueue_script('ksc-dashboard-utils', $this->dir_url . 'assets/js/components/dashboard-utils.js', ['jquery'], $this->version, true);
+            wp_enqueue_script('ksc-project-modal-component', $this->dir_url . 'assets/js/components/project-modal-component.js', ['jquery', 'ksc-dashboard-utils'], $this->version, true);
             wp_enqueue_script('project-modal-js', $this->dir_url . 'assets/js/project-modal.js', ['jquery'], '1.0.0', true);
-            wp_enqueue_script('lead-component-js', $this->dir_url . 'assets/js/components/lead-component.js', ['jquery'], '1.0.1', true);
-			wp_enqueue_script( 'manager-dashboard-js', $this->dir_url . 'assets/js/manager-dashboard.js', [ 'jquery', 'chart-js', 'lead-component-js' ], '1.0.0', true );
+            wp_enqueue_script('lead-component-js', $this->dir_url . 'assets/js/components/lead-component.js', ['jquery', 'ksc-dashboard-utils'], '1.0.6', true);
+			wp_enqueue_script( 'manager-dashboard-js', $this->dir_url . 'assets/js/manager-dashboard.js', [ 'jquery', 'chart-js', 'lead-component-js', 'ksc-dashboard-utils', 'ksc-project-modal-component' ], '1.0.1', true );
 			wp_localize_script('manager-dashboard-js', 'sp_area_dashboard_vars', [
 				'ajax_url' => admin_url('admin-ajax.php'),
 				'create_project_nonce' => wp_create_nonce('sp_create_project_nonce_field'),
@@ -430,8 +438,9 @@ final class Krtrim_Solar_Core {
 			wp_enqueue_style('sales-manager-dashboard-css', $this->dir_url . 'assets/css/sales-manager-dashboard.css', ['area-manager-modern', 'lead-component-css'], '1.0.1');
 			wp_enqueue_style('toast-css', $this->dir_url . 'assets/css/toast.css', [], '1.0.0');
 			wp_enqueue_script('chart-js', 'https://cdn.jsdelivr.net/npm/chart.js', [], '3.7.0', true);
-			wp_enqueue_script('lead-component-js', $this->dir_url . 'assets/js/components/lead-component.js', ['jquery'], '1.0.1', true);
-			wp_enqueue_script('sales-manager-dashboard-js', $this->dir_url . 'assets/js/sales-manager-dashboard.js', ['jquery', 'chart-js', 'lead-component-js'], '1.0.1', true);
+            wp_enqueue_script('ksc-dashboard-utils', $this->dir_url . 'assets/js/components/dashboard-utils.js', ['jquery'], $this->version, true);
+			wp_enqueue_script('lead-component-js', $this->dir_url . 'assets/js/components/lead-component.js', ['jquery', 'ksc-dashboard-utils'], '1.0.6', true);
+			wp_enqueue_script('sales-manager-dashboard-js', $this->dir_url . 'assets/js/sales-manager-dashboard.js', ['jquery', 'chart-js', 'lead-component-js', 'ksc-dashboard-utils'], '1.0.2', true);
 			wp_localize_script('sales-manager-dashboard-js', 'sm_vars', [
 				'ajax_url' => admin_url('admin-ajax.php'),
 				'nonce' => wp_create_nonce('sp_sales_manager_nonce'),

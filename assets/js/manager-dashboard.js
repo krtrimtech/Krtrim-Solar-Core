@@ -79,85 +79,32 @@
     });
 
     //Navigation (Global) ---
-    // console.log('Attaching click handler to .manager-dashboard .nav-item');
-    $(document).on('click', '.manager-dashboard .nav-item', function (e) {
-        // console.log('=== NAV CLICK DETECTED ===');
-        e.preventDefault();
-        e.stopPropagation();
-
-        const section = $(this).data('section');
-        const sectionId = '#' + section + '-section';
-
-        // console.log('Clicked section:', section);
-        // console.log('Target selector:', sectionId);
-        // console.log('Target element exists:', $(sectionId).length > 0);
-        // console.log('All .section-content elements:', $('.section-content').length);
-
-        // Remove active class
-        $('.manager-dashboard .nav-item').removeClass('active');
-        $(this).addClass('active');
-        // console.log('Active class updated');
-
-        // Hide all sections
-        $('.section-content').each(function () {
-            // console.log('Hiding:', this.id, 'Current display:', $(this).css('display'));
-            $(this).hide();
-        });
-
-        // Show target section
-        // console.log('Showing section:', sectionId);
-        $(sectionId).show();
-        // console.log('Target section display after show():', $(sectionId).css('display'));
-
-        $('#section-title').text($(this).text());
-
-        // Trigger data load if needed
-        if (typeof loadSectionData === 'function') {
-            loadSectionData(section);
-        } else {
-            $(document).trigger('area-manager-nav-click', [section]);
+    // Delegated to DashboardUtils
+    $(document).ready(function () {
+        if (typeof DashboardUtils !== 'undefined') {
+            DashboardUtils.setupTabNavigation('.manager-dashboard');
         }
-
-        // console.log('=== NAV CLICK COMPLETE ===');
     });
 
+    // Handle deep linking for tabs - handled by DashboardUtils
+
+
     // --- Toast Notification Helper ---
+    // --- Toast Notification Helper ---
+    // Delegated to DashboardUtils
     function showToast(message, type = 'info') {
-        const toastContainer = $('#toast-container');
-        const toastId = 'toast-' + Date.now();
-
-        const toast = $(`
-                <div class="toast ${type}" id="${toastId}">
-                    <div class="toast-icon"></div>
-                    <div class="toast-message">${message}</div>
-                    <button class="toast-close">×</button>
-                </div>
-            `);
-
-        toastContainer.append(toast);
-
-        // Close button click
-        toast.find('.toast-close').on('click', function () {
-            removeToast(toastId);
-        });
-
-        // Auto remove after 3 seconds
-        setTimeout(() => {
-            removeToast(toastId);
-        }, 3000);
+        if (typeof DashboardUtils !== 'undefined') {
+            DashboardUtils.showToast(message, type);
+        } else {
+            console.error('DashboardUtils not loaded');
+            alert(message);
+        }
     }
     // Expose showToast globally for shared components
     window.showToast = showToast;
 
-    function removeToast(toastId) {
-        const toast = $('#' + toastId);
-        if (toast.length) {
-            toast.addClass('removing');
-            setTimeout(() => {
-                toast.remove();
-            }, 300);
-        }
-    }
+    // removeToast is handled internally by DashboardUtils
+
 
     // --- Initialize AJAX URL and nonces FIRST (before any functions use them) ---
     const ajaxUrl = (typeof sp_area_dashboard_vars !== 'undefined') ? sp_area_dashboard_vars.ajax_url : '';
@@ -176,13 +123,35 @@
     // Forward declaration for loadBids (defined later, used by window.loadSectionData)
     var loadBids;
 
-    // Initialize shared lead component
-    function initLeadComponent() {
+    // Initialize shared components
+    function initComponents() {
+        // Initialize Lead Component
         if (!leadComponentInitialized && typeof window.initLeadComponent === 'function') {
             window.initLeadComponent(ajaxUrl, sp_area_dashboard_vars.get_leads_nonce);
             leadComponentInitialized = true;
         } else if (typeof window.loadLeads === 'function') {
             window.loadLeads();
+        }
+
+        // Initialize Project Modal Component
+        if (typeof ProjectModalComponent !== 'undefined') {
+            ProjectModalComponent.init({
+                ajaxUrl: ajaxUrl,
+                nonces: {
+                    project_details_nonce: sp_area_dashboard_vars.project_details_nonce
+                }
+            });
+        }
+    }
+
+    // Call init
+    initComponents();
+
+    // Alias for backward compatibility (if needed)
+    function initLeadComponent() {
+        if (!leadComponentInitialized && typeof window.initLeadComponent === 'function') {
+            window.initLeadComponent(ajaxUrl, sp_area_dashboard_vars.get_leads_nonce);
+            leadComponentInitialized = true;
         }
     }
 
@@ -678,6 +647,8 @@
     $(document).on('change', '#filter-status', filterProjects);
 
     // View project details button handler
+    // Handled by ProjectModalComponent
+    /*
     $(document).on('click', '.view-project-details', function () {
         const projectId = $(this).data('id');
         // console.log('View project details:', projectId);
@@ -687,6 +658,7 @@
             // console.error('openProjectModal function not found');
         }
     });
+    */
 
     // Edit Project - Navigate to create form and pre-fill
     $(document).on('click', '.edit-project', function () {
@@ -2745,6 +2717,25 @@
                     <td><span class="badge badge-${lead.status}">${lead.status}</span></td>
                     <td>${lead.city}</td>
                     <td>${lead.created_date}</td>
+                </tr>`;
+            });
+            html += '</tbody></table></div></div>';
+        }
+
+        // Team Members Section (for Area Managers)
+        if (role === 'area_manager' && data.team_members && data.team_members.length > 0) {
+            html += '<div class="detail-section">';
+            html += '<h3>👥 Team Members</h3>';
+            html += '<div class="table-responsive">';
+            html += '<table class="data-table"><thead><tr><th>Name</th><th>Role</th><th>Email</th><th>Phone</th><th>Leads</th><th>Joined</th></tr></thead><tbody>';
+            data.team_members.forEach(member => {
+                html += `<tr>
+                    <td>${member.name}</td>
+                    <td><span class="badge badge-info">${member.role}</span></td>
+                    <td>${member.email}</td>
+                    <td>${member.phone || '-'}</td>
+                    <td>${member.lead_count || 0}</td>
+                    <td>${member.joined_date}</td>
                 </tr>`;
             });
             html += '</tbody></table></div></div>';

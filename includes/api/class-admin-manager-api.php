@@ -1673,83 +1673,26 @@ class KSC_Admin_Manager_API extends KSC_API_Base {
         $search = isset($_POST['search']) ? sanitize_text_field($_POST['search']) : '';
         $lead_type = isset($_POST['lead_type']) ? sanitize_text_field($_POST['lead_type']) : '';
         
+        // Prepare args for component
         $args = [
-            'post_type' => 'solar_lead',
-            'posts_per_page' => -1,
             'author' => $manager->ID,
-            'post_status' => 'any'
+            'search' => $search,
+            'filter_meta' => []
         ];
-        
-        
-        // Add meta query for status filter
-        $meta_query = [];
-        
-        // Exclude 'converted' leads by default (unless specifically filtering for them)
-        if ($status !== 'converted') {
-            $meta_query[] = [
-                'key' => '_lead_status',
-                'value' => 'converted',
-                'compare' => '!='
-            ];
-        }
-        
+
         if (!empty($status)) {
-            $meta_query[] = [
-                'key' => '_lead_status',
-                'value' => $status,
-            ];
+            $args['filter_meta']['status'] = $status;
         }
         if (!empty($lead_type)) {
-            $meta_query[] = [
-                'key' => '_lead_type',
-                'value' => $lead_type,
-            ];
-        }
-        if (!empty($meta_query)) {
-            $args['meta_query'] = $meta_query;
+            $args['filter_meta']['lead_type'] = $lead_type;
         }
         
-        // Add search
-        if (!empty($search)) {
-            $args['s'] = $search;
-        }
-        
-        
-        $query = new WP_Query($args);
-        $leads = [];
-        
-        // Get followup counts from database
-        global $wpdb;
-        $table_followups = $wpdb->prefix . 'solar_lead_followups';
-        
-        if ($query->have_posts()) {
-            while ($query->have_posts()) {
-                $query->the_post();
-                $lead_id = get_the_ID();
-                
-                // Count followups for this lead
-                $followup_count = $wpdb->get_var($wpdb->prepare(
-                    "SELECT COUNT(*) FROM {$table_followups} WHERE lead_id = %d",
-                    $lead_id
-                ));
-                
-                $leads[] = [
-                    'id' => $lead_id,
-                    'name' => get_the_title(),
-                    'phone' => get_post_meta($lead_id, '_lead_phone', true),
-                    'email' => get_post_meta($lead_id, '_lead_email', true),
-                    'status' => get_post_meta($lead_id, '_lead_status', true) ?: 'new',
-                    'lead_type' => get_post_meta($lead_id, '_lead_type', true) ?: 'solar_project',
-                    'project_type' => get_post_meta($lead_id, '_lead_project_type', true),
-                    'system_size' => get_post_meta($lead_id, '_lead_system_size', true),
-                    'source' => get_post_meta($lead_id, '_lead_source', true),
-                    'address' => get_post_meta($lead_id, '_lead_address', true),
-                    'notes' => get_the_content(),
-                    'created_date' => get_the_date('Y-m-d'),
-                    'followup_count' => intval($followup_count),
-                ];
-            }
-            wp_reset_postdata();
+        // Use Component
+        if (class_exists('LeadManagerComponent')) {
+             $leads = LeadManagerComponent::get_leads($args);
+        } else {
+             wp_send_json_error(['message' => 'System Error: Component missing']);
+             return;
         }
         
         wp_send_json_success(['leads' => $leads]);
@@ -1759,46 +1702,43 @@ class KSC_Admin_Manager_API extends KSC_API_Base {
      * Create new lead
      */
     public function create_solar_lead() {
-        check_ajax_referer('sp_lead_nonce', 'lead_nonce');
+        error_log('🔵 [Admin Manager API] create_solar_lead called');
         
-        $manager = $this->verify_area_manager_role();
-        
-        $name = isset($_POST['lead_name']) ? sanitize_text_field($_POST['lead_name']) : '';
-        $phone = isset($_POST['lead_phone']) ? sanitize_text_field($_POST['lead_phone']) : '';
-        $email = isset($_POST['lead_email']) ? sanitize_email($_POST['lead_email']) : '';
-        $status = isset($_POST['lead_status']) ? sanitize_text_field($_POST['lead_status']) : 'new';
-        $notes = isset($_POST['lead_notes']) ? sanitize_textarea_field($_POST['lead_notes']) : '';
-        $lead_type = isset($_POST['lead_type']) ? sanitize_text_field($_POST['lead_type']) : 'solar_project';
-        $project_type = isset($_POST['lead_project_type']) ? sanitize_text_field($_POST['lead_project_type']) : '';
-        $system_size = isset($_POST['lead_system_size']) ? floatval($_POST['lead_system_size']) : 0;
-        $source = isset($_POST['lead_source']) ? sanitize_text_field($_POST['lead_source']) : '';
-        $address = isset($_POST['lead_address']) ? sanitize_textarea_field($_POST['lead_address']) : '';
-        
-        if (empty($name)) {
-            wp_send_json_error(['message' => 'Lead name is required']);
+        try {
+            check_ajax_referer('sp_lead_nonce', 'lead_nonce');
+            error_log('✅ [Admin Manager API] Nonce verified');
+        } catch (Exception $e) {
+            error_log('❌ [Admin Manager API] Nonce verification failed: ' . $e->getMessage());
+            wp_send_json_error(['message' => 'Security check failed']);
+            return;
         }
         
-        $lead_id = wp_insert_post([
-            'post_title' => $name,
-            'post_content' => $notes,
-            'post_type' => 'solar_lead',
-            'post_status' => 'publish',
-            'post_author' => $manager->ID,
-        ]);
+        error_log('🔍 [Admin Manager API] Verifying Area Manager role...');
+        $manager = $this->verify_area_manager_role();
+        error_log('✅ [Admin Manager API] Manager verified: ID=' . $manager->ID);
+        
+        error_log('📦 [Admin Manager API] POST data: ' . print_r($_POST, true));
+        
+        // Use Component for creation
+        if (class_exists('LeadManagerComponent')) {
+            error_log('✅ [Admin Manager API] LeadManagerComponent found');
+            error_log('🚀 [Admin Manager API] Calling LeadManagerComponent::create_lead()');
+            
+            $lead_id = LeadManagerComponent::create_lead($_POST, $manager->ID);
+            
+            error_log('📊 [Admin Manager API] create_lead returned: ' . print_r($lead_id, true));
+        } else {
+            error_log('❌ [Admin Manager API] LeadManagerComponent NOT found');
+            wp_send_json_error(['message' => 'System Error: Component missing']);
+            return;
+        }
         
         if (is_wp_error($lead_id)) {
+            error_log('❌ [Admin Manager API] WP_Error: ' . $lead_id->get_error_message());
             wp_send_json_error(['message' => $lead_id->get_error_message()]);
         }
         
-        update_post_meta($lead_id, '_lead_phone', $phone);
-        update_post_meta($lead_id, '_lead_email', $email);
-        update_post_meta($lead_id, '_lead_status', $status);
-        update_post_meta($lead_id, '_lead_type', $lead_type);
-        update_post_meta($lead_id, '_lead_project_type', $project_type);
-        update_post_meta($lead_id, '_lead_system_size', $system_size);
-        update_post_meta($lead_id, '_lead_source', $source);
-        update_post_meta($lead_id, '_lead_address', $address);
-        
+        error_log('✨ [Admin Manager API] Lead created successfully! ID=' . $lead_id);
         wp_send_json_success(['message' => 'Lead created successfully', 'lead_id' => $lead_id]);
     }
     
@@ -1826,10 +1766,15 @@ class KSC_Admin_Manager_API extends KSC_API_Base {
             wp_send_json_error(['message' => 'You do not have permission to delete this lead']);
         }
         
-        $deleted = wp_delete_post($lead_id, true);
-        
-        if (!$deleted) {
-            wp_send_json_error(['message' => 'Failed to delete lead']);
+        // Use Component for deletion
+        if (class_exists('LeadManagerComponent')) {
+            $result = LeadManagerComponent::delete_lead($lead_id);
+            if (is_wp_error($result)) {
+                wp_send_json_error(['message' => $result->get_error_message()]);
+            }
+        } else {
+             wp_send_json_error(['message' => 'System Error: Component missing']);
+             return;
         }
         
         wp_send_json_success(['message' => 'Lead deleted successfully']);
@@ -1861,7 +1806,16 @@ class KSC_Admin_Manager_API extends KSC_API_Base {
             wp_send_json_error(['message' => 'You do not have permission to update this lead']);
         }
         
-        update_post_meta($lead_id, '_lead_status', $status);
+        // Use Component for update
+        if (class_exists('LeadManagerComponent')) {
+            $result = LeadManagerComponent::update_lead($lead_id, ['lead_status' => $status]);
+            if (is_wp_error($result)) {
+                wp_send_json_error(['message' => $result->get_error_message()]);
+            }
+        } else {
+             wp_send_json_error(['message' => 'System Error: Component missing']);
+             return;
+        }
         
         wp_send_json_success(['message' => 'Status updated successfully']);
     }
@@ -2981,6 +2935,55 @@ class KSC_Admin_Manager_API extends KSC_API_Base {
         // Get team size
         $team_size = count($sm_ids);
         
+        // Get team members details (Sales Managers)
+        $team_members = [];
+        foreach ($sm_ids as $sm_id) {
+            $sm_user = get_userdata($sm_id);
+            if ($sm_user) {
+                // Get lead count for this SM
+                global $wpdb;
+                $sm_lead_count = $wpdb->get_var($wpdb->prepare(
+                    "SELECT COUNT(*) FROM {$wpdb->posts} WHERE post_type = 'solar_lead' AND post_author = %d",
+                    $sm_id
+                ));
+                
+                $team_members[] = [
+                    'id' => $sm_user->ID,
+                    'name' => $sm_user->display_name,
+                    'email' => $sm_user->user_email,
+                    'phone' => get_user_meta($sm_id, 'phone_number', true) ?: get_user_meta($sm_id, 'phone', true),
+                    'role' => 'Sales Manager',
+                    'lead_count' => intval($sm_lead_count),
+                    'joined_date' => date('M d, Y', strtotime($sm_user->user_registered))
+                ];
+            }
+        }
+        
+        // Add Cleaners to team
+        $cleaner_ids = get_users([
+            'role' => 'solar_cleaner',
+            'meta_key' => '_supervised_by_area_manager',
+            'meta_value' => $user_id,
+            'fields' => 'ID'
+        ]);
+        
+        foreach ($cleaner_ids as $cleaner_id) {
+            $cleaner_user = get_userdata($cleaner_id);
+            if ($cleaner_user) {
+                $team_members[] = [
+                    'id' => $cleaner_user->ID,
+                    'name' => $cleaner_user->display_name,
+                    'email' => $cleaner_user->user_email,
+                    'phone' => get_user_meta($cleaner_id, 'phone_number', true) ?: get_user_meta($cleaner_id, 'phone', true),
+                    'role' => 'Cleaner',
+                    'lead_count' => 0,
+                    'joined_date' => date('M d, Y', strtotime($cleaner_user->user_registered))
+                ];
+            }
+        }
+        
+        $team_size += count($cleaner_ids);
+        
         // Stats
         $stats = [
             'total_projects' => count($project_ids),
@@ -3008,6 +3011,7 @@ class KSC_Admin_Manager_API extends KSC_API_Base {
             'stats' => $stats,
             'projects' => $projects,
             'leads' => $leads,
+            'team_members' => $team_members,
             'recent_activity' => $recent_activity
         ];
     }

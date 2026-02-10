@@ -45,6 +45,7 @@
     let canCreateClient = false;
     let canDelete = false;
     let dashboardType = 'sales_manager';
+    let eventsAlreadyBound = false; // Flag to prevent double-binding
 
     // Initialize component
     window.initLeadComponent = function (ajaxUrl, nonce) {
@@ -55,11 +56,28 @@
         canDelete = $component.data('can-delete') === true || $component.data('can-delete') === 'true';
         dashboardType = $component.data('dashboard') || 'sales_manager';
 
-        // Store ajax config
-        window.leadAjax = { url: ajaxUrl, nonce: nonce };
+        // Store ajax config - PRESERVE existing values if called without parameters
+        if (ajaxUrl && nonce) {
+            window.leadAjax = { url: ajaxUrl, nonce: nonce };
+            console.log('🔧 [Lead Component] Initialized');
+            console.log('🌐 AJAX URL:', ajaxUrl);
+            console.log('🔑 Nonce:', nonce);
+        } else if (window.leadAjax) {
+            console.log('⚠️ [Lead Component] Re-initialized without params - preserving existing config');
+            console.log('🌐 Existing AJAX URL:', window.leadAjax.url);
+        } else {
+            console.error('❌ [Lead Component] Cannot initialize without AJAX URL and nonce!');
+            return;
+        }
 
-        // Bind events
-        bindLeadEvents();
+        // Bind events only once to prevent double submissions
+        if (!eventsAlreadyBound) {
+            bindLeadEvents();
+            eventsAlreadyBound = true;
+            console.log('🔗 [Lead Component] Events bound');
+        } else {
+            console.log('⏭️ [Lead Component] Events already bound, skipping');
+        }
 
         // Load leads initially
         loadLeads();
@@ -385,24 +403,45 @@
         // Form serialization includes lead_nonce from the hidden field
         const formData = $form.serialize() + '&action=' + action;
 
+        console.log('🔵 [Lead Creation] Starting...');
+        console.log('📊 Dashboard Type:', dashboardType);
+        console.log('🎯 Action:', action);
+        console.log('📦 Form Data:', formData);
+
         $.ajax({
             url: window.leadAjax.url,
             type: 'POST',
             data: formData,
             beforeSend: function () {
+                console.log('⏳ [Lead Creation] Sending request...');
                 $form.find('button[type="submit"]').prop('disabled', true).text('Adding...');
             },
             success: function (response) {
+                console.log('✅ [Lead Creation] AJAX Success Response:', response);
+                console.log('📋 Response Success Flag:', response.success);
+                console.log('📋 Response Data:', response.data);
+
                 if (response.success) {
+                    console.log('✨ [Lead Creation] Lead created successfully!');
                     showToast('Lead created successfully! 🎉', 'success');
                     $form[0].reset();
                     closeModal('#add-lead-modal');
                     loadLeads();
                 } else {
+                    console.error('❌ [Lead Creation] Server returned success=false');
+                    console.error('Error Message:', response.data?.message);
                     showToast(response.data?.message || 'Error creating lead', 'error');
                 }
             },
+            error: function (xhr, status, error) {
+                console.error('🔴 [Lead Creation] AJAX Error');
+                console.error('Status:', status);
+                console.error('Error:', error);
+                console.error('XHR Response:', xhr.responseText);
+                showToast('Network error creating lead', 'error');
+            },
             complete: function () {
+                console.log('🏁 [Lead Creation] Request complete');
                 $form.find('button[type="submit"]').prop('disabled', false).text('➕ Add Lead');
             }
         });

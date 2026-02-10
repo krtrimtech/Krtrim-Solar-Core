@@ -60,8 +60,16 @@ class KSC_Unified_Lead_API {
         // Get follow-ups with attribution (who added each followup)
         $followups = $this->get_followups_with_attribution($lead_id);
         
-        wp_send_json_success([
-            'lead' => [
+        $lead_data = [];
+        
+        // Use Component for lead data formatting if available
+        if (class_exists('LeadManagerComponent')) {
+            $lead_data = LeadManagerComponent::format_lead_data($lead_id);
+            // Override date to return full datetime as per original API
+            $lead_data['created_date'] = $lead->post_date;
+        } else {
+            // Fallback
+             $lead_data = [
                 'id' => $lead_id,
                 'name' => $lead->post_title,
                 'phone' => get_post_meta($lead_id, '_lead_phone', true),
@@ -74,7 +82,11 @@ class KSC_Unified_Lead_API {
                 'source' => get_post_meta($lead_id, '_lead_source', true),
                 'notes' => get_post_meta($lead_id, '_lead_notes', true),
                 'created_date' => $lead->post_date,
-            ],
+            ];
+        }
+        
+        wp_send_json_success([
+            'lead' => $lead_data,
             'creator' => $creator_info,
             'followups' => $followups,
         ]);

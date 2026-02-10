@@ -105,63 +105,28 @@
     }
 
     // Navigation (sidebar)
-    function initNavigation() {
-        $('.sidebar-nav .nav-item').on('click', function () {
-            navigateToSection($(this).data('section'), $(this));
-        });
-    }
+    // Delegated to DashboardUtils
+    $(document).ready(function () {
+        if (typeof DashboardUtils !== 'undefined') {
+            DashboardUtils.setupTabNavigation('.sales-manager-dashboard');
 
-    // Mobile Bottom Navigation
-    function initMobileNav() {
-        $('.mobile-nav-item').on('click', function (e) {
-            const section = $(this).data('section');
-            if (!section) return; // Logout link doesn't have section
-
-            e.preventDefault();
-            navigateToSection(section, $(this));
-        });
-    }
-
-    // Navigate to section (shared between sidebar and mobile nav)
-    function navigateToSection(section, $clickedNav) {
-        // Update active nav for both sidebar and mobile
-        $('.sidebar-nav .nav-item').removeClass('active');
-        $('.mobile-nav-item').removeClass('active');
-
-        // Set active on clicked and corresponding nav
-        $(`.sidebar-nav .nav-item[data-section="${section}"]`).addClass('active');
-        $(`.mobile-nav-item[data-section="${section}"]`).addClass('active');
-
-        // Update title
-        const titles = {
-            'dashboard': 'Dashboard',
-            'my-leads': 'Leads',
-            'cleaning-services': 'Cleaning Services',
-            'conversions': 'My Conversions'
-        };
-        $('#section-title').text(titles[section] || 'Dashboard');
-
-        // Show/hide sections
-        $('.section-content').hide();
-        $(`#${section}-section`).show();
-
-        // Load data for section
-        switch (section) {
-            case 'dashboard':
-                loadDashboardStats();
-                loadTodayFollowups();
-                break;
-            case 'my-leads':
-                initLeadComponent();
-                break;
-            case 'conversions':
-                loadConversions();
-                break;
-            case 'cleaning-services':
-                loadSMCleaningServices();
-                break;
+            // Also handle mobile nav if needed, or assume DashboardUtils handles .nav-item globally
+            // DashboardUtils targets .nav-item which covers both sidebar and likely mobile if class matches
+            // However, mobile nav uses .mobile-nav-item in this file. 
+            // Let's add specific handler for mobile nav to use DashboardUtils logic manually or add to DashboardUtils?
+            // For now, let's keep it simple and bind click to trigger dashboard utils logic
+            $('.mobile-nav-item').on('click', function (e) {
+                e.preventDefault();
+                const section = $(this).data('section');
+                if (section) {
+                    // Trigger click on corresponding sidebar item to reuse DashboardUtils logic
+                    $(`.sidebar-nav .nav-item[data-section="${section}"]`).click();
+                }
+            });
         }
-    }
+    });
+
+    // navigateToSection is removed as DashboardUtils handles it via triggerSectionLoad
 
     // Initialize shared lead component
     function initLeadComponent() {
@@ -684,10 +649,15 @@
     }
 
     // Utility functions
+    // Utility functions
+    // Delegated to DashboardUtils
     function showToast(message, type = 'info') {
-        const toast = $(`<div class="toast ${type}">${message}</div>`);
-        $('#toast-container').append(toast);
-        setTimeout(() => toast.remove(), 4000);
+        if (typeof DashboardUtils !== 'undefined') {
+            DashboardUtils.showToast(message, type);
+        } else {
+            console.error('DashboardUtils not loaded');
+            alert(message);
+        }
     }
     // Expose globally for shared components
     window.showToast = showToast;

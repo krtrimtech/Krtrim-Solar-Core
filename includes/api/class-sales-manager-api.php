@@ -145,69 +145,26 @@ class KSC_Sales_Manager_API {
         $status_filter = isset($_POST['status']) ? sanitize_text_field($_POST['status']) : '';
         $search = isset($_POST['search']) ? sanitize_text_field($_POST['search']) : '';
 
-        $meta_query = [
-            ['key' => '_created_by_sales_manager', 'value' => $user_id],
-        ];
-        
-        // Exclude 'converted' leads by default (unless specifically filtering for them)
-        if ($status_filter !== 'converted') {
-            $meta_query[] = [
-                'key' => '_lead_status',
-                'value' => 'converted',
-                'compare' => '!='
-            ];
-        }
-
-        if (!empty($status_filter)) {
-            $meta_query[] = ['key' => '_lead_status', 'value' => $status_filter];
-        }
-
+        // Prepare args for component
         $args = [
-            'post_type' => 'solar_lead',
             'posts_per_page' => 50,
-            'post_status' => 'publish',
-            'meta_query' => $meta_query,
-            'orderby' => 'date',
-            'order' => 'DESC',
+            'meta_query' => [
+                ['key' => '_created_by_sales_manager', 'value' => $user_id],
+            ],
+            'search' => $search,
+            'filter_meta' => [] 
         ];
 
-        if (!empty($search)) {
-            $args['s'] = $search;
+         if (!empty($status_filter)) {
+            $args['filter_meta']['status'] = $status_filter;
         }
 
-        $leads_query = new WP_Query($args);
-        $leads = [];
-
-        global $wpdb;
-        $table_followups = $wpdb->prefix . 'solar_lead_followups';
-
-        if ($leads_query->have_posts()) {
-            while ($leads_query->have_posts()) {
-                $leads_query->the_post();
-                $lead_id = get_the_ID();
-                
-                // Get all follow-ups for this lead (for thread display)
-                $followups = $wpdb->get_results($wpdb->prepare(
-                    "SELECT activity_type, activity_date, notes FROM {$table_followups} 
-                     WHERE lead_id = %d ORDER BY activity_date DESC LIMIT 10",
-                    $lead_id
-                ));
-
-                $leads[] = [
-                    'id' => $lead_id,
-                    'name' => get_the_title(),
-                    'phone' => get_post_meta($lead_id, '_lead_phone', true),
-                    'email' => get_post_meta($lead_id, '_lead_email', true),
-                    'status' => get_post_meta($lead_id, '_lead_status', true) ?: 'new',
-                    'lead_type' => get_post_meta($lead_id, '_lead_type', true) ?: 'solar_project',
-                    'project_type' => get_post_meta($lead_id, '_lead_project_type', true),
-                    'system_size' => get_post_meta($lead_id, '_lead_system_size', true),
-                    'source' => get_post_meta($lead_id, '_lead_source', true),
-                    'created_date' => get_the_date('Y-m-d'),
-                    'followups' => $followups,
-                ];
-            }
-            wp_reset_postdata();
+        // Use Component
+        if (class_exists('LeadManagerComponent')) {
+            $leads = LeadManagerComponent::get_leads($args);
+        } else {
+             wp_send_json_error(['message' => 'System Error: Component missing']);
+             return;
         }
 
         wp_send_json_success(['leads' => $leads]);
@@ -217,64 +174,58 @@ class KSC_Sales_Manager_API {
      * Create a new lead
      */
     public function create_lead_by_sales_manager() {
+        error_log('🔵 [Sales Manager API] create_lead_by_sales_manager called');
+        
         if (!$this->verify_sales_manager()) {
+            error_log('❌ [Sales Manager API] Sales Manager verification failed');
             wp_send_json_error(['message' => 'Unauthorized']);
         }
+        error_log('✅ [Sales Manager API] Sales Manager verified');
 
-        check_ajax_referer('sp_sales_manager_nonce', 'sm_nonce');
+        try {
+            check_ajax_referer('sp_sales_manager_nonce', 'sm_nonce');
+            error_log('✅ [Sales Manager API] Nonce verified');
+        } catch (Exception $e) {
+            error_log('❌ [Sales Manager API] Nonce verification failed: ' . $e->getMessage());
+            wp_send_json_error(['message' => 'Security check failed']);
+            return;
+        }
 
         $user_id = get_current_user_id();
         $supervisor_id = get_user_meta($user_id, '_supervised_by_area_manager', true);
+        
+        error_log('📦 [Sales Manager API] User ID: ' . $user_id);
+        error_log('📦 [Sales Manager API] Supervisor ID: ' . $supervisor_id);
+        error_log('📦 [Sales Manager API] POST data: ' . print_r($_POST, true));
 
-        $name = sanitize_text_field($_POST['lead_name']);
-        $phone = sanitize_text_field($_POST['lead_phone']);
-        $email = sanitize_email($_POST['lead_email'] ?? '');
-        $address = sanitize_textarea_field($_POST['lead_address'] ?? '');
-        $source = sanitize_text_field($_POST['lead_source'] ?? 'other');
-        $notes = sanitize_textarea_field($_POST['lead_notes'] ?? '');
-
-        if (empty($name) || empty($phone)) {
-            wp_send_json_error(['message' => 'Name and phone are required']);
+        // Use Component for creation
+        if (class_exists('LeadManagerComponent')) {
+            error_log('✅ [Sales Manager API] LeadManagerComponent found');
+            error_log('🚀 [Sales Manager API] Calling LeadManagerComponent::create_lead()');
+            
+            $post_id = LeadManagerComponent::create_lead($_POST, $user_id);
+            
+            error_log('📊 [Sales Manager API] create_lead returned: ' . print_r($post_id, true));
+        } else {
+            error_log('❌ [Sales Manager API] LeadManagerComponent NOT found');
+            wp_send_json_error(['message' => 'System Error: Component missing']);
+            return;
         }
-
-        // Create lead post
-        $post_id = wp_insert_post([
-            'post_title' => $name,
-            'post_type' => 'solar_lead',
-            'post_status' => 'publish',
-            'post_author' => $user_id,
-        ]);
 
         if (is_wp_error($post_id)) {
-            wp_send_json_error(['message' => 'Failed to create lead']);
+            error_log('❌ [Sales Manager API] WP_Error: ' . $post_id->get_error_message());
+            wp_send_json_error(['message' => $post_id->get_error_message()]);
         }
 
-        // Save meta
-        update_post_meta($post_id, '_lead_phone', $phone);
-        update_post_meta($post_id, '_lead_email', $email);
-        update_post_meta($post_id, '_lead_address', $address);
-        update_post_meta($post_id, '_lead_source', $source);
-        update_post_meta($post_id, '_lead_notes', $notes);
-        update_post_meta($post_id, '_lead_status', 'new');
-        
-        // Save Lead Type & Specifics
-        $lead_type = sanitize_text_field($_POST['lead_type'] ?? 'solar_project');
-        update_post_meta($post_id, '_lead_type', $lead_type);
-        
-        if ($lead_type === 'solar_project') {
-            $project_type = sanitize_text_field($_POST['lead_project_type'] ?? '');
-            update_post_meta($post_id, '_lead_project_type', $project_type);
-        } else {
-            $system_size = floatval($_POST['lead_system_size'] ?? 0);
-            update_post_meta($post_id, '_lead_system_size', $system_size);
-        }
-
+        // SM Specific Meta
+        error_log('💾 [Sales Manager API] Saving SM-specific meta...');
         update_post_meta($post_id, '_created_by_sales_manager', $user_id);
         
         if ($supervisor_id) {
             update_post_meta($post_id, '_assigned_area_manager', $supervisor_id);
         }
 
+        error_log('✨ [Sales Manager API] Lead created successfully! ID=' . $post_id);
         wp_send_json_success([
             'message' => 'Lead created successfully',
             'lead_id' => $post_id,
@@ -298,33 +249,18 @@ class KSC_Sales_Manager_API {
             wp_send_json_error(['message' => 'You can only edit your own leads']);
         }
 
-        if (isset($_POST['lead_status'])) {
-            update_post_meta($lead_id, '_lead_status', sanitize_text_field($_POST['lead_status']));
-        }
-        if (isset($_POST['lead_phone'])) {
-            update_post_meta($lead_id, '_lead_phone', sanitize_text_field($_POST['lead_phone']));
-        }
-        if (isset($_POST['lead_email'])) {
-            update_post_meta($lead_id, '_lead_email', sanitize_email($_POST['lead_email']));
-        }
-        if (isset($_POST['lead_notes'])) {
-            update_post_meta($lead_id, '_lead_notes', sanitize_textarea_field($_POST['lead_notes']));
-        }
-        // Optional: Update Type/Details if provided
-        if (isset($_POST['lead_type'])) {
-            $lead_type = sanitize_text_field($_POST['lead_type']);
-            update_post_meta($lead_id, '_lead_type', $lead_type);
-            
-            if ($lead_type === 'solar_project' && isset($_POST['lead_project_type'])) {
-                update_post_meta($lead_id, '_lead_project_type', sanitize_text_field($_POST['lead_project_type']));
-            } elseif ($lead_type === 'cleaning_service' && isset($_POST['lead_system_size'])) {
-                update_post_meta($lead_id, '_lead_system_size', floatval($_POST['lead_system_size']));
+        // Use Component for update
+        if (class_exists('LeadManagerComponent')) {
+            $result = LeadManagerComponent::update_lead($lead_id, $_POST);
+            if (is_wp_error($result)) {
+                wp_send_json_error(['message' => $result->get_error_message()]);
             }
+        } else {
+             wp_send_json_error(['message' => 'System Error: Component missing']);
         }
 
-        wp_send_json_success(['message' => 'Lead updated']);
+        wp_send_json_success(['message' => 'Lead updated successfully']);
     }
-
 
     /**
      * Add follow-up activity
