@@ -23,7 +23,7 @@ if ( ! defined( 'WPINC' ) ) {
 final class Krtrim_Solar_Core {
 
 	private static $instance = null;
-	public $version = '1.4.6';
+	public $version = '1.3.2';
 	public $file = __FILE__;
 	public $dir_path;
 	public $dir_url;
@@ -582,7 +582,7 @@ final class Krtrim_Solar_Core {
 		
 		// Only load admin.js if it exists
 		if ( file_exists( $this->dir_path . 'assets/js/admin.js' ) ) {
-			wp_enqueue_script( 'ksc-admin-scripts', $this->dir_url . 'assets/js/admin.js', [ 'jquery' ], $this->version, true );
+			wp_enqueue_script( 'ksc-admin-scripts', $this->dir_url . 'assets/js/admin.js', [ 'jquery' ], time(), true );
 		}
 
 		if ( 'user-edit.php' === $hook || 'profile.php' === $hook ) {

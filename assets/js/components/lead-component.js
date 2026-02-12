@@ -277,6 +277,7 @@
                     <td class="lead-actions-cell">
                         <a href="https://wa.me/91${lead.phone.replace(/\D/g, '')}" target="_blank" class="lead-quick-action btn-icon" title="WhatsApp">💬</a>
                         <a href="tel:${lead.phone}" class="lead-quick-action btn-icon" title="Call">📞</a>
+                        ${dashboardType === 'sales_manager' ? `<button class="lead-quick-action btn-icon btn-book-cleaning" title="Book Cleaning" data-lead-id="${lead.id}" data-lead-name="${escapeHtml(lead.name)}">🧹</button>` : ''}
                     </td>
                 </tr>
             `;
@@ -297,6 +298,7 @@
                     <div class="lead-card-mobile-actions">
                         <a href="https://wa.me/91${lead.phone.replace(/\D/g, '')}" target="_blank" class="lead-quick-action">WhatsApp</a>
                         <a href="tel:${lead.phone}" class="lead-quick-action">Call</a>
+                        ${dashboardType === 'sales_manager' ? `<button class="lead-quick-action btn-book-cleaning" data-lead-id="${lead.id}" data-lead-name="${escapeHtml(lead.name)}">Book Cleaning</button>` : ''}
                     </div>
                 </div>
             `;
@@ -361,6 +363,16 @@
         // Set action links
         $('#btn-whatsapp-detail').attr('href', `https://wa.me/91${lead.phone.replace(/\D/g, '')}`);
         $('#btn-call-detail').attr('href', `tel:${lead.phone}`);
+
+        // Add Book Cleaning button for SM
+        if (dashboardType === 'sales_manager') {
+            // Check if button exists, if not append it
+            if ($('#btn-book-cleaning-detail').length === 0) {
+                $('<button class="btn btn-secondary btn-book-cleaning" id="btn-book-cleaning-detail" style="background:#059669;color:white;">🧹 Book Cleaning</button>')
+                    .insertAfter('#btn-call-detail');
+            }
+            $('#btn-book-cleaning-detail').data('lead-id', lead.id).data('lead-name', lead.name);
+        }
 
         // Store lead data for create client
         $('#btn-create-client-detail').data('lead', lead);

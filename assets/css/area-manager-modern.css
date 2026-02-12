@@ -442,6 +442,7 @@
 /* Modal Specific Padding for Cleaning Services */
 #schedule-visit-modal .modal-content,
 #am-service-details-modal .modal-content,
-#service-detail-modal .modal-content {
+#service-detail-modal .modal-content,
+#service-details-modal .modal-content {
     padding: 15px !important;
 }

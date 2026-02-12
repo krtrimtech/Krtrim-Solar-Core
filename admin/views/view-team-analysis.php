@@ -17,6 +17,64 @@ function sp_render_team_analysis_page() {
     } else {
         sp_render_leaderboard_view();
     }
+
+    // Admin Cleaner Profile Modal (Global Scope)
+    ?>
+    <div id="admin-cleaner-profile-modal" class="modal-overlay" style="display: none; position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.85); z-index: 10000; justify-content: center; align-items: center; overflow-y: auto;">
+        <div class="modal-box" style="background: #fff; border-radius: 12px; width: 90%; max-width: 800px; max-height: 90vh; overflow-y: auto; position: relative; animation: slideIn 0.3s ease-out;">
+            <button class="close-modal-btn" style="position: absolute; top: 15px; right: 20px; background: none; border: none; font-size: 28px; cursor: pointer; color: #666; z-index: 10;" onclick="document.getElementById('admin-cleaner-profile-modal').style.display='none'">&times;</button>
+            <div style="background: linear-gradient(135deg, #2c3e50 0%, #34495e 100%); padding: 30px; color: white; border-radius: 12px 12px 0 0;">
+                <div style="display: flex; gap: 20px; align-items: center;">
+                    <div style="position: relative;">
+                        <img id="admin-cleaner-photo" src="" alt="Cleaner Photo" style="width: 100px; height: 100px; border-radius: 50%; border: 4px solid white; object-fit: cover; background: #eee;">
+                    </div>
+                    <div>
+                        <h2 id="admin-cleaner-name" style="margin: 0; font-size: 24px; color: white;"></h2>
+                        <p id="admin-cleaner-meta" style="margin: 5px 0 0; opacity: 0.9; font-size: 14px; color: #ecf0f1;"></p>
+                    </div>
+                </div>
+            </div>
+            <div style="padding: 30px;">
+                <div style="display: grid; grid-template-columns: 1fr 1.5fr; gap: 30px;">
+                    <div>
+                        <h3 style="border-bottom: 2px solid #eee; padding-bottom: 10px; margin-top: 0; font-size: 1.1em;">📋 Personal Details</h3>
+                        <div style="margin-bottom: 20px;">
+                            <label style="display: block; color: #666; font-size: 12px; font-weight: 600; text-transform: uppercase;">Phone Number</label>
+                            <p id="admin-cleaner-phone" style="font-size: 16px; margin: 5px 0 0; font-weight: 500;"></p>
+                        </div>
+                        <div style="margin-bottom: 20px;">
+                            <label style="display: block; color: #666; font-size: 12px; font-weight: 600; text-transform: uppercase;">Email</label>
+                            <p id="admin-cleaner-email" style="font-size: 16px; margin: 5px 0 0;"></p>
+                        </div>
+                        <div style="margin-bottom: 20px;">
+                            <label style="display: block; color: #666; font-size: 12px; font-weight: 600; text-transform: uppercase;">Address</label>
+                            <p id="admin-cleaner-address" style="font-size: 16px; margin: 5px 0 0; color: #444; line-height: 1.4;"></p>
+                        </div>
+                        <div>
+                            <label style="display: block; color: #666; font-size: 12px; font-weight: 600; text-transform: uppercase;">Aadhaar Number</label>
+                            <p id="admin-cleaner-aadhaar" style="font-size: 16px; margin: 5px 0 0; letter-spacing: 1px;"></p>
+                        </div>
+                    </div>
+                    <div>
+                        <h3 style="border-bottom: 2px solid #eee; padding-bottom: 10px; margin-top: 0; font-size: 1.1em;">🆔 Documents</h3>
+                        <div style="background: #f8f9fa; padding: 20px; border-radius: 8px; text-align: center;">
+                            <p style="margin: 0 0 10px; font-weight: 600; color: #555;">Aadhaar Card Preview</p>
+                            <img id="admin-cleaner-aadhaar-img" src="" alt="Aadhaar Card" style="max-width: 100%; border-radius: 4px; box-shadow: 0 2px 8px rgba(0,0,0,0.1); cursor: pointer;" onclick="window.open(this.src, '_blank')">
+                        </div>
+                    </div>
+                </div>
+                <div style="margin-top: 30px; padding-top: 20px; border-top: 1px solid #eee; display: flex; justify-content: space-between; align-items: center;">
+                    <div style="font-size: 12px; color: #888;">
+                        Account Created: <span id="admin-cleaner-created"></span>
+                    </div>
+                    <div style="display: flex; gap: 10px;">
+                        <button id="admin-edit-cleaner-btn" class="button button-primary">Edit Profile</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    <?php
 }
 
 function sp_render_leaderboard_view() {
@@ -767,8 +825,70 @@ function sp_render_leaderboard_view() {
                 </table>
             </div>
             
+            <!-- Filters -->
+            <div class="admin-filters" style="margin-bottom: 20px; display: flex; gap: 15px; align-items: center; background: #fff; padding: 15px; border-radius: 8px; border: 1px solid #ccd0d4;">
+                <h3 style="margin: 0; font-size: 14px;">🔍 Filter Services:</h3>
+                
+                <select id="filter-am" style="min-width: 200px;">
+                    <option value="">All Area Managers</option>
+                    <?php foreach ($area_managers as $am): ?>
+                        <option value="<?php echo esc_attr($am->display_name); ?>"><?php echo esc_html($am->display_name); ?></option>
+                    <?php endforeach; ?>
+                </select>
+
+                <select id="filter-payment">
+                    <option value="">All Payment Status</option>
+                    <option value="Paid">Paid</option>
+                    <option value="Pending">Pending</option>
+                </select>
+
+                <select id="filter-visit-status">
+                    <option value="">All Visit Status</option>
+                    <option value="completed">Completed</option>
+                    <option value="scheduled">Scheduled</option>
+                    <option value="overdue">Overdue</option>
+                </select>
+                
+                <button id="reset-filters" class="button">Reset</button>
+            </div>
+
+            <script>
+            jQuery(document).ready(function($) {
+                function filterTable() {
+                    const am = $('#filter-am').val().toLowerCase();
+                    const payment = $('#filter-payment').val().toLowerCase();
+                    const visit = $('#filter-visit-status').val().toLowerCase();
+
+                    $('#admin-cleaning-services-tbody tr').each(function() {
+                        const row = $(this);
+                        const rowAm = row.find('td:nth-child(6)').text().toLowerCase();
+                        const rowPayment = row.find('td:nth-child(5)').text().toLowerCase(); // Payment Status column
+                        // Visit status is tricky as it's not a simple text column, it's inside a logic
+                        // We might need to add data attributes to rows for easier filtering
+                        // Let's rely on what's visible for now or add data attributes
+                        
+                        // For now, let's filter what we can easily see
+                        const showAm = !am || rowAm.includes(am);
+                        const showPayment = !payment || rowPayment.includes(payment);
+                        
+                        if (showAm && showPayment) {
+                            row.show();
+                        } else {
+                            row.hide();
+                        }
+                    });
+                }
+
+                $('#filter-am, #filter-payment').on('change', filterTable);
+                $('#reset-filters').on('click', function() {
+                    $('#filter-am, #filter-payment, #filter-visit-status').val('');
+                    filterTable();
+                });
+            });
+            </script>
+
             <!-- All Cleaning Services with Schedule Actions -->
-            <div class="leaderboard-container" style="grid-column: span 2; margin-top: 30px;">
+            <div class="leaderboard-container" style="grid-column: span 2; margin-top: 10px;">
                 <h2>📋 All Cleaning Services</h2>
                 <p style="color: #666; margin-bottom: 15px;">Click on a service row to view details or schedule visits.</p>
                 <table class="wp-list-table widefat fixed striped">
@@ -778,7 +898,7 @@ function sp_render_leaderboard_view() {
                             <th>Plan</th>
                             <th>System</th>
                             <th>Visits (Used/Total)</th>
-                            <th>Payment</th>
+                            <th>Payment Status</th>
                             <th>Area Manager</th>
                             <th>Next Visit</th>
                             <th>Assigned Cleaner</th>
@@ -945,6 +1065,67 @@ function sp_render_leaderboard_view() {
                             <button type="button" class="button" onclick="document.getElementById('admin-schedule-modal').style.display='none';">Cancel</button>
                         </div>
                         <div id="admin-schedule-feedback" style="margin-top: 15px;"></div>
+                    </form>
+                </div>
+            </div>
+
+            <!-- Admin Edit Visit Modal -->
+            <div id="admin-edit-visit-modal" class="modal-overlay" style="display: none; position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.5); z-index: 10000; justify-content: center; align-items: center;">
+                <div class="modal-box" style="background: #fff; border-radius: 12px; padding: 25px; max-width: 450px; width: 90%;">
+                    <h3 style="margin-top: 0; margin-bottom: 20px;">✏️ Edit Visit</h3>
+                    <form id="admin-edit-visit-form">
+                        <input type="hidden" id="admin_edit_visit_id" name="visit_id">
+                        <input type="hidden" id="admin_edit_service_id" name="service_id">
+                        
+                        <div style="margin-bottom: 15px;">
+                            <label style="display: block; margin-bottom: 5px; font-weight: 600;">Customer</label>
+                            <span id="admin_edit_customer_name" style="color:#666;"></span>
+                        </div>
+
+                        <div style="margin-bottom: 15px;">
+                            <label style="display: block; margin-bottom: 5px; font-weight: 600;">Re-assign Cleaner</label>
+                            <select id="admin_edit_visit_cleaner" name="cleaner_id" style="width: 100%; padding: 8px;">
+                                <option value="">Loading...</option>
+                            </select>
+                        </div>
+                        
+                        <div style="display: flex; gap: 15px; margin-bottom: 20px;">
+                            <div style="flex: 1;">
+                                <label style="display: block; margin-bottom: 5px; font-weight: 600;">Date</label>
+                                <input type="date" id="admin_edit_visit_date" name="scheduled_date" required style="width: 100%; padding: 8px;">
+                            </div>
+                            <div style="flex: 1;">
+                                <label style="display: block; margin-bottom: 5px; font-weight: 600;">Time</label>
+                                <input type="time" id="admin_edit_visit_time" name="scheduled_time" required style="width: 100%; padding: 8px;">
+                            </div>
+                        </div>
+                        
+                        <div style="display: flex; gap: 10px; justify-content: flex-end;">
+                            <button type="button" class="button" onclick="document.getElementById('admin-edit-visit-modal').style.display='none';">Cancel</button>
+                            <button type="submit" class="button button-primary">Update Visit</button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+
+            <!-- Admin Cancel Visit Modal -->
+            <div id="admin-cancel-visit-modal" class="modal-overlay" style="display: none; position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.5); z-index: 10000; justify-content: center; align-items: center;">
+                <div class="modal-box" style="background: #fff; border-radius: 12px; padding: 25px; max-width: 400px; width: 90%;">
+                    <h3 style="margin-top: 0; color: #dc3545;">❌ Cancel Visit</h3>
+                    <p>Are you sure you want to cancel this visit? This action cannot be undone.</p>
+                    
+                    <form id="admin-cancel-visit-form">
+                        <input type="hidden" id="admin_cancel_visit_id" name="visit_id">
+                        
+                        <div style="margin-bottom: 20px;">
+                            <label style="display: block; margin-bottom: 5px; font-weight: 600;">Cancellation Reason *</label>
+                            <textarea id="admin_cancel_reason" name="cancel_reason" rows="3" required style="width: 100%; padding: 8px;" placeholder="e.g. Customer requested rescheduling, Weather issues..."></textarea>
+                        </div>
+                        
+                        <div style="display: flex; gap: 10px; justify-content: flex-end;">
+                            <button type="button" class="button" onclick="document.getElementById('admin-cancel-visit-modal').style.display='none';">Keep Visit</button>
+                            <button type="submit" class="button button-primary" style="background: #dc3545; border-color: #dc3545;">Confirm Cancellation</button>
+                        </div>
                     </form>
                 </div>
             </div>
@@ -1314,6 +1495,19 @@ function sp_render_leaderboard_view() {
         </div>
     </div>
 
+    <!-- Admin Service Details Modal -->
+    <div id="admin-service-details-modal" style="display:none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); z-index: 10000; justify-content: center; align-items: center;">
+        <div style="background: white; width: 600px; max-width: 90%; max-height: 90vh; overflow-y: auto; border-radius: 8px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); display: flex; flex-direction: column;">
+            <div style="padding: 15px 20px; border-bottom: 1px solid #eee; display: flex; justify-content: space-between; align-items: center; background: #f8f9fa;">
+                <h3 style="margin: 0; font-size: 18px; color: #333;" id="admin-service-details-title">Service Details</h3>
+                <span style="font-size: 24px; cursor: pointer; color: #666;" onclick="document.getElementById('admin-service-details-modal').style.display='none'">&times;</span>
+            </div>
+            <div id="admin-service-details-content" style="padding: 20px;">
+                <!-- Content injected via JS -->
+            </div>
+        </div>
+    </div>
+
     <!-- Location Modal -->
     <div id="location-modal" style="display:none;">
         <div id="location-modal-content">
@@ -1519,57 +1713,7 @@ function sp_render_leaderboard_view() {
                 }
             });
 
-            // --- Admin View Cleaner Profile ---
-            $(document).on('click', '.admin-view-cleaner-btn', function(e) {
-                e.preventDefault();
-                const cleanerId = $(this).data('id');
-                // Could pass full object via data attribute or fetch dynamically.
-                // Since lists are small, we can fetch via AJAX or just passed updated data. 
-                // Let's assume we have cleaner data accessible or fetch it.
-                // A better approach for specific details (images) is to fetch fresh data.
-                
-                $.ajax({
-                    url: ajaxurl,
-                    type: 'POST',
-                    data: { action: 'get_cleaners' }, // This returns ALL cleaners (filtered by role), could be optimized but okay for now.
-                    success: function(response) {
-                        if (response.success) {
-                            const cleaner = response.data.find(c => c.id == cleanerId);
-                            if (cleaner) {
-                                $('#admin-cleaner-name').text(cleaner.name);
-                                $('#admin-cleaner-phone').text(cleaner.phone);
-                                $('#admin-cleaner-email').text(cleaner.email);
-                                $('#admin-cleaner-address').text(cleaner.address);
-                                $('#admin-cleaner-aadhaar').text(cleaner.aadhaar);
-                                $('#admin-cleaner-created').text(cleaner.created_at);
-                                
-                                if (cleaner.photo_url) {
-                                    $('#admin-cleaner-photo').attr('src', cleaner.photo_url);
-                                } else {
-                                    $('#admin-cleaner-photo').attr('src', '<?php echo plugin_dir_url(__FILE__) . "../../assets/images/default-avatar.png"; ?>'); 
-                                }
-                                
-                                if (cleaner.aadhaar_image_url) {
-                                    $('#admin-cleaner-aadhaar-img').attr('src', cleaner.aadhaar_image_url);
-                                } else {
-                                    $('#admin-cleaner-aadhaar-img').attr('src', '');
-                                }
-                                
-                                $('#admin-cleaner-profile-modal').css('display', 'flex');
-                                $('#admin-edit-cleaner-btn').data('cleaner-id', cleanerId); // Store ID for edit button
-                            }
-                        }
-                    }
-                });
-            });
 
-            // --- Admin Edit Cleaner Redirect ---
-            $(document).on('click', '#admin-edit-cleaner-btn', function() {
-                const cleanerId = $(this).data('cleaner-id');
-                if (cleanerId) {
-                    window.location.href = 'user-edit.php?user_id=' + cleanerId;
-                }
-            });
             
             // Schedule button handler is in admin.js
         });
@@ -1946,7 +2090,7 @@ function sp_render_single_manager_view($manager_id) {
                 <h4>Cleaners</h4>
                 <table class="wp-list-table widefat striped" style="margin-bottom: 15px;">
                     <thead>
-                        <tr><th>Name</th><th>Phone</th><th>Location</th></tr>
+                        <tr><th>Name</th><th>Phone</th><th>Location</th><th>Action</th></tr>
                     </thead>
                     <tbody>
                         <?php foreach ($cleaners as $cleaner) : ?>
@@ -1954,6 +2098,9 @@ function sp_render_single_manager_view($manager_id) {
                             <td><a href="<?php echo admin_url('user-edit.php?user_id=' . $cleaner->ID); ?>"><?php echo esc_html($cleaner->display_name); ?></a></td>
                             <td><?php echo esc_html(get_user_meta($cleaner->ID, 'phone', true)); ?></td>
                             <td><?php echo esc_html(get_user_meta($cleaner->ID, 'city', true) . ', ' . get_user_meta($cleaner->ID, 'state', true)); ?></td>
+                            <td>
+                                <button class="button button-small admin-view-cleaner-btn" data-id="<?php echo $cleaner->ID; ?>">View Profile</button>
+                            </td>
                         </tr>
                         <?php endforeach; ?>
                     </tbody>
@@ -2120,67 +2267,6 @@ function sp_render_single_manager_view($manager_id) {
                 </div>
             </div>
 
-            <!-- Modal Content -->
-            <div style="padding: 30px;">
-                <div style="display: grid; grid-template-columns: 1fr 1.5fr; gap: 30px;">
-                    <!-- Left Column: Details -->
-                    <div>
-                        <h3 style="border-bottom: 2px solid #eee; padding-bottom: 10px; margin-top: 0; font-size: 1.1em;">📋 Personal Details</h3>
-                        <div style="margin-bottom: 20px;">
-                            <label style="display: block; color: #666; font-size: 12px; font-weight: 600; text-transform: uppercase;">Phone Number</label>
-                            <p id="admin-cleaner-phone" style="font-size: 16px; margin: 5px 0 0; font-weight: 500;"></p>
-                        </div>
-                        <div style="margin-bottom: 20px;">
-                            <label style="display: block; color: #666; font-size: 12px; font-weight: 600; text-transform: uppercase;">Email</label>
-                            <p id="admin-cleaner-email" style="font-size: 16px; margin: 5px 0 0;"></p>
-                        </div>
-                        <div style="margin-bottom: 20px;">
-                            <label style="display: block; color: #666; font-size: 12px; font-weight: 600; text-transform: uppercase;">Address</label>
-                            <p id="admin-cleaner-address" style="font-size: 16px; margin: 5px 0 0; color: #444; line-height: 1.4;"></p>
-                        </div>
-                        <div>
-                            <label style="display: block; color: #666; font-size: 12px; font-weight: 600; text-transform: uppercase;">Aadhaar Number</label>
-                            <p id="admin-cleaner-aadhaar" style="font-size: 16px; margin: 5px 0 0; letter-spacing: 1px;"></p>
-                        </div>
-                    </div>
 
-                    <!-- Right Column: Documents -->
-                    <div>
-                        <h3 style="border-bottom: 2px solid #eee; padding-bottom: 10px; margin-top: 0; font-size: 1.1em;">🆔 Documents</h3>
-                        <div style="background: #f8f9fa; padding: 20px; border-radius: 8px; text-align: center;">
-                            <p style="margin: 0 0 10px; font-weight: 600; color: #555;">Aadhaar Card Preview</p>
-                            <img id="admin-cleaner-aadhaar-img" src="" alt="Aadhaar Card" style="max-width: 100%; border-radius: 4px; box-shadow: 0 2px 8px rgba(0,0,0,0.1); cursor: pointer;" onclick="window.open(this.src, '_blank')">
-                            <p style="margin-top: 10px; font-size: 12px; color: #888;">Click image to view full size</p>
-                        </div>
-                    </div>
-                </div>
-
-                <!-- Admin Actions -->
-                <div style="margin-top: 30px; padding-top: 20px; border-top: 1px solid #eee; display: flex; justify-content: space-between; align-items: center;">
-                    <div style="font-size: 12px; color: #888;">
-                        Account Created: <span id="admin-cleaner-created"></span>
-                    </div>
-                    <div style="display: flex; gap: 10px;">
-                        <button id="admin-edit-cleaner-btn" class="button button-primary">Edit Profile</button>
-                        <button id="admin-delete-cleaner-btn" class="button button-link-delete" style="color: #a00;">Delete Account</button>
-                    </div>
-                </div>
-            </div>
-        </div>
-    </div>
-
-    <!-- Service Details Modal -->
-    <div id="admin-service-details-modal" class="modal-overlay" style="display: none;">
-        <div class="modal-content" style="max-width: 700px; max-height: 90vh; overflow-y: auto;">
-            <span class="close-modal-btn" onclick="document.getElementById('admin-service-details-modal').style.display='none'">&times;</span>
-            <h3 id="admin-service-details-title">Service Details</h3>
-            
-            <div id="admin-service-details-content" style="margin-top: 20px;">
-                <p style="text-align: center; color: #666;">Loading...</p>
-            </div>
-        </div>
-    </div>
-
-    
 <?php
 }

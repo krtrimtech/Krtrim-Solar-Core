@@ -1099,58 +1099,7 @@ function sp_area_manager_dashboard_shortcode() {
         </div>
     </div>
 
-    <!-- Assign Cleaner Modal -->
-    <div id="am-assign-cleaner-modal" class="modal-overlay" style="display: none;">
-        <div class="modal-content" style="max-width: 500px;">
-            <span class="close-modal-btn" onclick="document.getElementById('am-assign-cleaner-modal').style.display='none'">&times;</span>
-            <h3>👤 Assign Cleaner to Visit</h3>
-            
-            <form id="am-assign-cleaner-form" style="margin-top: 20px;">
-                <input type="hidden" id="am_assign_visit_id">
-                <input type="hidden" id="am_assign_service_id">
-                
-                <div style="margin-bottom: 15px;">
-                    <label for="am_assign_cleaner_id" style="display: block; margin-bottom: 5px; font-weight: 600;">Select Cleaner:</label>
-                    <select id="am_assign_cleaner_id" required style="width: 100%; padding: 8px; border: 1px solid #d1d5db; border-radius: 4px;">
-                        <option value="">Loading cleaners...</option>
-                    </select>
-                </div>
-                
-                <div style="display: flex; gap: 10px; margin-top: 20px;">
-                    <button type="submit" class="btn btn-primary" style="flex: 1;">Assign Cleaner</button>
-                    <button type="button" class="btn btn-secondary" onclick="document.getElementById('am-assign-cleaner-modal').style.display='none'" style="flex: 1;">Cancel</button>
-                </div>
-            </form>
-        </div>
-    </div>
 
-    <!-- Reschedule Visit Modal -->
-    <div id="am-reschedule-visit-modal" class="modal-overlay" style="display: none;">
-        <div class="modal-content" style="max-width: 500px;">
-            <span class="close-modal-btn" onclick="document.getElementById('am-reschedule-visit-modal').style.display='none'">&times;</span>
-            <h3>📅 Reschedule Visit</h3>
-            
-            <form id="am-reschedule-visit-form" style="margin-top: 20px;">
-                <input type="hidden" id="am_reschedule_visit_id">
-                <input type="hidden" id="am_reschedule_service_id">
-                
-                <div style="margin-bottom: 15px;">
-                    <label for="am_reschedule_date" style="display: block; margin-bottom: 5px; font-weight: 600;">New Date:</label>
-                    <input type="date" id="am_reschedule_date" required style="width: 100%; padding: 8px; border: 1px solid #d1d5db; border-radius: 4px;">
-                </div>
-                
-                <div style="margin-bottom: 15px;">
-                    <label for="am_reschedule_time" style="display: block; margin-bottom: 5px; font-weight: 600;">New Time:</label>
-                    <input type="time" id="am_reschedule_time" required style="width: 100%; padding: 8px; border: 1px solid #d1d5db; border-radius: 4px;">
-                </div>
-                
-                <div style="display: flex; gap: 10px; margin-top: 20px;">
-                    <button type="submit" class="btn btn-primary" style="flex: 1;">Reschedule</button>
-                    <button type="button" class="btn btn-secondary" onclick="document.getElementById('am-reschedule-visit-modal').style.display='none'" style="flex: 1;">Cancel</button>
-                </div>
-            </form>
-        </div>
-    </div>
 
     <!-- Toast Container -->
     <div class="toast-container" id="toast-container"></div>

@@ -494,7 +494,8 @@ jQuery(function ($) {
         const modal = $('#admin-service-details-modal');
         const content = $('#admin-service-details-content');
 
-        modal.show();
+        // Fix: Use flex to center the modal instead of default block from .show()
+        modal.css('display', 'flex').fadeIn(200);
         content.html('<p style="text-align: center; color: #666;">Loading service details...</p>');
 
         jQuery.ajax({
@@ -566,20 +567,44 @@ jQuery(function ($) {
                         visits.forEach((visit, index) => {
                             const statusColors = {
                                 'scheduled': '#3b82f6',
+                                'in_progress': '#f59e0b',
                                 'completed': '#10b981',
                                 'cancelled': '#ef4444'
                             };
                             const statusIcons = {
                                 'scheduled': '📅',
+                                'in_progress': '⏳',
                                 'completed': '✅',
                                 'cancelled': '❌'
                             };
 
+                            let actions = '';
+                            // Ensure status check is robust (trim whitespace, lowercase)
+                            const vStatus = (visit.status || '').toLowerCase().trim();
+
+                            if (vStatus === 'scheduled') {
+                                actions = `
+                                    <div style="margin-top: 10px; padding-top: 10px; border-top: 1px dashed #eee;">
+                                        <button class="button button-small admin-btn-edit-visit" 
+                                            data-id="${visit.id}" 
+                                            data-service-id="${serviceId}" 
+                                            data-customer="${service.customer_name}"
+                                            data-cleaner-id="${visit.cleaner_id || ''}"
+                                            data-date="${visit.scheduled_date}" 
+                                            data-time="${visit.scheduled_time || ''}"
+                                            style="margin-right: 5px;">✏️ Edit</button>
+                                        <button class="button button-small admin-btn-cancel-visit" 
+                                            data-id="${visit.id}" 
+                                            style="color: #dc3545; border-color: #dc3545;">❌ Cancel</button>
+                                    </div>
+                                `;
+                            }
+
                             html += `
-                                <div style="background: white; padding: 15px; border-radius: 6px; margin-bottom: 10px; border-left: 4px solid ${statusColors[visit.status] || '#6b7280'};">
+                                <div style="background: white; padding: 15px; border-radius: 6px; margin-bottom: 10px; border-left: 4px solid ${statusColors[vStatus] || '#6b7280'};">
                                     <div style="display: flex; justify-content: space-between; align-items: start; margin-bottom: 8px;">
-                                        <strong>${statusIcons[visit.status] || '📍'} Visit ${index + 1}</strong>
-                                        <span style="background: ${statusColors[visit.status] || '#6b7280'}; color: white; padding: 2px 8px; border-radius: 4px; font-size: 12px;">${visit.status.toUpperCase()}</span>
+                                        <strong>${statusIcons[vStatus] || '📍'} Visit ${index + 1}</strong>
+                                        <span style="background: ${statusColors[vStatus] || '#6b7280'}; color: white; padding: 2px 8px; border-radius: 4px; font-size: 12px;">${(visit.status || 'unknown').toUpperCase()}</span>
                                     </div>
                                     <div style="font-size: 14px; color: #666;">
                                         <div><strong>Date:</strong> ${visit.scheduled_date} at ${visit.scheduled_time || 'N/A'}</div>
@@ -587,6 +612,7 @@ jQuery(function ($) {
                                         ${visit.completed_at ? `<div><strong>Completed:</strong> ${visit.completed_at}</div>` : ''}
                                         ${visit.completion_notes ? `<div><strong>Notes:</strong> ${visit.completion_notes}</div>` : ''}
                                     </div>
+                                    ${actions}
                                 </div>
                             `;
                         });
@@ -606,6 +632,189 @@ jQuery(function ($) {
             }
         });
     }
+
+    // --- Admin Edit Visit Logic ---
+    $(document).on('click', '.admin-btn-edit-visit', function (e) {
+        e.preventDefault();
+        const btn = $(this);
+        const visitId = btn.data('id');
+        const serviceId = btn.data('service-id');
+        const customerName = btn.data('customer');
+        const cleanerId = btn.data('cleaner-id');
+        const date = btn.data('date');
+        const time = btn.data('time');
+
+        $('#admin_edit_visit_id').val(visitId);
+        $('#admin_edit_service_id').val(serviceId);
+        $('#admin_edit_customer_name').text(customerName);
+        $('#admin_edit_visit_date').val(date);
+        $('#admin_edit_visit_time').val(time);
+
+        // Populate cleaners
+        const select = $('#admin_edit_visit_cleaner');
+        select.html('<option value="">Loading...</option>');
+
+        $.post(ajaxurl, { action: 'get_cleaners' }, function (response) {
+            if (response.success) {
+                select.empty();
+                select.append('<option value="">Select Cleaner</option>');
+                select.append('<option value="0">Unassigned</option>');
+                response.data.forEach(c => {
+                    const selected = c.id == cleanerId ? 'selected' : '';
+                    select.append(`<option value="${c.id}" ${selected}>${c.name} (${c.phone || ''})</option>`);
+                });
+            } else {
+                select.html('<option value="">Error loading cleaners</option>');
+            }
+        });
+
+        $('#admin-edit-visit-modal').fadeIn(200).css('display', 'flex');
+    });
+
+    $('#admin-edit-visit-form').on('submit', function (e) {
+        e.preventDefault();
+        const form = $(this);
+        const btn = form.find('button[type="submit"]');
+        const serviceId = $('#admin_edit_service_id').val();
+
+        btn.prop('disabled', true).text('Updating...');
+
+        const formData = form.serialize() + '&action=update_cleaning_visit';
+
+        $.post(ajaxurl, formData, function (response) {
+            if (response.success) {
+                alert('Visit updated successfully!');
+                $('#admin-edit-visit-modal').hide();
+                displayAdminServiceDetails(serviceId); // Refresh details
+                // Optional: Refresh main table row if needed, but details modal is key
+            } else {
+                alert('Error: ' + response.data.message);
+            }
+            btn.prop('disabled', false).text('Update Visit');
+        }).fail(function () {
+            alert('Server error');
+            btn.prop('disabled', false).text('Update Visit');
+        });
+    });
+
+    // --- Admin Cancel Visit Logic ---
+    $(document).on('click', '.admin-btn-cancel-visit', function (e) {
+        e.preventDefault();
+        const visitId = $(this).data('id');
+        $('#admin_cancel_visit_id').val(visitId);
+        $('#admin_cancel_reason').val('');
+        $('#admin-cancel-visit-modal').fadeIn(200).css('display', 'flex');
+    });
+
+    $('#admin-cancel-visit-form').on('submit', function (e) {
+        e.preventDefault();
+        const form = $(this);
+        const btn = form.find('button[type="submit"]');
+        // We need service ID to refresh details, but it's not in this form directly.
+        // It's in the background details modal. We can get it from there if needed or reload page.
+        // Or store it in a global/hidden field when opening cancel modal.
+        // Let's assume we reload details if we can find the ID, or just reload page.
+        // Currently the Cancel modal is on top of Service Details modal.
+
+        btn.prop('disabled', true).text('Cancelling...');
+
+        const formData = form.serialize() + '&action=cancel_cleaning_visit';
+
+        $.post(ajaxurl, formData, function (response) {
+            if (response.success) {
+                alert('Visit cancelled successfully.');
+                $('#admin-cancel-visit-modal').hide();
+
+                // Try to find open service details ID to refresh
+                // We can't easily get it unless we stored it. 
+                // But the service details modal is still open behind.
+                // We can close everything or try to refresh.
+                // Simple approach: Close details modal too and reload page to reflect status in main table
+                $('#admin-service-details-modal').hide();
+                location.reload();
+            } else {
+                alert('Error: ' + response.data.message);
+                btn.prop('disabled', false).text('Confirm Cancellation');
+            }
+        }).fail(function () {
+            alert('Server error');
+            btn.prop('disabled', false).text('Confirm Cancellation');
+        });
+    });
+
+
+    // --- Admin View Cleaner Profile ---
+    // --- Admin View Cleaner Profile ---
+    console.log('Attaching cleaner profile handlers...'); // DEBUG
+    $(document).on('click', '.admin-view-cleaner-btn', function (e) {
+        e.preventDefault();
+        console.log('Cleaner Profile Button Clicked!'); // DEBUG
+        const cleanerId = $(this).data('id');
+        console.log('Cleaner ID:', cleanerId); // DEBUG
+
+        $.ajax({
+            url: ajaxurl,
+            type: 'POST',
+            data: { action: 'get_cleaners' },
+            success: function (response) {
+                console.log('API Response:', response); // DEBUG
+                if (response.success) {
+                    const cleaner = response.data.find(c => c.id == cleanerId);
+                    if (cleaner) {
+                        console.log('Cleaner Found:', cleaner); // DEBUG
+                        $('#admin-cleaner-name').text(cleaner.name);
+                        $('#admin-cleaner-phone').text(cleaner.phone);
+                        $('#admin-cleaner-email').text(cleaner.email);
+                        $('#admin-cleaner-address').text(cleaner.address);
+                        $('#admin-cleaner-aadhaar').text(cleaner.aadhaar);
+                        $('#admin-cleaner-created').text(cleaner.created_at);
+
+                        if (cleaner.photo_url) {
+                            $('#admin-cleaner-photo').attr('src', cleaner.photo_url);
+                        } else {
+                            // Fallback or keep existing src if it has a default
+                            // logic to set default if empty
+                            $('#admin-cleaner-photo').attr('src', '');
+                        }
+
+                        if (cleaner.aadhaar_image_url) {
+                            $('#admin-cleaner-aadhaar-img').attr('src', cleaner.aadhaar_image_url);
+                        } else {
+                            $('#admin-cleaner-aadhaar-img').attr('src', '');
+                        }
+
+                        console.log('Opening Modal...'); // DEBUG
+                        const modal = $('#admin-cleaner-profile-modal');
+                        console.log('Modal Element Count:', modal.length); // DEBUG
+
+                        if (modal.length > 0) {
+                            // Move to body to avoid z-index/overflow issues
+                            $('body').append(modal);
+                            modal.css('display', 'flex');
+                            $('#admin-edit-cleaner-btn').data('cleaner-id', cleanerId);
+                        } else {
+                            console.error('CRITICAL: Modal element #admin-cleaner-profile-modal NOT found in DOM!');
+                        }
+                    } else {
+                        console.error('Cleaner NOT found in list for ID:', cleanerId); // DEBUG
+                    }
+                } else {
+                    console.error('API Error:', response); // DEBUG
+                }
+            },
+            error: function (xhr, status, error) {
+                console.error('AJAX Failure:', status, error); // DEBUG
+            }
+        });
+    });
+
+    // --- Admin Edit Cleaner Redirect ---
+    $(document).on('click', '#admin-edit-cleaner-btn', function () {
+        const cleanerId = $(this).data('cleaner-id');
+        if (cleanerId) {
+            window.location.href = 'user-edit.php?user_id=' + cleanerId;
+        }
+    });
 
 }); // End jQuery ready wrapper
 

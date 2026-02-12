@@ -295,6 +295,122 @@ function sp_sales_manager_dashboard_shortcode() {
         </div>
     </div>
 
+    <!-- Book Cleaning Modal -->
+    <div id="book-cleaning-modal" class="modal" style="display:none;">
+        <div class="modal-content" style="max-width: 500px;">
+            <span class="close-modal">&times;</span>
+            <h3>🧹 Book Cleaning Service</h3>
+            <form id="book-cleaning-form">
+                <input type="hidden" id="book_lead_id" name="lead_id">
+                
+                <div class="form-group">
+                    <label>Customer</label>
+                    <p id="book_customer_name" style="font-weight: 600; margin: 5px 0;"></p>
+                </div>
+
+                <div class="form-row" style="display: flex; gap: 15px;">
+                    <div class="form-group" style="flex: 1;">
+                        <label for="book_plan_type">Plan Type *</label>
+                        <select id="book_plan_type" name="plan_type" required style="width: 100%; padding: 10px; border: 1px solid #ddd; border-radius: 6px;">
+                            <option value="one_time">One Time</option>
+                            <option value="monthly">Monthly</option>
+                            <option value="6_month">6 Months</option>
+                            <option value="yearly">Yearly</option>
+                        </select>
+                    </div>
+                    <div class="form-group" style="flex: 1;">
+                        <label for="book_system_size">System Size (kW) *</label>
+                        <input type="number" id="book_system_size" name="system_size" min="1" step="0.1" required style="width: 100%; padding: 10px; border: 1px solid #ddd; border-radius: 6px;">
+                    </div>
+                </div>
+
+                <div class="form-group">
+                    <label for="book_total_amount">Total Amount (₹) *</label>
+                    <input type="number" id="book_total_amount" name="total_amount" min="0" required style="width: 100%; padding: 10px; border: 1px solid #ddd; border-radius: 6px;">
+                </div>
+
+                <div class="form-group">
+                    <label for="book_cleaner_id">Assign Cleaner *</label>
+                    <select id="book_cleaner_id" name="cleaner_id" required style="width: 100%; padding: 10px; border: 1px solid #ddd; border-radius: 6px;">
+                        <option value="">Loading cleaners...</option>
+                    </select>
+                </div>
+
+                <div class="form-row" style="display: flex; gap: 15px;">
+                    <div class="form-group" style="flex: 1;">
+                        <label for="book_visit_date">First Visit Date *</label>
+                        <input type="date" id="book_visit_date" name="visit_date" required style="width: 100%; padding: 10px; border: 1px solid #ddd; border-radius: 6px;">
+                    </div>
+                    <div class="form-group" style="flex: 1;">
+                        <label for="book_visit_time">Time *</label>
+                        <input type="time" id="book_visit_time" name="visit_time" value="09:00" required style="width: 100%; padding: 10px; border: 1px solid #ddd; border-radius: 6px;">
+                    </div>
+                </div>
+
+                <button type="submit" class="btn btn-primary" style="width: 100%; margin-top: 10px;">✅ Book Service</button>
+            </form>
+        </div>
+    </div>
+
+    <!-- Edit Visit Modal -->
+    <div id="edit-visit-modal" class="modal" style="display:none;">
+        <div class="modal-content" style="max-width: 500px;">
+            <span class="close-modal">&times;</span>
+            <h3>✏️ Edit Visit</h3>
+            <form id="edit-visit-form">
+                <input type="hidden" id="edit_visit_id" name="visit_id">
+                <input type="hidden" id="edit_service_id" name="service_id">
+                
+                <div class="form-group">
+                    <label>Customer</label>
+                    <p id="edit_customer_name" style="font-weight: 600; margin: 5px 0;"></p>
+                </div>
+
+                <div class="form-row" style="display: flex; gap: 15px;">
+                    <div class="form-group" style="flex: 1;">
+                        <label for="edit_visit_date">Date *</label>
+                        <input type="date" id="edit_visit_date" name="scheduled_date" required style="width: 100%; padding: 10px; border: 1px solid #ddd; border-radius: 6px;">
+                    </div>
+                    <div class="form-group" style="flex: 1;">
+                        <label for="edit_visit_time">Time *</label>
+                        <input type="time" id="edit_visit_time" name="scheduled_time" required style="width: 100%; padding: 10px; border: 1px solid #ddd; border-radius: 6px;">
+                    </div>
+                </div>
+
+                <div class="form-group">
+                    <label for="edit_visit_cleaner">Assign Cleaner</label>
+                    <select id="edit_visit_cleaner" name="cleaner_id" style="width: 100%; padding: 10px; border: 1px solid #ddd; border-radius: 6px;">
+                        <option value="">Select Cleaner</option>
+                    </select>
+                </div>
+
+                <button type="submit" class="btn btn-primary" style="width: 100%; margin-top: 10px;">💾 Save Changes</button>
+            </form>
+        </div>
+    </div>
+
+    <!-- Cancel Visit Modal -->
+    <div id="cancel-visit-modal" class="modal" style="display:none;">
+        <div class="modal-content" style="max-width: 400px;">
+            <span class="close-modal">&times;</span>
+            <h3 style="color: #dc3545;">❌ Cancel Visit</h3>
+            <p>Are you sure you want to cancel this visit?</p>
+            <form id="cancel-visit-form">
+                <input type="hidden" id="cancel_visit_id" name="visit_id">
+                
+                <div class="form-group">
+                    <label for="cancel_reason">Reason for Cancellation *</label>
+                    <textarea id="cancel_reason" name="reason" rows="3" required placeholder="Client requested rescheduling..." style="width: 100%; padding: 10px; border: 1px solid #ddd; border-radius: 6px;"></textarea>
+                </div>
+
+                <div style="display: flex; gap: 10px; margin-top: 15px;">
+                    <button type="button" class="btn btn-secondary close-modal" style="flex: 1;">Go Back</button>
+                    <button type="submit" class="btn btn-danger" style="flex: 1; background-color: #dc3545; color: white;">Confirm Cancellation</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
     <!-- Toast Container -->
     <div class="toast-container" id="toast-container"></div>
 

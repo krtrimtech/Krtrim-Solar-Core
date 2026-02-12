@@ -1644,13 +1644,16 @@
                                 <td>${paymentOptionDisplay}</td>
                                 <td>
                                     ${s.next_visit_date
-                                ? `<span style="color:#4f46e5;">✓ ${s.next_visit_date}</span>`
+                                ? `<span style="color:#4f46e5;">✓ ${s.next_visit_date}</span><br><small style="color:#666;">👤 ${s.next_visit_cleaner || 'Unassigned'}</small>`
                                 : s.preferred_date
                                     ? `<span style="color:#b45309;">⏳ Requested: ${s.preferred_date}</span><br><button class="btn btn-sm schedule-visit-btn" data-id="${s.id}">+ Schedule</button>`
                                     : '<button class="btn btn-sm schedule-visit-btn" data-id="' + s.id + '">+ Schedule</button>'}
+                                </td>
+                                <td>${paymentOptionDisplay}</td>
+                                <td>
                                     <button class="btn btn-sm view-service-details-btn" 
                                             data-id="${s.id}" 
-                                            style="background: #6366f1; color: white; margin-left: 5px;">📋 Details</button>
+                                            style="background: #6366f1; color: white;">📋 Details</button>
                                 </td>
                             </tr>
                         `;
@@ -2462,6 +2465,7 @@
                 service_id: serviceId
             },
             success: function (response) {
+                console.log('Service Details Response:', response);
                 if (response.success) {
                     const service = response.data.service;
                     const visits = response.data.visits;
@@ -2544,16 +2548,16 @@
                                     </div>
                                     ${visit.status === 'scheduled' ? `
                                         <div style="display: flex; gap: 8px; margin-top: 10px;">
-                                            <button class="btn btn-sm assign-cleaner-btn" 
-                                                    data-visit-id="${visit.id}" 
-                                                    data-service-id="${serviceId}"
-                                                    style="background: #059669; color: white;">👤 Assign Cleaner</button>
-                                            <button class="btn btn-sm reschedule-visit-btn" 
+                                            <button class="btn btn-sm edit-visit-btn" 
                                                     data-visit-id="${visit.id}"
                                                     data-service-id="${serviceId}"
-                                                    data-current-date="${visit.scheduled_date}"
-                                                    data-current-time="${visit.scheduled_time || ''}"
-                                                    style="background: #f59e0b; color: white;">📅 Reschedule</button>
+                                                    data-date="${visit.scheduled_date}"
+                                                    data-time="${visit.scheduled_time || ''}"
+                                                    data-cleaner-id="${visit.cleaner_id || ''}"
+                                                    style="background: #eab308; color: white;">✏️ Edit</button>
+                                            <button class="btn btn-sm cancel-visit-btn" 
+                                                    data-visit-id="${visit.id}" 
+                                                    style="background: #ef4444; color: white;">✕ Cancel</button>
                                         </div>
                                     ` : ''}
                                 </div>
@@ -2576,154 +2580,42 @@
         });
     }
 
-
-    // Assign Cleaner Button Handler
-    $(document).on('click', '.assign-cleaner-btn', function (e) {
+    // Cancel Visit Handler
+    $(document).on('click', '.cancel-visit-btn', function (e) {
         e.preventDefault();
-        e.stopPropagation();
-
         const visitId = $(this).data('visit-id');
-        const serviceId = $(this).data('service-id');
 
-        $('#am_assign_visit_id').val(visitId);
-        $('#am_assign_service_id').val(serviceId);
-
-        // Load cleaners for this Area Manager
-        $('#am_assign_cleaner_id').html('<option value="">Loading cleaners...</option>');
-
-        $.ajax({
-            url: ajaxUrl,
-            type: 'POST',
-            data: {
-                action: 'get_am_cleaners'
-            },
-            success: function (response) {
-                if (response.success && response.data.length > 0) {
-                    let options = '<option value="">-- Select Cleaner --</option>';
-                    response.data.forEach(cleaner => {
-                        options += `<option value="${cleaner.id}">${cleaner.name} (${cleaner.phone})</option>`;
-                    });
-                    $('#am_assign_cleaner_id').html(options);
-                } else {
-                    $('#am_assign_cleaner_id').html('<option value="">No cleaners available</option>');
-                    showToast('No cleaners found. Please add cleaners first.', 'error');
-                }
-            },
-            error: function () {
-                $('#am_assign_cleaner_id').html('<option value="">Error loading cleaners</option>');
-                showToast('Error loading cleaners', 'error');
-            }
-        });
-
-        $('#am-assign-cleaner-modal').show();
-    });
-
-    // Assign Cleaner Form Submission
-    $('#am-assign-cleaner-form').on('submit', function (e) {
-        e.preventDefault();
-
-        const visitId = $('#am_assign_visit_id').val();
-        const serviceId = $('#am_assign_service_id').val();
-        const cleanerId = $('#am_assign_cleaner_id').val();
-
-        if (!cleanerId) {
-            showToast('Please select a cleaner', 'error');
+        if (!confirm('Are you sure you want to cancel this visit? This cannot be undone.')) {
             return;
         }
 
-        const $submitBtn = $(this).find('button[type="submit"]');
-        $submitBtn.prop('disabled', true).text('Assigning...');
+        const reason = prompt('Please enter a cancellation reason (optional):');
 
         $.ajax({
             url: ajaxUrl,
             type: 'POST',
             data: {
-                action: 'assign_cleaner_to_visit',
+                action: 'cancel_cleaning_visit',
                 visit_id: visitId,
-                service_id: serviceId,
-                cleaner_id: cleanerId
+                reason: reason
             },
             success: function (response) {
                 if (response.success) {
-                    showToast('Cleaner assigned successfully!', 'success');
-                    $('#am-assign-cleaner-modal').hide();
-                    // Refresh service details
-                    displayServiceDetails(serviceId);
-                } else {
-                    showToast(response.data.message || 'Failed to assign cleaner', 'error');
-                }
-                $submitBtn.prop('disabled', false).text('Assign Cleaner');
-            },
-            error: function () {
-                showToast('Error assigning cleaner. Please try again.', 'error');
-                $submitBtn.prop('disabled', false).text('Assign Cleaner');
-            }
-        });
-    });
-
-    // Reschedule Visit Button Handler
-    $(document).on('click', '.reschedule-visit-btn', function (e) {
-        e.preventDefault();
-        e.stopPropagation();
-
-        const visitId = $(this).data('visit-id');
-        const serviceId = $(this).data('service-id');
-        const currentDate = $(this).data('current-date');
-        const currentTime = $(this).data('current-time');
-
-        $('#am_reschedule_visit_id').val(visitId);
-        $('#am_reschedule_service_id').val(serviceId);
-        $('#am_reschedule_date').val(currentDate);
-        $('#am_reschedule_time').val(currentTime);
-
-        // Set minimum date to today
-        const today = new Date().toISOString().split('T')[0];
-        $('#am_reschedule_date').attr('min', today);
-
-        $('#am-reschedule-visit-modal').show();
-    });
-
-    // Reschedule Visit Form Submission
-    $('#am-reschedule-visit-form').on('submit', function (e) {
-        e.preventDefault();
-
-        const visitId = $('#am_reschedule_visit_id').val();
-        const serviceId = $('#am_reschedule_service_id').val();
-        const newDate = $('#am_reschedule_date').val();
-        const newTime = $('#am_reschedule_time').val();
-
-        const $submitBtn = $(this).find('button[type="submit"]');
-        $submitBtn.prop('disabled', true).text('Rescheduling...');
-
-        $.ajax({
-            url: ajaxUrl,
-            type: 'POST',
-            data: {
-                action: 'reschedule_cleaning_visit',
-                visit_id: visitId,
-                service_id: serviceId,
-                new_date: newDate,
-                new_time: newTime
-            },
-            success: function (response) {
-                if (response.success) {
-                    showToast('Visit rescheduled successfully!', 'success');
-                    $('#am-reschedule-visit-modal').hide();
-                    // Refresh service details
-                    displayServiceDetails(serviceId);
-                    // Refresh cleaning services table
+                    showToast('Visit cancelled successfully', 'success');
+                    $('#am-service-details-modal').hide();
                     loadCleaningServices();
                 } else {
-                    showToast(response.data.message || 'Failed to reschedule visit', 'error');
+                    showToast(response.data.message || 'Error cancelling visit', 'error');
                 }
-                $submitBtn.prop('disabled', false).text('Reschedule');
             },
             error: function () {
-                showToast('Error rescheduling visit. Please try again.', 'error');
-                $submitBtn.prop('disabled', false).text('Reschedule');
+                showToast('Error cancelling visit', 'error');
             }
         });
     });
+
+
+
 
     // Initial Load
     loadDashboardStats();
@@ -2734,4 +2626,125 @@
     if (window.initCleanerComponent && typeof sp_area_dashboard_vars !== 'undefined') {
         initCleanerComponent(sp_area_dashboard_vars.ajax_url, sp_area_dashboard_vars.cleaner_nonce);
     }
+    // Cleaner loading helper for AM
+    function loadAMCleanersForSelect(selectId, selectedId = null) {
+        const select = $(selectId);
+        select.html('<option value="">Loading...</option>');
+
+        $.ajax({
+            url: ajaxUrl,
+            type: 'POST',
+            data: { action: 'get_am_cleaners' },
+            success: function (response) {
+                if (response.success) {
+                    let options = '<option value="">-- Select Cleaner --</option>';
+                    options += '<option value="0">Not Assigned</option>';
+                    response.data.forEach(cleaner => {
+                        const isSelected = selectedId && String(cleaner.id) === String(selectedId) ? 'selected' : '';
+                        options += `<option value="${cleaner.id}" ${isSelected}>${cleaner.name} (${cleaner.phone})</option>`;
+                    });
+                    select.html(options);
+                } else {
+                    select.html('<option value="">No cleaners found</option>');
+                }
+            },
+            error: function () {
+                select.html('<option value="">Error loading cleaners</option>');
+            }
+        });
+    }
+
+    // Append Edit Modal to Body
+    $('body').append(`
+        <div id="am-edit-visit-modal" class="modal" style="display: none; position: fixed; z-index: 1050; left: 0; top: 0; width: 100%; height: 100%; overflow: auto; background-color: rgba(0,0,0,0.4);">
+            <div class="modal-content" style="background-color: #fefefe; margin: 10% auto; padding: 20px; border: 1px solid #888; width: 90%; max-width: 500px; border-radius: 8px;">
+                <span class="close-modal" data-modal="am-edit-visit-modal" style="color: #aaa; float: right; font-size: 28px; font-weight: bold; cursor: pointer;">&times;</span>
+                <h3 style="margin-top: 0; color: #1f2937;">✏️ Edit Visit</h3>
+                <form id="am-edit-visit-form">
+                    <input type="hidden" id="am_edit_visit_id" name="visit_id">
+                    <input type="hidden" id="am_edit_service_id" name="service_id">
+                    
+                    <div class="form-group" style="margin-bottom: 15px;">
+                        <label style="display: block; margin-bottom: 5px; font-weight: 500;">📅 Date</label>
+                        <input type="date" id="am_edit_scheduled_date" name="scheduled_date" required style="width: 100%; padding: 8px; border: 1px solid #d1d5db; border-radius: 4px;">
+                    </div>
+
+                    <div class="form-group" style="margin-bottom: 15px;">
+                        <label style="display: block; margin-bottom: 5px; font-weight: 500;">⏰ Time</label>
+                        <input type="time" id="am_edit_scheduled_time" name="scheduled_time" style="width: 100%; padding: 8px; border: 1px solid #d1d5db; border-radius: 4px;">
+                    </div>
+
+                    <div class="form-group" style="margin-bottom: 15px;">
+                        <label style="display: block; margin-bottom: 5px; font-weight: 500;">👤 Cleaner</label>
+                        <select id="am_edit_cleaner_id" name="cleaner_id" style="width: 100%; padding: 8px; border: 1px solid #d1d5db; border-radius: 4px;">
+                            <option value="">Loading...</option>
+                        </select>
+                    </div>
+
+                    <div style="text-align: right; margin-top: 20px;">
+                        <button type="button" class="btn close-modal-btn" data-modal="am-edit-visit-modal" style="background: #9ca3af; color: white; padding: 8px 16px; border: none; border-radius: 4px; margin-right: 10px;">Cancel</button>
+                        <button type="submit" class="btn" style="background: #3b82f6; color: white; padding: 8px 16px; border: none; border-radius: 4px;">Update Visit</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    `);
+
+    // Edit Visit Button Click
+    $(document).on('click', '.edit-visit-btn', function (e) {
+        e.preventDefault();
+        const visitId = $(this).data('visit-id');
+        const serviceId = $(this).data('service-id');
+        const date = $(this).data('date');
+        const time = $(this).data('time');
+        const cleanerId = $(this).data('cleaner-id');
+
+        $('#am_edit_visit_id').val(visitId);
+        $('#am_edit_service_id').val(serviceId);
+        $('#am_edit_scheduled_date').val(date);
+        $('#am_edit_scheduled_time').val(time);
+
+        loadAMCleanersForSelect('#am_edit_cleaner_id', cleanerId);
+
+        $('#am-edit-visit-modal').show();
+    });
+
+    // Edit Visit Form Submit
+    $('#am-edit-visit-form').on('submit', function (e) {
+        e.preventDefault();
+
+        const $btn = $(this).find('button[type="submit"]');
+        const originalText = $btn.text();
+        $btn.prop('disabled', true).text('Updating...');
+
+        $.ajax({
+            url: ajaxUrl,
+            type: 'POST',
+            data: {
+                action: 'update_cleaning_visit',
+                visit_id: $('#am_edit_visit_id').val(),
+                service_id: $('#am_edit_service_id').val(),
+                scheduled_date: $('#am_edit_scheduled_date').val(),
+                scheduled_time: $('#am_edit_scheduled_time').val(),
+                cleaner_id: $('#am_edit_cleaner_id').val()
+            },
+            success: function (response) {
+                if (response.success) {
+                    showToast('Visit updated successfully', 'success');
+                    $('#am-edit-visit-modal').hide();
+                    // Just hide details modal to force reload on next open, or refresh specifically
+                    $('#am-service-details-modal').hide();
+                    loadCleaningServices();
+                } else {
+                    showToast(response.data.message || 'Error updating visit', 'error');
+                }
+            },
+            error: function () {
+                showToast('Error updating visit', 'error');
+            },
+            complete: function () {
+                $btn.prop('disabled', false).text(originalText);
+            }
+        });
+    });
 })(jQuery);
