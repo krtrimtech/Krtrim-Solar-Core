@@ -10,6 +10,8 @@ if ( ! defined( 'ABSPATH' ) ) {
 
 function sp_area_manager_dashboard_shortcode() {
     // Security check
+    require_once plugin_dir_path(__FILE__) . '../../includes/components/class-cleaner-component.php';
+
     if ( ! is_user_logged_in() ) {
         wp_safe_redirect( wp_login_url( get_permalink() ) );
         exit;
@@ -599,127 +601,16 @@ function sp_area_manager_dashboard_shortcode() {
                 </div>
 
                 <!-- Manage Cleaners Section -->
+                <!-- Manage Cleaners Section -->
                 <section id="manage-cleaners-section" class="section-content" style="display:none;">
-                    <div class="section-header">
-                        <h2 class="section-title">Manage Cleaners</h2>
-                    </div>
-                    
-                    <!-- Add Cleaner Form -->
-                    <div class="card modern-form">
-                        <h3>🧹 Add New Cleaner</h3>
-                        <form id="create-cleaner-form" enctype="multipart/form-data">
-                            <?php wp_nonce_field('ksc_cleaner_nonce', 'cleaner_nonce'); ?>
-                            <div class="form-row">
-                                <div class="form-group">
-                                    <label for="cleaner_name">Full Name *</label>
-                                    <input type="text" id="cleaner_name" name="cleaner_name" required>
-                                </div>
-                                <div class="form-group">
-                                    <label for="cleaner_phone">Phone Number *</label>
-                                    <input type="text" id="cleaner_phone" name="cleaner_phone" required>
-                                </div>
-                            </div>
-                            <div class="form-row">
-                                <div class="form-group">
-                                    <label for="cleaner_email">Email</label>
-                                    <input type="email" id="cleaner_email" name="cleaner_email">
-                                </div>
-                                <div class="form-group">
-                                    <label for="cleaner_aadhaar">Aadhaar Number *</label>
-                                    <input type="text" id="cleaner_aadhaar" name="cleaner_aadhaar" maxlength="12" pattern="[0-9]{12}" required placeholder="12-digit Aadhaar">
-                                </div>
-                            </div>
-                            <div class="form-row">
-                                <div class="form-group">
-                                    <label for="cleaner_photo">Photo *</label>
-                                    <input type="file" id="cleaner_photo" name="cleaner_photo" accept="image/*" required>
-                                    <p class="description">Passport size photo for customer identification</p>
-                                </div>
-                                <div class="form-group">
-                                    <label for="cleaner_aadhaar_image">Aadhaar Card Image *</label>
-                                    <input type="file" id="cleaner_aadhaar_image" name="cleaner_aadhaar_image" accept="image/*" required>
-                                    <p class="description">Upload front side of Aadhaar card</p>
-                                </div>
-                            </div>
-                            <div class="form-group">
-                                <label for="cleaner_address">Address</label>
-                                <textarea id="cleaner_address" name="cleaner_address" rows="2"></textarea>
-                            </div>
-                            <button type="submit" class="btn btn-primary">➕ Create Cleaner Account</button>
-                            <div id="create-cleaner-feedback" style="margin-top:15px;"></div>
-                        </form>
-                    </div>
-
-                    <!-- Cleaners List -->
-                    <div class="card" style="margin-top: 20px;">
-                        <h3>Your Cleaners</h3>
-                        <div id="cleaners-list-container">
-                            <p>Loading cleaners...</p>
-                        </div>
-                    </div>
-
-                    <!-- Enhanced Cleaner Detail Modal -->
-                    <div id="cleaner-detail-modal" class="modal-overlay" style="display: none; position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.85); z-index: 10000; justify-content: center; align-items: center; overflow-y: auto;">
-                        <div class="modal-box" style="background: #fff; border-radius: 12px; width: 90%; max-width: 800px; max-height: 90vh; overflow-y: auto; position: relative; animation: slideIn 0.3s ease-out;">
-                            <button id="close-cleaner-modal" style="position: absolute; top: 15px; right: 20px; background: none; border: none; font-size: 28px; cursor: pointer; color: #666; z-index: 10;">&times;</button>
-                            
-                            <!-- Modal Header -->
-                            <div style="background: linear-gradient(135deg, #1e3c72 0%, #2a5298 100%); padding: 30px; color: white; border-radius: 12px 12px 0 0;">
-                                <div style="display: flex; gap: 20px; align-items: center;">
-                                    <div style="position: relative;">
-                                        <img id="modal-cleaner-photo" src="" alt="Cleaner Photo" style="width: 100px; height: 100px; border-radius: 50%; border: 4px solid white; object-fit: cover; background: #eee;">
-                                    </div>
-                                    <div>
-                                        <h2 id="modal-cleaner-name" style="margin: 0; font-size: 24px;"></h2>
-                                        <p id="modal-cleaner-role" style="margin: 5px 0 0; opacity: 0.9; font-size: 14px;">Solar Cleaner</p>
-                                    </div>
-                                </div>
-                            </div>
-
-                            <!-- Modal Content -->
-                            <div style="padding: 30px;">
-                                <div style="display: grid; grid-template-columns: 1fr 1.5fr; gap: 30px;">
-                                    <!-- Left Column: Details -->
-                                    <div>
-                                        <h3 style="border-bottom: 2px solid #eee; padding-bottom: 10px; margin-top: 0;">📋 Personal Details</h3>
-                                        <div style="margin-bottom: 20px;">
-                                            <label style="display: block; color: #666; font-size: 12px; font-weight: 600; text-transform: uppercase;">Phone Number</label>
-                                            <p id="modal-cleaner-phone" style="font-size: 16px; margin: 5px 0 0; font-weight: 500;"></p>
-                                        </div>
-                                        <div style="margin-bottom: 20px;">
-                                            <label style="display: block; color: #666; font-size: 12px; font-weight: 600; text-transform: uppercase;">Email</label>
-                                            <p id="modal-cleaner-email" style="font-size: 16px; margin: 5px 0 0;"></p>
-                                        </div>
-                                        <div style="margin-bottom: 20px;">
-                                            <label style="display: block; color: #666; font-size: 12px; font-weight: 600; text-transform: uppercase;">Address</label>
-                                            <p id="modal-cleaner-address" style="font-size: 16px; margin: 5px 0 0; color: #444; line-height: 1.5;"></p>
-                                        </div>
-                                        <div>
-                                            <label style="display: block; color: #666; font-size: 12px; font-weight: 600; text-transform: uppercase;">Aadhaar Number</label>
-                                            <p id="modal-cleaner-aadhaar" style="font-size: 16px; margin: 5px 0 0; letter-spacing: 1px;"></p>
-                                        </div>
-                                    </div>
-
-                                    <!-- Right Column: Documents -->
-                                    <div>
-                                        <h3 style="border-bottom: 2px solid #eee; padding-bottom: 10px; margin-top: 0;">🆔 Documents</h3>
-                                        <div style="background: #f8f9fa; padding: 20px; border-radius: 8px; text-align: center;">
-                                            <p style="margin: 0 0 10px; font-weight: 600; color: #555;">Aadhaar Card Preview</p>
-                                            <img id="modal-cleaner-aadhaar-img" src="" alt="Aadhaar Card" style="max-width: 100%; border-radius: 4px; box-shadow: 0 2px 8px rgba(0,0,0,0.1); cursor: pointer;" onclick="window.open(this.src, '_blank')">
-                                            <p style="margin-top: 10px; font-size: 12px; color: #888;">Click image to view full size</p>
-                                        </div>
-                                    </div>
-                                </div>
-
-                                <!-- Action Buttons -->
-                                <div style="margin-top: 30px; pt: 20px; border-top: 1px solid #eee; display: flex; justify-content: flex-end; gap: 15px;">
-                                    <button id="edit-cleaner-btn" class="btn btn-primary" style="background: #f0ad4e; border-color: #eea236;">✏️ Edit Profile</button>
-                                    <button class="btn btn-secondary" onclick="document.getElementById('cleaner-detail-modal').style.display='none'">Close</button>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                    <!-- Activity Feed Widget -->
+                    <?php 
+                    // Use Shared Cleaner Component
+                    if (class_exists('KSC_Cleaner_Component')) {
+                        KSC_Cleaner_Component::render_cleaner_section($user_roles, 'area_manager'); 
+                    } else {
+                        echo '<p>Error: Cleaner component not loaded.</p>';
+                    }
+                    ?>
                 </section>
 
                 <!-- Cleaning Services Section -->
@@ -752,11 +643,12 @@ function sp_area_manager_dashboard_shortcode() {
                                         <th>Visits</th>
                                         <th>Next Visit</th>
                                         <th>Status</th>
+                                        <th>Payment Option</th>
                                         <th>Actions</th>
                                     </tr>
                                 </thead>
                                 <tbody id="cleaning-services-tbody">
-                                    <tr><td colspan="7">Loading cleaning services...</td></tr>
+                                    <tr><td colspan="8">Loading cleaning services...</td></tr>
                                 </tbody>
                             </table>
                         </div>
@@ -1195,13 +1087,68 @@ function sp_area_manager_dashboard_shortcode() {
     </div>
 
     <!-- Service Detail Modal -->
-    <div id="service-detail-modal" class="modal" style="display:none;">
-        <div class="modal-content" style="max-width: 700px;">
-            <span class="close-modal">&times;</span>
-            <h3>🧼 Cleaning Service Details</h3>
-            <div id="service-detail-content">
-                <p>Loading...</p>
+    <!-- Service Details Modal -->
+    <div id="am-service-details-modal" class="modal-overlay" style="display: none;">
+        <div class="modal-content" style="max-width: 800px; max-height: 90vh; overflow-y: auto;">
+            <span class="close-modal-btn" onclick="document.getElementById('am-service-details-modal').style.display='none'">&times;</span>
+            <h3 id="am-service-details-title">Service Details</h3>
+            
+            <div id="am-service-details-content" style="margin-top: 20px;">
+                <p style="text-align: center; color: #666;">Loading...</p>
             </div>
+        </div>
+    </div>
+
+    <!-- Assign Cleaner Modal -->
+    <div id="am-assign-cleaner-modal" class="modal-overlay" style="display: none;">
+        <div class="modal-content" style="max-width: 500px;">
+            <span class="close-modal-btn" onclick="document.getElementById('am-assign-cleaner-modal').style.display='none'">&times;</span>
+            <h3>👤 Assign Cleaner to Visit</h3>
+            
+            <form id="am-assign-cleaner-form" style="margin-top: 20px;">
+                <input type="hidden" id="am_assign_visit_id">
+                <input type="hidden" id="am_assign_service_id">
+                
+                <div style="margin-bottom: 15px;">
+                    <label for="am_assign_cleaner_id" style="display: block; margin-bottom: 5px; font-weight: 600;">Select Cleaner:</label>
+                    <select id="am_assign_cleaner_id" required style="width: 100%; padding: 8px; border: 1px solid #d1d5db; border-radius: 4px;">
+                        <option value="">Loading cleaners...</option>
+                    </select>
+                </div>
+                
+                <div style="display: flex; gap: 10px; margin-top: 20px;">
+                    <button type="submit" class="btn btn-primary" style="flex: 1;">Assign Cleaner</button>
+                    <button type="button" class="btn btn-secondary" onclick="document.getElementById('am-assign-cleaner-modal').style.display='none'" style="flex: 1;">Cancel</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Reschedule Visit Modal -->
+    <div id="am-reschedule-visit-modal" class="modal-overlay" style="display: none;">
+        <div class="modal-content" style="max-width: 500px;">
+            <span class="close-modal-btn" onclick="document.getElementById('am-reschedule-visit-modal').style.display='none'">&times;</span>
+            <h3>📅 Reschedule Visit</h3>
+            
+            <form id="am-reschedule-visit-form" style="margin-top: 20px;">
+                <input type="hidden" id="am_reschedule_visit_id">
+                <input type="hidden" id="am_reschedule_service_id">
+                
+                <div style="margin-bottom: 15px;">
+                    <label for="am_reschedule_date" style="display: block; margin-bottom: 5px; font-weight: 600;">New Date:</label>
+                    <input type="date" id="am_reschedule_date" required style="width: 100%; padding: 8px; border: 1px solid #d1d5db; border-radius: 4px;">
+                </div>
+                
+                <div style="margin-bottom: 15px;">
+                    <label for="am_reschedule_time" style="display: block; margin-bottom: 5px; font-weight: 600;">New Time:</label>
+                    <input type="time" id="am_reschedule_time" required style="width: 100%; padding: 8px; border: 1px solid #d1d5db; border-radius: 4px;">
+                </div>
+                
+                <div style="display: flex; gap: 10px; margin-top: 20px;">
+                    <button type="submit" class="btn btn-primary" style="flex: 1;">Reschedule</button>
+                    <button type="button" class="btn btn-secondary" onclick="document.getElementById('am-reschedule-visit-modal').style.display='none'" style="flex: 1;">Cancel</button>
+                </div>
+            </form>
         </div>
     </div>
 

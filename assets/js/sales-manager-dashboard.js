@@ -36,11 +36,25 @@
 
     // Initialize when document is ready
     $(document).ready(function () {
-        initNavigation();
-        initMobileNav();
+        // Initialize Lead Component early to set config
+        initLeadComponent();
+
         initNotifications();
         loadDashboardStats();
         loadTodayFollowups();
+    });
+
+    // --- Tab Data Loading Triggers ---
+    $(document).on('click', '.nav-item[data-section="cleaning-services"]', function () {
+        loadSMCleaningServices();
+    });
+
+    $(document).on('click', '.nav-item[data-section="conversions"]', function () {
+        loadConversions();
+    });
+
+    $(document).on('click', '.nav-item[data-section="my-leads"]', function () {
+        initLeadComponent();
     });
 
     // --- Notification System ---

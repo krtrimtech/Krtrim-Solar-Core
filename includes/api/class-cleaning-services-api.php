@@ -33,6 +33,11 @@ class KSC_Cleaning_Services_API {
         
         // Cleaner schedule for assignment preview
         add_action('wp_ajax_get_cleaner_schedule', [$this, 'get_cleaner_schedule']);
+        
+        // Area Manager specific actions
+        add_action('wp_ajax_get_am_cleaners', [$this, 'get_am_cleaners']);
+        add_action('wp_ajax_assign_cleaner_to_visit', [$this, 'assign_cleaner_to_visit']);
+        add_action('wp_ajax_reschedule_cleaning_visit', [$this, 'reschedule_cleaning_visit']);
     }
 
     /**
@@ -67,8 +72,8 @@ class KSC_Cleaning_Services_API {
             'post_status' => 'publish',
         ];
 
-        // Admin sees all, AM sees their area, SM sees services they created
-        if (!in_array('administrator', (array) $user->roles)) {
+        // Admin and Manager sees all, AM sees their area, SM sees services they created
+        if (!in_array('administrator', (array) $user->roles) && !in_array('manager', (array) $user->roles)) {
             if (in_array('sales_manager', (array) $user->roles)) {
                 // SM sees only services created from their leads
                 $args['meta_query'][] = [
@@ -235,7 +240,10 @@ class KSC_Cleaning_Services_API {
                 'visits_total' => get_post_meta($service_id, '_visits_total', true),
                 'visits_used' => get_post_meta($service_id, '_visits_used', true),
                 'payment_status' => get_post_meta($service_id, '_payment_status', true),
+                'payment_mode' => get_post_meta($service_id, '_payment_mode', true),
+                'transaction_id' => get_post_meta($service_id, '_transaction_id', true),
                 'total_amount' => get_post_meta($service_id, '_total_amount', true),
+                'preferred_date' => get_post_meta($service_id, '_preferred_date', true),
             ],
             'visits' => $visit_data,
         ]);
@@ -692,6 +700,129 @@ class KSC_Cleaning_Services_API {
             'date_visits' => $date_visits,
             'upcoming_visits' => $upcoming_visits
         ]);
+    }
+
+    /**
+     * Get cleaners for Area Manager
+     */
+    public function get_am_cleaners() {
+        $user = $this->verify_am_access();
+        
+        $args = [
+            'role' => 'solar_cleaner',
+            'orderby' => 'display_name',
+            'order' => 'ASC',
+        ];
+
+        // If user is Area Manager, only get cleaners in their area
+        if (in_array('area_manager', (array) $user->roles)) {
+            $area = get_user_meta($user->ID, 'assigned_area', true);
+            if ($area) {
+                $args['meta_key'] = 'assigned_area';
+                $args['meta_value'] = $area;
+            }
+        }
+
+        $cleaners = get_users($args);
+        $cleaner_data = [];
+
+        foreach ($cleaners as $cleaner) {
+            $cleaner_data[] = [
+                'id' => $cleaner->ID,
+                'name' => $cleaner->display_name,
+                'phone' => get_user_meta($cleaner->ID, 'phone_number', true) ?: 'N/A',
+            ];
+        }
+
+        wp_send_json_success($cleaner_data);
+    }
+
+    /**
+     * Assign cleaner to a visit
+     */
+    public function assign_cleaner_to_visit() {
+        $user = $this->verify_am_access();
+        
+        $visit_id = intval($_POST['visit_id'] ?? 0);
+        $service_id = intval($_POST['service_id'] ?? 0);
+        $cleaner_id = intval($_POST['cleaner_id'] ?? 0);
+        
+        if (!$visit_id || !$service_id || !$cleaner_id) {
+            wp_send_json_error(['message' => 'Missing required fields']);
+        }
+        
+        // Verify service belongs to AM's area if applicable
+        if (in_array('area_manager', (array) $user->roles)) {
+            $assigned_am = get_post_meta($service_id, '_assigned_area_manager', true);
+            if ($assigned_am != $user->ID) {
+                wp_send_json_error(['message' => 'Access denied. Service not in your area.']);
+            }
+        }
+        
+        // Verify visit belongs to service
+        $visit_service_id = get_post_meta($visit_id, '_service_id', true);
+        if ($visit_service_id != $service_id) {
+            wp_send_json_error(['message' => 'Invalid visit for this service']);
+        }
+        
+        // Verify visit is scheduled
+        $status = get_post_meta($visit_id, '_status', true);
+        if ($status !== 'scheduled') {
+            wp_send_json_error(['message' => 'Can only assign cleaners to scheduled visits']);
+        }
+        
+        // Update visit with cleaner
+        update_post_meta($visit_id, '_cleaner_id', $cleaner_id);
+        
+        // Send notification to cleaner (optional implementation)
+        // $this->notify_cleaner_assignment($cleaner_id, $visit_id);
+        
+        wp_send_json_success(['message' => 'Cleaner assigned successfully']);
+    }
+
+    /**
+     * Reschedule a cleaning visit
+     */
+    public function reschedule_cleaning_visit() {
+        $user = $this->verify_am_access();
+        
+        $visit_id = intval($_POST['visit_id'] ?? 0);
+        $service_id = intval($_POST['service_id'] ?? 0);
+        $new_date = sanitize_text_field($_POST['new_date'] ?? '');
+        $new_time = sanitize_text_field($_POST['new_time'] ?? '');
+        
+        if (!$visit_id || !$service_id || !$new_date || !$new_time) {
+            wp_send_json_error(['message' => 'Missing required fields']);
+        }
+        
+        // Verify service belongs to AM's area if applicable
+        if (in_array('area_manager', (array) $user->roles)) {
+            $assigned_am = get_post_meta($service_id, '_assigned_area_manager', true);
+            if ($assigned_am != $user->ID) {
+                wp_send_json_error(['message' => 'Access denied. Service not in your area.']);
+            }
+        }
+        
+        // Verify visit belongs to service
+        $visit_service_id = get_post_meta($visit_id, '_service_id', true);
+        if ($visit_service_id != $service_id) {
+            wp_send_json_error(['message' => 'Invalid visit for this service']);
+        }
+        
+        // Verify visit is scheduled
+        $status = get_post_meta($visit_id, '_status', true);
+        if ($status !== 'scheduled') {
+            wp_send_json_error(['message' => 'Can only reschedule upcoming visits']);
+        }
+        
+        // Update visit schedule
+        update_post_meta($visit_id, '_scheduled_date', $new_date);
+        update_post_meta($visit_id, '_scheduled_time', $new_time);
+        
+        // Also update the next visit date on the service post if this is the next visit
+        // Simplified approach: generic next visit update logic would be better but for now let's rely on get_next_visit
+        
+        wp_send_json_success(['message' => 'Visit rescheduled successfully']);
     }
 }
 

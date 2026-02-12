@@ -11,6 +11,8 @@ if ( ! defined( 'ABSPATH' ) ) {
 
 function sp_manager_dashboard_shortcode() {
     // Security check
+    require_once plugin_dir_path(__FILE__) . '../../includes/components/class-cleaner-component.php';
+
     if ( ! is_user_logged_in() ) {
         wp_safe_redirect( wp_login_url( get_permalink() ) );
         exit;
@@ -573,85 +575,16 @@ function sp_manager_dashboard_shortcode() {
                 </div>
 
                 <!-- Manage Cleaners Section -->
+                <!-- Manage Cleaners Section -->
                 <section id="manage-cleaners-section" class="section-content" style="display:none;">
-                    <div class="section-header">
-                        <h2 class="section-title">Manage Cleaners</h2>
-                    </div>
-                    
-                    <!-- Add Cleaner Form -->
-                    <div class="card modern-form">
-                        <h3>🧹 Add New Cleaner</h3>
-                        <form id="create-cleaner-form" enctype="multipart/form-data">
-                            <?php wp_nonce_field('ksc_cleaner_nonce', 'cleaner_nonce'); ?>
-                            <div class="form-row">
-                                <div class="form-group">
-                                    <label for="cleaner_name">Full Name *</label>
-                                    <input type="text" id="cleaner_name" name="cleaner_name" required>
-                                </div>
-                                <div class="form-group">
-                                    <label for="cleaner_phone">Phone Number *</label>
-                                    <input type="text" id="cleaner_phone" name="cleaner_phone" required>
-                                </div>
-                            </div>
-                            <div class="form-row">
-                                <div class="form-group">
-                                    <label for="cleaner_email">Email</label>
-                                    <input type="email" id="cleaner_email" name="cleaner_email">
-                                </div>
-                                <div class="form-group">
-                                    <label for="cleaner_aadhaar">Aadhaar Number *</label>
-                                    <input type="text" id="cleaner_aadhaar" name="cleaner_aadhaar" maxlength="12" pattern="[0-9]{12}" required placeholder="12-digit Aadhaar">
-                                </div>
-                            </div>
-                            <div class="form-row">
-                                <div class="form-group">
-                                    <label for="cleaner_photo">Photo *</label>
-                                    <input type="file" id="cleaner_photo" name="cleaner_photo" accept="image/*" required>
-                                    <p class="description">Passport size photo for customer identification</p>
-                                </div>
-                                <div class="form-group">
-                                    <label for="cleaner_aadhaar_image">Aadhaar Card Image *</label>
-                                    <input type="file" id="cleaner_aadhaar_image" name="cleaner_aadhaar_image" accept="image/*" required>
-                                    <p class="description">Upload front side of Aadhaar card</p>
-                                </div>
-                            </div>
-                            <div class="form-group">
-                                <label for="cleaner_address">Address</label>
-                                <textarea id="cleaner_address" name="cleaner_address" rows="2"></textarea>
-                            </div>
-                            
-                            <div class="form-group">
-                                <label for="assigned_area_manager">Assign to Area Manager <span style="color:#666; font-weight:normal;">(Optional - for Team Overview)</span></label>
-                                <select id="assigned_area_manager" name="assigned_area_manager" style="width:100%; padding:10px; border:1px solid #ddd; border-radius:4px;">
-                                    <option value="">-- Select Area Manager --</option>
-                                    <?php
-                                    $all_ams = get_users([
-                                        'role' => 'area_manager',
-                                        'orderby' => 'display_name',
-                                        'order' => 'ASC',
-                                    ]);
-                                    foreach ($all_ams as $am_user) {
-                                        $am_city = get_user_meta($am_user->ID, 'city', true);
-                                        $am_state = get_user_meta($am_user->ID, 'state', true);
-                                        $loc = $am_city ? " ($am_city, $am_state)" : "";
-                                        echo '<option value="' . esc_attr($am_user->ID) . '">' . esc_html($am_user->display_name . $loc) . '</option>';
-                                    }
-                                    ?>
-                                </select>
-                                <p class="description">If selected, this cleaner will appear in this Area Manager's team.</p>
-                            </div>
-                            <button type="submit" class="btn btn-primary">➕ Create Cleaner Account</button>
-                            <div id="create-cleaner-feedback" style="margin-top:15px;"></div>
-                        </form>
-                    </div>
-
-                    <!-- Cleaners List -->
-                    <div class="card" style="margin-top: 20px;">
-                        <h3>Your Cleaners</h3>
-                        <div id="cleaners-list-container">
-                            <p>Loading cleaners...</p>
-                        </div>
-                    </div>
+                    <?php 
+                    // Use Shared Cleaner Component
+                    if (class_exists('KSC_Cleaner_Component')) {
+                        KSC_Cleaner_Component::render_cleaner_section($user_roles, 'manager'); 
+                    } else {
+                        echo '<p>Error: Cleaner component not loaded.</p>';
+                    }
+                    ?>
                 </section>
 
                 <!-- Cleaning Services Section -->
@@ -679,16 +612,17 @@ function sp_manager_dashboard_shortcode() {
                                 <thead>
                                     <tr>
                                         <th>Customer</th>
-                                        <th>Phone</th>
                                         <th>Plan</th>
                                         <th>Visits</th>
                                         <th>Next Visit</th>
-                                        <th>Status</th>
+                                        <th>Assigned Cleaner</th>
+                                        <th>Payment Option</th>
+                                        <th>Payment Status</th>
                                         <th>Actions</th>
                                     </tr>
                                 </thead>
                                 <tbody id="cleaning-services-tbody">
-                                    <tr><td colspan="7">Loading cleaning services...</td></tr>
+                                    <tr><td colspan="8">Loading cleaning services...</td></tr>
                                 </tbody>
                             </table>
                         </div>
@@ -1030,6 +964,18 @@ function sp_manager_dashboard_shortcode() {
             </div>
             <div class="modal-body" id="member-detail-content">
                 <p style="text-align: center; padding: 40px; color: #666;">Loading member details...</p>
+            </div>
+        </div>
+    </div>
+
+    <!-- Service Details Modal -->
+    <div id="service-details-modal" class="modal" style="display:none;">
+        <div class="modal-content" style="max-width: 700px; max-height: 90vh; overflow-y: auto;">
+            <span class="close-modal" onclick="document.getElementById('service-details-modal').style.display='none'">&times;</span>
+            <h3 id="service-details-title">Service Details</h3>
+            
+            <div id="service-details-content" style="margin-top: 20px;">
+                <p style="text-align: center; color: #666;">Loading...</p>
             </div>
         </div>
     </div>

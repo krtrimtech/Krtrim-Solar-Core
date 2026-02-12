@@ -781,6 +781,8 @@ function sp_render_leaderboard_view() {
                             <th>Payment</th>
                             <th>Area Manager</th>
                             <th>Next Visit</th>
+                            <th>Assigned Cleaner</th>
+                            <th>Payment Option</th>
                             <th>Actions</th>
                         </tr>
                     </thead>
@@ -859,20 +861,53 @@ function sp_render_leaderboard_view() {
                                         <?php endif; ?>
                                     </td>
                                     <td>
+                                        <?php 
+                                        // Get assigned cleaner from next visit
+                                        if (!empty($next_visit)) {
+                                            $cleaner_id = get_post_meta($next_visit[0]->ID, '_cleaner_id', true);
+                                            if ($cleaner_id) {
+                                                $cleaner = get_userdata($cleaner_id);
+                                                if ($cleaner) {
+                                                    echo '<span style="color: #059669;">👤 ' . esc_html($cleaner->display_name) . '</span>';
+                                                } else {
+                                                    echo '<span style="color: #9ca3af;">Unknown</span>';
+                                                }
+                                            } else {
+                                                echo '<span style="color: #9ca3af;">—</span>';
+                                            }
+                                        } else {
+                                            echo '<span style="color: #9ca3af;">—</span>';
+                                        }
+                                        ?>
+                                    </td>
+                                    <td>
+                                        <?php 
+                                        $payment_option = get_post_meta($sid, '_payment_option', true);
+                                        $payment_option_labels = [
+                                            'online' => '💳 Pay Online',
+                                            'pay_after' => '💵 Pay After Service'
+                                        ];
+                                        echo $payment_option ? ($payment_option_labels[$payment_option] ?? esc_html($payment_option)) : '<span style="color: #9ca3af;">—</span>';
+                                        ?>
+                                    </td>
+                                    <td>
                                         <?php if ($visits_used < $visits_total) : ?>
                                         <button class="button button-primary button-small admin-schedule-btn" 
                                                 data-id="<?php echo $sid; ?>" 
                                                 data-name="<?php echo esc_attr($customer_name); ?>"
-                                                onclick="event.stopPropagation();">+ Schedule</button>
+                                                data-preferred-date="<?php echo esc_attr($preferred_date); ?>">+ Schedule</button>
                                         <?php else : ?>
                                         <span style="color: #9ca3af;">—</span>
                                         <?php endif; ?>
+                                        <button class="button button-small admin-view-service-details-btn" 
+                                                data-id="<?php echo $sid; ?>" 
+                                                style="background: #6366f1; color: white; border-color: #6366f1; margin-left: 5px;">📋 Details</button>
                                     </td>
                                 </tr>
                                 <?php
                             }
                         } else {
-                            echo '<tr><td colspan="8">No cleaning services found.</td></tr>';
+                            echo '<tr><td colspan="10">No cleaning services found.</td></tr>';
                         }
                         ?>
                     </tbody>
@@ -1536,101 +1571,7 @@ function sp_render_leaderboard_view() {
                 }
             });
             
-            // --- Admin Schedule Visit Handlers ---
-            let adminCleanersList = [];
-            
-            // Load all cleaners for admin
-            function loadAdminCleaners() {
-                jQuery.ajax({
-                    url: ajaxurl,
-                    type: 'POST',
-                    data: { action: 'get_cleaners' },
-                    success: function(response) {
-                        if (response.success) {
-                            adminCleanersList = response.data;
-                        }
-                    }
-                });
-            }
-            
-            // Load cleaners on page load if on cleaning services tab
-            if (window.location.search.includes('cleaning_services')) {
-                loadAdminCleaners();
-            }
-            
-            // Open admin schedule modal
-            $(document).on('click', '.admin-schedule-btn', function(e) {
-                e.preventDefault();
-                const serviceId = $(this).data('id');
-                const customerName = $(this).data('name');
-                
-                $('#admin_schedule_service_id').val(serviceId);
-                $('#admin_schedule_customer_name').text(customerName);
-                
-                // Set min date to today
-                const today = new Date().toISOString().split('T')[0];
-                $('#admin_schedule_date').attr('min', today).val(today);
-                
-                // Populate cleaners dropdown
-                const select = $('#admin_schedule_cleaner_id');
-                select.empty().append('<option value="">Select Cleaner</option>');
-                adminCleanersList.forEach(cleaner => {
-                    select.append(`<option value="${cleaner.id}">${cleaner.name} (📞 ${cleaner.phone})</option>`);
-                });
-                
-                $('#admin-schedule-feedback').html('');
-                $('#admin-schedule-modal').css('display', 'flex');
-            });
-            
-            // Submit admin schedule form
-            $('#admin-schedule-form').on('submit', function(e) {
-                e.preventDefault();
-                
-                const form = $(this);
-                const feedback = $('#admin-schedule-feedback');
-                const submitBtn = form.find('button[type="submit"]');
-                
-                const serviceId = $('#admin_schedule_service_id').val();
-                const cleanerId = $('#admin_schedule_cleaner_id').val();
-                const scheduledDate = $('#admin_schedule_date').val();
-                const scheduledTime = $('#admin_schedule_time').val();
-                
-                if (!cleanerId) {
-                    feedback.html('<div style="background:#f8d7da;color:#721c24;padding:10px;border-radius:6px;">Please select a cleaner</div>');
-                    return;
-                }
-                
-                submitBtn.prop('disabled', true).text('Scheduling...');
-                feedback.html('');
-                
-                $.ajax({
-                    url: ajaxurl,
-                    type: 'POST',
-                    data: {
-                        action: 'schedule_cleaning_visit',
-                        service_id: serviceId,
-                        cleaner_id: cleanerId,
-                        scheduled_date: scheduledDate,
-                        scheduled_time: scheduledTime
-                    },
-                    success: function(response) {
-                        if (response.success) {
-                            feedback.html('<div style="background:#d4edda;color:#155724;padding:10px;border-radius:6px;">✅ ' + response.data.message + '</div>');
-                            setTimeout(function() {
-                                location.reload();
-                            }, 1500);
-                        } else {
-                            feedback.html('<div style="background:#f8d7da;color:#721c24;padding:10px;border-radius:6px;">❌ ' + response.data.message + '</div>');
-                        }
-                    },
-                    error: function() {
-                        feedback.html('<div style="background:#f8d7da;color:#721c24;padding:10px;border-radius:6px;">❌ Error scheduling visit</div>');
-                    },
-                    complete: function() {
-                        submitBtn.prop('disabled', false).text('+ Schedule Visit');
-                    }
-                });
-            });
+            // Schedule button handler is in admin.js
         });
     </script>
     <style>
@@ -2228,6 +2169,17 @@ function sp_render_single_manager_view($manager_id) {
         </div>
     </div>
 
+    <!-- Service Details Modal -->
+    <div id="admin-service-details-modal" class="modal-overlay" style="display: none;">
+        <div class="modal-content" style="max-width: 700px; max-height: 90vh; overflow-y: auto;">
+            <span class="close-modal-btn" onclick="document.getElementById('admin-service-details-modal').style.display='none'">&times;</span>
+            <h3 id="admin-service-details-title">Service Details</h3>
+            
+            <div id="admin-service-details-content" style="margin-top: 20px;">
+                <p style="text-align: center; color: #666;">Loading...</p>
+            </div>
+        </div>
+    </div>
 
     
 <?php
