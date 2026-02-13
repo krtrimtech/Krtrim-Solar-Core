@@ -36,6 +36,7 @@ class SP_API_Handlers {
         require_once plugin_dir_path(__FILE__) . 'api/class-admin-manager-api.php';
         require_once plugin_dir_path(__FILE__) . 'api/class-public-api.php';
         require_once plugin_dir_path(__FILE__) . 'api/class-sales-manager-api.php';
+        require_once plugin_dir_path(__FILE__) . 'api/class-unified-lead-api.php';
         
         // Initialize API modules
         $this->vendor_api = new KSC_Vendor_API();

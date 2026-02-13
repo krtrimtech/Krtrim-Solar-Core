@@ -290,3 +290,571 @@ jQuery(document).ready(function ($) {
 
 });
 
+// --- Admin Cleaner Management Logic ---
+// Wrap in jQuery ready to ensure $ is available
+jQuery(function ($) {
+
+    // Open Cleaner Profile Modal
+    $(document).on('click', '.admin-view-cleaner-btn', function (e) {
+        e.preventDefault();
+        const cleanerId = $(this).data('id');
+        const modal = $('#admin-cleaner-profile-modal');
+
+        // Reset and Show Loading
+        modal.find('h2').text('Loading...');
+        modal.find('p, img').not('.close-modal-btn').css('opacity', 0.5);
+        modal.show();
+
+        // Fetch Data
+        $.ajax({
+            url: ajaxurl,
+            type: 'POST',
+            data: {
+                action: 'get_cleaners' // Admin gets all cleaners so this works if we filter or just find by ID in JS
+            },
+            success: function (response) {
+                if (response.success) {
+                    const cleaner = response.data.find(c => c.id == cleanerId);
+                    if (cleaner) {
+                        populateAdminCleanerModal(cleaner);
+                    } else {
+                        alert('Cleaner not found.');
+                        modal.hide();
+                    }
+                } else {
+                    alert('Error fetching cleaner details.');
+                    modal.hide();
+                }
+            },
+            error: function () {
+                alert('Connection error.');
+                modal.hide();
+            }
+        });
+    });
+
+    function populateAdminCleanerModal(cleaner) {
+        const modal = $('#admin-cleaner-profile-modal');
+
+        modal.find('#admin-cleaner-name').text(cleaner.name);
+        modal.find('#admin-cleaner-meta').text('Solar Cleaner • Joined ' + new Date(cleaner.created_at).toLocaleDateString());
+        modal.find('#admin-cleaner-phone').text(cleaner.phone);
+        modal.find('#admin-cleaner-email').text(cleaner.email || 'N/A');
+        modal.find('#admin-cleaner-address').text(cleaner.address || 'N/A');
+        modal.find('#admin-cleaner-aadhaar').text(cleaner.aadhaar || 'N/A');
+
+        // Images
+        const photoUrl = cleaner.photo_url || 'https://via.placeholder.com/150?text=No+Photo';
+        modal.find('#admin-cleaner-photo').attr('src', photoUrl).css('opacity', 1);
+
+        if (cleaner.aadhaar_image_url) {
+            modal.find('#admin-cleaner-aadhaar-img').attr('src', cleaner.aadhaar_image_url).show().css('opacity', 1);
+            modal.find('#admin-cleaner-aadhaar-img').next().show();
+        } else {
+            modal.find('#admin-cleaner-aadhaar-img').hide();
+            modal.find('#admin-cleaner-aadhaar-img').next().hide();
+        }
+
+        // Bind Actions
+        modal.find('#admin-edit-cleaner-btn').data('id', cleaner.id).off('click').on('click', function () {
+            // Future: Implement inline edit or redirect to user-edit.php
+            window.location.href = 'user-edit.php?user_id=' + cleaner.id;
+        });
+
+        modal.find('#admin-delete-cleaner-btn').data('id', cleaner.id).off('click').on('click', function () {
+            if (confirm('Are you sure you want to permanently delete this cleaner account? This action cannot be undone.')) {
+                deleteCleanerAsAdmin(cleaner.id);
+            }
+        });
+    }
+
+    function deleteCleanerAsAdmin(cleanerId) {
+        $.ajax({
+            url: ajaxurl,
+            type: 'POST',
+            data: {
+                action: 'delete_cleaner',
+                cleaner_id: cleanerId,
+                // nonce should be added if stricter security is needed, using generic admin nonce or specific one
+            },
+            success: function (response) {
+                if (response.success) {
+                    alert('Cleaner deleted successfully.');
+                    $('#admin-cleaner-profile-modal').hide();
+                    location.reload();
+                } else {
+                    alert('Error: ' + response.data.message);
+                }
+            }
+        });
+    }
+
+
+
+
+    // --- Admin Schedule Visit Logic ---
+    console.log('🔧 [Admin.js] Attempting to bind Schedule button handler...');
+    try {
+        $(document).on('click', '.admin-schedule-btn', function (e) {
+            console.log('🎯 [Admin.js] Schedule button clicked!');
+            e.preventDefault();
+            e.stopPropagation();
+
+            const btn = $(this);
+            const serviceId = btn.data('id');
+            const customerName = btn.data('name');
+            const preferredDate = btn.data('preferred-date');
+
+            $('#admin_schedule_service_id').val(serviceId);
+            $('#admin_schedule_customer_name').text(customerName);
+
+            // Auto-fill preferred date if available, otherwise use today
+            const dateInput = $('#admin_schedule_date');
+            const today = new Date().toISOString().split('T')[0];
+            dateInput.attr('min', today);
+
+            if (preferredDate && preferredDate !== '') {
+                // Use client's preferred date
+                dateInput.val(preferredDate);
+            } else {
+                // Default to today
+                dateInput.val(today);
+            }
+
+            // Clear previous cleaners
+            const cleanerSelect = $('#admin_schedule_cleaner_id');
+            cleanerSelect.html('<option value="">Loading cleaners...</option>');
+
+            $('#admin-schedule-modal').fadeIn(200).css('display', 'flex');
+
+            // Fetch cleaners
+            $.post(ajaxurl, { action: 'get_cleaners' }, function (response) {
+                if (response.success) {
+                    cleanerSelect.empty();
+                    cleanerSelect.append('<option value="">Select Cleaner</option>');
+                    response.data.forEach(cleaner => {
+                        // Determine if cleaner has phone to show
+                        const label = cleaner.name + (cleaner.phone ? ` (${cleaner.phone})` : '');
+                        cleanerSelect.append(`<option value="${cleaner.id}">${label}</option>`);
+                    });
+                } else {
+                    cleanerSelect.html('<option value="">Error loading cleaners</option>');
+                }
+            });
+        });
+        console.log('✅ [Admin.js] Schedule button handler bound successfully');
+    } catch (error) {
+        console.error('❌ [Admin.js] Error binding Schedule button handler:', error);
+    }
+
+    // Handle Schedule Form Submit
+    $('#admin-schedule-form').on('submit', function (e) {
+        e.preventDefault();
+        const btn = $(this).find('button[type="submit"]');
+        const feedback = $('#admin-schedule-feedback');
+
+        btn.prop('disabled', true).text('Scheduling...');
+        feedback.html('');
+
+        const data = {
+            action: 'schedule_cleaning_visit',
+            service_id: $('#admin_schedule_service_id').val(),
+            cleaner_id: $('#admin_schedule_cleaner_id').val(),
+            scheduled_date: $('#admin_schedule_date').val(),
+            scheduled_time: $('#admin_schedule_time').val()
+        };
+
+        $.post(ajaxurl, data, function (response) {
+            if (response.success) {
+                feedback.html('<span style="color: green;">Visit scheduled successfully!</span>');
+                setTimeout(() => {
+                    location.reload();
+                }, 1000);
+            } else {
+                feedback.html('<span style="color: red;">Error: ' + (response.data.message || 'Unknown error') + '</span>');
+                btn.prop('disabled', false).text('+ Schedule Visit');
+            }
+        }).fail(function () {
+            feedback.html('<span style="color: red;">Server connection failed.</span>');
+            btn.prop('disabled', false).text('+ Schedule Visit');
+        });
+    });
+
+    // Admin View Service Details Button Handler
+    $(document).on('click', '.admin-view-service-details-btn', function (e) {
+        e.preventDefault();
+        e.stopPropagation();
+
+        const serviceId = $(this).data('id');
+        displayAdminServiceDetails(serviceId);
+    });
+
+    // Function to display service details in admin
+    function displayAdminServiceDetails(serviceId) {
+        const modal = $('#admin-service-details-modal');
+        const content = $('#admin-service-details-content');
+
+        // Fix: Use flex to center the modal instead of default block from .show()
+        modal.css('display', 'flex').fadeIn(200);
+        content.html('<p style="text-align: center; color: #666;">Loading service details...</p>');
+
+        jQuery.ajax({
+            url: ajaxurl,
+            type: 'POST',
+            data: {
+                action: 'get_cleaning_service_details',
+                service_id: serviceId
+            },
+            success: function (response) {
+                if (response.success) {
+                    const service = response.data.service;
+                    const visits = response.data.visits;
+
+                    const planLabels = {
+                        'one_time': 'One-Time',
+                        'monthly': 'Monthly',
+                        '6_month': '6-Month',
+                        'yearly': 'Yearly'
+                    };
+
+                    const paymentModeLabels = {
+                        'online': '💳 Online',
+                        'cash': '💵 Cash',
+                        'upi': '📱 UPI',
+                        'card': '💳 Card'
+                    };
+
+                    let html = `
+                        <div style="background: #f9fafb; padding: 20px; border-radius: 8px; margin-bottom: 20px;">
+                            <h4 style="margin: 0 0 15px 0; color: #1f2937;">👤 Customer Information</h4>
+                            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
+                                <div><strong>Name:</strong> ${service.customer_name}</div>
+                                <div><strong>Phone:</strong> ${service.customer_phone}</div>
+                                <div style="grid-column: 1 / -1;"><strong>Address:</strong> ${service.customer_address || 'N/A'}</div>
+                            </div>
+                        </div>
+                        
+                        <div style="background: #eff6ff; padding: 20px; border-radius: 8px; margin-bottom: 20px;">
+                            <h4 style="margin: 0 0 15px 0; color: #1e40af;">📋 Service Plan</h4>
+                            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
+                                <div><strong>Plan Type:</strong> ${planLabels[service.plan_type] || service.plan_type}</div>
+                                <div><strong>System Size:</strong> ${service.system_size_kw} kW</div>
+                                <div><strong>Total Visits:</strong> ${service.visits_total}</div>
+                                <div><strong>Visits Used:</strong> ${service.visits_used}</div>
+                                <div><strong>Remaining:</strong> ${service.visits_total - service.visits_used}</div>
+                                ${service.preferred_date ? `<div><strong>Preferred Date:</strong> ${service.preferred_date}</div>` : ''}
+                            </div>
+                        </div>
+                        
+                        <div style="background: #f0fdf4; padding: 20px; border-radius: 8px; margin-bottom: 20px;">
+                            <h4 style="margin: 0 0 15px 0; color: #166534;">💰 Payment Information</h4>
+                            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
+                                <div><strong>Total Amount:</strong> ₹${Number(service.total_amount || 0).toLocaleString()}</div>
+                                <div><strong>Payment Status:</strong> <span style="background: ${service.payment_status === 'paid' ? '#d1fae5' : '#fef3c7'}; color: ${service.payment_status === 'paid' ? '#047857' : '#b45309'}; padding: 3px 8px; border-radius: 4px;">${service.payment_status === 'paid' ? 'Paid' : 'Pending'}</span></div>
+                                <div><strong>Payment Mode:</strong> ${service.payment_mode ? paymentModeLabels[service.payment_mode] || service.payment_mode : 'N/A'}</div>
+                                ${service.transaction_id ? `<div><strong>Transaction ID:</strong> ${service.transaction_id}</div>` : ''}
+                            </div>
+                        </div>
+                        
+                        <div style="background: #fef3c7; padding: 20px; border-radius: 8px;">
+                            <h4 style="margin: 0 0 15px 0; color: #92400e;">📅 Visit History</h4>
+                    `;
+
+                    if (visits.length === 0) {
+                        html += '<p style="color: #666; text-align: center;">No visits scheduled yet.</p>';
+                    } else {
+                        html += '<div style="max-height: 300px; overflow-y: auto;">';
+                        visits.forEach((visit, index) => {
+                            const statusColors = {
+                                'scheduled': '#3b82f6',
+                                'in_progress': '#f59e0b',
+                                'completed': '#10b981',
+                                'cancelled': '#ef4444'
+                            };
+                            const statusIcons = {
+                                'scheduled': '📅',
+                                'in_progress': '⏳',
+                                'completed': '✅',
+                                'cancelled': '❌'
+                            };
+
+                            // Timeline Logic
+                            const vStatus = (visit.status || '').toLowerCase().trim();
+                            const isCompleted = vStatus === 'completed';
+                            const isStarted = vStatus === 'in_progress' || isCompleted;
+                            const timelineId = `visit-timeline-${visit.id}`;
+                            const cleanerPill = visit.cleaner_name ? `<span style="font-size:11px; background:#f3f4f6; padding:2px 6px; border-radius:4px; margin-left:5px;">👤 ${visit.cleaner_name}</span>` : '';
+
+                            html += `
+                            <div style="background: white; border-radius: 6px; margin-bottom: 10px; border-left: 4px solid ${statusColors[vStatus] || '#6b7280'}; box-shadow: 0 1px 2px rgba(0,0,0,0.05);">
+                                <div style="padding: 15px; display: flex; justify-content: space-between; align-items: center; cursor: pointer;" onclick="jQuery('#${timelineId}').slideToggle()">
+                                    <div>
+                                        <div style="font-weight: 600; color: #374151; display:flex; align-items:center;">
+                                            ${statusIcons[vStatus] || '📍'} Visit ${index + 1}
+                                            ${cleanerPill}
+                                        </div>
+                                        <div style="font-size: 12px; color: #6b7280; margin-top: 2px;">${visit.scheduled_date} • ${visit.scheduled_time || 'N/A'}</div>
+                                    </div>
+                                    <div style="display: flex; align-items: center; gap: 10px;">
+                                        <span style="background: ${statusColors[vStatus] || '#6b7280'}; color: white; padding: 2px 8px; border-radius: 4px; font-size: 11px; text-transform: uppercase;">${vStatus}</span>
+                                        <span style="color: #9ca3af; font-size: 12px;">▼</span>
+                                    </div>
+                                </div>
+                                
+                                <div id="${timelineId}" style="display: none; border-top: 1px solid #f3f4f6; padding: 15px; background: #f9fafb;">
+                                    <div style="position: relative; padding-left: 20px; border-left: 2px solid #e5e7eb; margin-left: 5px;">
+                                        <!-- Scheduled / Start Node -->
+                                        <div style="margin-bottom: 20px; position: relative;">
+                                            <div style="position: absolute; left: -26px; top: 0; background: ${isStarted ? '#10b981' : '#e5e7eb'}; width: 10px; height: 10px; border-radius: 50%; border: 2px solid white; box-shadow: 0 0 0 1px #d1d5db;"></div>
+                                            <div style="font-size: 13px; font-weight: 600; color: #374151;">Started / Check-in</div>
+                                            <div style="font-size: 12px; color: #6b7280;">
+                                                 ${visit.start_time ? `Time: ${visit.start_time}` : (isStarted ? 'Started (Time N/A)' : 'Not started yet')}
+                                            </div>
+                                            
+                                            ${visit.before_photo ? `
+                                            <div style="margin-top: 8px;">
+                                                <a href="${visit.before_photo}" target="_blank" style="display: inline-block;">
+                                                    <img src="${visit.before_photo}" style="width: 80px; height: 80px; object-fit: cover; border-radius: 4px; border: 1px solid #d1d5db;">
+                                                </a>
+                                                <div style="font-size: 10px; color: #6b7280; margin-top:2px;">Before Cleaning</div>
+                                            </div>` : ''}
+                                        </div>
+
+                                        <!-- Completion Node -->
+                                        <div style="position: relative;">
+                                            <div style="position: absolute; left: -26px; top: 0; background: ${isCompleted ? '#10b981' : '#e5e7eb'}; width: 10px; height: 10px; border-radius: 50%; border: 2px solid white; box-shadow: 0 0 0 1px #d1d5db;"></div>
+                                            <div style="font-size: 13px; font-weight: 600; color: #374151;">Completed</div>
+                                            ${visit.completed_at ? `<div style="font-size: 12px; color: #6b7280;">Time: ${visit.completed_at}</div>` : '<div style="font-size: 12px; color: #9ca3af;">Pending completion</div>'}
+                                            
+                                            ${visit.completion_notes ? `<div style="font-size: 12px; font-style: italic; color: #4b5563; margin-top:5px; background: white; padding: 8px; border-radius: 4px; border: 1px solid #e5e7eb;">"${visit.completion_notes}"</div>` : ''}
+
+                                            ${visit.completion_photo ? `
+                                            <div style="margin-top: 8px;">
+                                                <a href="${visit.completion_photo}" target="_blank" style="display: inline-block;">
+                                                    <img src="${visit.completion_photo}" style="width: 80px; height: 80px; object-fit: cover; border-radius: 4px; border: 1px solid #d1d5db;">
+                                                </a>
+                                                <div style="font-size: 10px; color: #6b7280; margin-top:2px;">After Cleaning</div>
+                                            </div>` : ''}
+                                        </div>
+                                    </div>
+
+                                    ${vStatus === 'scheduled' ? `
+                                    <div style="margin-top: 15px; padding-top: 15px; border-top: 1px dashed #e5e7eb; display: flex; gap: 10px; justify-content: flex-end;">
+                                         <button class="button button-small admin-btn-edit-visit" 
+                                            data-id="${visit.id}" 
+                                            data-service-id="${serviceId}" 
+                                            data-customer="${service.customer_name}"
+                                            data-cleaner-id="${visit.cleaner_id || ''}"
+                                            data-date="${visit.scheduled_date}" 
+                                            data-time="${visit.scheduled_time || ''}"
+                                            style="margin-right: 5px; background: #eab308; color: white; border:none; cursor:pointer;">✏️ Edit</button>
+                                        <button class="button button-small admin-btn-cancel-visit" 
+                                            data-id="${visit.id}" 
+                                            style="background: #ef4444; color: white; border:none; cursor:pointer;">✕ Cancel</button>
+                                    </div>` : ''}
+                                </div>
+                            </div>
+                            `;
+                        });
+                        html += '</div>';
+                    }
+
+                    html += '</div>';
+
+                    content.html(html);
+                    jQuery('#admin-service-details-title').text(`Service Details - ${service.customer_name}`);
+                } else {
+                    content.html('<p style="color: red; text-align: center;">Error loading service details.</p>');
+                }
+            },
+            error: function () {
+                content.html('<p style="color: red; text-align: center;">Error loading service details. Please try again.</p>');
+            }
+        });
+    }
+
+    // --- Admin Edit Visit Logic ---
+    $(document).on('click', '.admin-btn-edit-visit', function (e) {
+        e.preventDefault();
+        const btn = $(this);
+        const visitId = btn.data('id');
+        const serviceId = btn.data('service-id');
+        const customerName = btn.data('customer');
+        const cleanerId = btn.data('cleaner-id');
+        const date = btn.data('date');
+        const time = btn.data('time');
+
+        $('#admin_edit_visit_id').val(visitId);
+        $('#admin_edit_service_id').val(serviceId);
+        $('#admin_edit_customer_name').text(customerName);
+        $('#admin_edit_visit_date').val(date);
+        $('#admin_edit_visit_time').val(time);
+
+        // Populate cleaners
+        const select = $('#admin_edit_visit_cleaner');
+        select.html('<option value="">Loading...</option>');
+
+        $.post(ajaxurl, { action: 'get_cleaners' }, function (response) {
+            if (response.success) {
+                select.empty();
+                select.append('<option value="">Select Cleaner</option>');
+                select.append('<option value="0">Unassigned</option>');
+                response.data.forEach(c => {
+                    const selected = c.id == cleanerId ? 'selected' : '';
+                    select.append(`<option value="${c.id}" ${selected}>${c.name} (${c.phone || ''})</option>`);
+                });
+            } else {
+                select.html('<option value="">Error loading cleaners</option>');
+            }
+        });
+
+        $('#admin-edit-visit-modal').fadeIn(200).css('display', 'flex');
+    });
+
+    $('#admin-edit-visit-form').on('submit', function (e) {
+        e.preventDefault();
+        const form = $(this);
+        const btn = form.find('button[type="submit"]');
+        const serviceId = $('#admin_edit_service_id').val();
+
+        btn.prop('disabled', true).text('Updating...');
+
+        const formData = form.serialize() + '&action=update_cleaning_visit';
+
+        $.post(ajaxurl, formData, function (response) {
+            if (response.success) {
+                alert('Visit updated successfully!');
+                $('#admin-edit-visit-modal').hide();
+                displayAdminServiceDetails(serviceId); // Refresh details
+                // Optional: Refresh main table row if needed, but details modal is key
+            } else {
+                alert('Error: ' + response.data.message);
+            }
+            btn.prop('disabled', false).text('Update Visit');
+        }).fail(function () {
+            alert('Server error');
+            btn.prop('disabled', false).text('Update Visit');
+        });
+    });
+
+    // --- Admin Cancel Visit Logic ---
+    $(document).on('click', '.admin-btn-cancel-visit', function (e) {
+        e.preventDefault();
+        const visitId = $(this).data('id');
+        $('#admin_cancel_visit_id').val(visitId);
+        $('#admin_cancel_reason').val('');
+        $('#admin-cancel-visit-modal').fadeIn(200).css('display', 'flex');
+    });
+
+    $('#admin-cancel-visit-form').on('submit', function (e) {
+        e.preventDefault();
+        const form = $(this);
+        const btn = form.find('button[type="submit"]');
+        // We need service ID to refresh details, but it's not in this form directly.
+        // It's in the background details modal. We can get it from there if needed or reload page.
+        // Or store it in a global/hidden field when opening cancel modal.
+        // Let's assume we reload details if we can find the ID, or just reload page.
+        // Currently the Cancel modal is on top of Service Details modal.
+
+        btn.prop('disabled', true).text('Cancelling...');
+
+        const formData = form.serialize() + '&action=cancel_cleaning_visit';
+
+        $.post(ajaxurl, formData, function (response) {
+            if (response.success) {
+                alert('Visit cancelled successfully.');
+                $('#admin-cancel-visit-modal').hide();
+
+                // Try to find open service details ID to refresh
+                // We can't easily get it unless we stored it. 
+                // But the service details modal is still open behind.
+                // We can close everything or try to refresh.
+                // Simple approach: Close details modal too and reload page to reflect status in main table
+                $('#admin-service-details-modal').hide();
+                location.reload();
+            } else {
+                alert('Error: ' + response.data.message);
+                btn.prop('disabled', false).text('Confirm Cancellation');
+            }
+        }).fail(function () {
+            alert('Server error');
+            btn.prop('disabled', false).text('Confirm Cancellation');
+        });
+    });
+
+
+    // --- Admin View Cleaner Profile ---
+    // --- Admin View Cleaner Profile ---
+    console.log('Attaching cleaner profile handlers...'); // DEBUG
+    $(document).on('click', '.admin-view-cleaner-btn', function (e) {
+        e.preventDefault();
+        console.log('Cleaner Profile Button Clicked!'); // DEBUG
+        const cleanerId = $(this).data('id');
+        console.log('Cleaner ID:', cleanerId); // DEBUG
+
+        $.ajax({
+            url: ajaxurl,
+            type: 'POST',
+            data: { action: 'get_cleaners' },
+            success: function (response) {
+                console.log('API Response:', response); // DEBUG
+                if (response.success) {
+                    const cleaner = response.data.find(c => c.id == cleanerId);
+                    if (cleaner) {
+                        console.log('Cleaner Found:', cleaner); // DEBUG
+                        $('#admin-cleaner-name').text(cleaner.name);
+                        $('#admin-cleaner-phone').text(cleaner.phone);
+                        $('#admin-cleaner-email').text(cleaner.email);
+                        $('#admin-cleaner-address').text(cleaner.address);
+                        $('#admin-cleaner-aadhaar').text(cleaner.aadhaar);
+                        $('#admin-cleaner-created').text(cleaner.created_at);
+
+                        if (cleaner.photo_url) {
+                            $('#admin-cleaner-photo').attr('src', cleaner.photo_url);
+                        } else {
+                            // Fallback or keep existing src if it has a default
+                            // logic to set default if empty
+                            $('#admin-cleaner-photo').attr('src', '');
+                        }
+
+                        if (cleaner.aadhaar_image_url) {
+                            $('#admin-cleaner-aadhaar-img').attr('src', cleaner.aadhaar_image_url);
+                        } else {
+                            $('#admin-cleaner-aadhaar-img').attr('src', '');
+                        }
+
+                        console.log('Opening Modal...'); // DEBUG
+                        const modal = $('#admin-cleaner-profile-modal');
+                        console.log('Modal Element Count:', modal.length); // DEBUG
+
+                        if (modal.length > 0) {
+                            // Move to body to avoid z-index/overflow issues
+                            $('body').append(modal);
+                            modal.css('display', 'flex');
+                            $('#admin-edit-cleaner-btn').data('cleaner-id', cleanerId);
+                        } else {
+                            console.error('CRITICAL: Modal element #admin-cleaner-profile-modal NOT found in DOM!');
+                        }
+                    } else {
+                        console.error('Cleaner NOT found in list for ID:', cleanerId); // DEBUG
+                    }
+                } else {
+                    console.error('API Error:', response); // DEBUG
+                }
+            },
+            error: function (xhr, status, error) {
+                console.error('AJAX Failure:', status, error); // DEBUG
+            }
+        });
+    });
+
+    // --- Admin Edit Cleaner Redirect ---
+    $(document).on('click', '#admin-edit-cleaner-btn', function () {
+        const cleanerId = $(this).data('cleaner-id');
+        if (cleanerId) {
+            window.location.href = 'user-edit.php?user_id=' + cleanerId;
+        }
+    });
+
+}); // End jQuery ready wrapper
+

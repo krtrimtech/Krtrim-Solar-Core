@@ -1,6 +1,7 @@
 <?php
 /**
- * Shortcode and logic for the Area Manager frontend dashboard.
+ * Shortcode and logic for the Manager frontend dashboard.
+ * Manager has multi-state access and can assign areas to Area Managers.
  */
 
 // Exit if accessed directly.
@@ -8,7 +9,7 @@ if ( ! defined( 'ABSPATH' ) ) {
     exit;
 }
 
-function sp_area_manager_dashboard_shortcode() {
+function sp_manager_dashboard_shortcode() {
     // Security check
     require_once plugin_dir_path(__FILE__) . '../../includes/components/class-cleaner-component.php';
 
@@ -20,8 +21,13 @@ function sp_area_manager_dashboard_shortcode() {
     $current_user = wp_get_current_user();
     $user_roles   = $current_user->roles;
 
-    if ( ! in_array( 'area_manager', $user_roles, true ) && ! in_array( 'administrator', $user_roles, true ) && ! in_array( 'manager', $user_roles, true ) ) {
-        if ( in_array( 'solar_client', $user_roles, true ) || in_array( 'solar_vendor', $user_roles, true ) ) {
+    if ( ! in_array( 'manager', $user_roles, true ) && ! in_array( 'administrator', $user_roles, true ) ) {
+        // Redirect non-managers to appropriate dashboard
+        if ( in_array( 'area_manager', $user_roles, true ) ) {
+            $dashboard_url = get_permalink( get_page_by_path( 'area-manager-dashboard' ) );
+            wp_safe_redirect( $dashboard_url );
+            exit;
+        } elseif ( in_array( 'solar_client', $user_roles, true ) || in_array( 'solar_vendor', $user_roles, true ) ) {
             $dashboard_url = get_permalink( get_page_by_path( 'solar-dashboard' ) );
             wp_safe_redirect( $dashboard_url );
             exit;
@@ -71,7 +77,7 @@ function sp_area_manager_dashboard_shortcode() {
 
     ob_start();
     ?>
-    <div id="areaManagerDashboard" class="modern-solar-dashboard area-manager-dashboard">
+    <div id="managerDashboard" class="modern-solar-dashboard manager-dashboard">
         <!-- Sidebar -->
         <div class="dashboard-sidebar">
             <div class="sidebar-brand">
@@ -89,7 +95,6 @@ function sp_area_manager_dashboard_shortcode() {
                 <a href="javascript:void(0)" class="nav-item" data-section="projects"><span>🏗️</span> Projects</a>
                 <a href="javascript:void(0)" class="nav-item" data-section="create-project"><span>➕</span> Create Project</a>
                 <a href="javascript:void(0)" class="nav-item" data-section="project-reviews"><span>📝</span> Project Reviews</a>
-                <a href="javascript:void(0)" class="nav-item" data-section="marketplace"><span>🏪</span> Marketplace</a>
                 <a href="javascript:void(0)" class="nav-item" data-section="bid-management"><span>🔨</span> Bid Management</a>
 
                 <a href="javascript:void(0)" class="nav-item" data-section="leads"><span>🎯</span> Leads</a>
@@ -97,24 +102,20 @@ function sp_area_manager_dashboard_shortcode() {
                 
                 <a href="javascript:void(0)" class="nav-item" data-section="manage-cleaners"><span>🧹</span> Manage Cleaners</a>
                 <a href="javascript:void(0)" class="nav-item" data-section="cleaning-services"><span>🧼</span> Cleaning Services</a>
-                <a href="javascript:void(0)" class="nav-item" data-section="my-team"><span>👥</span> My Team</a>
                 
-                <?php if (in_array('manager', $user_roles, true) || in_array('administrator', $user_roles, true)) : ?>
-                <!-- Manager-Only Sections -->
+                <!-- Manager-Specific Sections -->
                 <div style="margin-top: 15px; border-top: 1px solid #e2e8f0; padding-top: 15px;">
                     <p style="font-size: 11px; text-transform: uppercase; color: #94a3b8; margin-bottom: 10px; padding: 0 20px; font-weight: 600;">Manager Tools</p>
                 </div>
-                <a href="javascript:void(0)" class="nav-item" data-section="team-analysis"><span>📊</span> Team Analysis</a>
+                <a href="javascript:void(0)" class="nav-item" data-section="team-analysis"><span>👥</span> Team Overview</a>
                 <a href="javascript:void(0)" class="nav-item" data-section="am-assignment"><span>🗺️</span> AM Assignment</a>
-                <?php endif; ?>
             </nav>
             <div class="sidebar-profile">
                 <div class="profile-info">
                     <h4><?php echo esc_html($user->display_name); ?></h4>
-                    <p><?php echo in_array('manager', $user_roles, true) ? 'Manager' : 'Area Manager'; ?></p>
+                    <p>Manager</p>
                 </div>
-                <?php if (in_array('manager', $user_roles, true)) : ?>
-                <!-- Assigned States for Manager -->
+                <!-- Assigned States -->
                 <div class="supervisor-info" style="margin-top: 15px; border-top: 1px solid rgba(255,255,255,0.1); padding-top: 15px;">
                     <p style="font-size: 11px; text-transform: uppercase; color: rgba(255,255,255,0.6); margin-bottom: 5px;">Assigned States</p>
                     <?php
@@ -126,33 +127,6 @@ function sp_area_manager_dashboard_shortcode() {
                     }
                     ?>
                 </div>
-                <?php else : ?>
-                <!-- Supervisor Contact for Area Manager -->
-                <div class="supervisor-info" style="margin-top: 15px; border-top: 1px solid rgba(255,255,255,0.1); padding-top: 15px;">
-                    <p style="font-size: 11px; text-transform: uppercase; color: rgba(255,255,255,0.6); margin-bottom: 5px;">My Supervisor</p>
-                    <?php
-                    $supervisor_ids = get_user_meta($user->ID, '_supervisor_ids', true);
-                    if (!empty($supervisor_ids) && is_array($supervisor_ids)) {
-                        foreach ($supervisor_ids as $sup_id) {
-                            $supervisor = get_userdata($sup_id);
-                            if ($supervisor) {
-                                echo '<div style="margin-bottom: 8px;">';
-                                echo '<p style="font-size: 13px; margin-bottom: 1px; font-weight: 500;">' . esc_html($supervisor->display_name) . '</p>';
-                                echo '<p style="font-size: 12px; opacity: 0.8; margin-bottom: 2px;">' . esc_html($supervisor->user_email) . '</p>';
-                                $sup_phone = get_user_meta($supervisor->ID, 'phone_number', true);
-                                if ($sup_phone) {
-                                    $whatsapp_url = 'https://wa.me/' . str_replace(['+', ' '], '', $sup_phone);
-                                    echo '<p style="font-size: 12px;"><a href="' . esc_url($whatsapp_url) . '" target="_blank" style="color: #4CAF50; text-decoration: none;">📱 ' . esc_html($sup_phone) . '</a></p>';
-                                }
-                                echo '</div>';
-                            }
-                        }
-                    } else {
-                        echo '<p style="font-size: 12px; opacity: 0.8;">No supervisor assigned</p>';
-                    }
-                    ?>
-                </div>
-                <?php endif; ?>
                 <a href="<?php echo wp_logout_url(home_url()); ?>" class="logout-btn" title="Logout">🚪</a>
             </div>
         </div>
@@ -265,7 +239,6 @@ function sp_area_manager_dashboard_shortcode() {
                             </div>
                         </div>
                     </div>
-
 
 
                 </section>
@@ -515,7 +488,7 @@ function sp_area_manager_dashboard_shortcode() {
                 <section id="project-reviews-section" class="section-content" style="display:none;">
                     <h2>Project Reviews</h2>
                     <div id="project-reviews-container">
-                        <p>Select a project to view reviews.</p>
+                        <p>Loading reviews...</p>
                     </div>
                 </section>
 
@@ -607,7 +580,7 @@ function sp_area_manager_dashboard_shortcode() {
                     <?php 
                     // Use Shared Cleaner Component
                     if (class_exists('KSC_Cleaner_Component')) {
-                        KSC_Cleaner_Component::render_cleaner_section($user_roles, 'area_manager'); 
+                        KSC_Cleaner_Component::render_cleaner_section($user_roles, 'manager'); 
                     } else {
                         echo '<p>Error: Cleaner component not loaded.</p>';
                     }
@@ -639,12 +612,12 @@ function sp_area_manager_dashboard_shortcode() {
                                 <thead>
                                     <tr>
                                         <th>Customer</th>
-                                        <th>Phone</th>
                                         <th>Plan</th>
                                         <th>Visits</th>
                                         <th>Next Visit</th>
-                                        <th>Status</th>
+                                        <th>Assigned Cleaner</th>
                                         <th>Payment Option</th>
+                                        <th>Payment Status</th>
                                         <th>Actions</th>
                                     </tr>
                                 </thead>
@@ -656,169 +629,11 @@ function sp_area_manager_dashboard_shortcode() {
                     </div>
                 </section>
 
-                    <!-- My Team Section (for all AMs - shows assigned Sales Managers) -->
-                <!-- My Team Section (Restricted Team Analysis) -->
-                <!-- My Team Section (Restricted Team Analysis) -->
-                <section id="my-team-section" class="section-content" style="display:none;">
-                    <div class="section-header">
-                        <h2 class="section-title">👥 My Team Overview</h2>
-                        <p style="color: #666; margin-top: 8px;">Performance overview of your assigned team</p>
-                    </div>
-
-                    <!-- Stats Row -->
-                    <div class="stats-grid" style="margin-bottom: 30px;">
-                        <div class="stat-card">
-                            <div class="stat-icon">👥</div>
-                            <div class="stat-details">
-                                <h3 id="my-team-sm-count">0</h3>
-                                <span>Sales Managers</span>
-                            </div>
-                        </div>
-                        <div class="stat-card">
-                            <div class="stat-icon">🧹</div>
-                            <div class="stat-details">
-                                <h3 id="my-team-cleaner-count">0</h3>
-                                <span>Cleaners</span>
-                            </div>
-                        </div>
-                        <div class="stat-card">
-                            <div class="stat-icon">🏗️</div>
-                            <div class="stat-details">
-                                <h3 id="my-team-project-count">0</h3>
-                                <span>Active Projects</span>
-                            </div>
-                        </div>
-                    </div>
-
-                    <!-- Sales Managers Table -->
-                    <div class="card" style="margin-bottom: 20px;">
-                        <h3>👥 Sales Managers</h3>
-                        <div class="table-responsive">
-                            <table class="data-table">
-                                <thead>
-                                    <tr>
-                                        <th>Name</th>
-                                        <th>Supervisor</th>
-                                        <th class="text-center">Leads</th>
-                                        <th class="text-center">Conversions</th>
-                                        <th class="text-center">Actions</th>
-                                    </tr>
-                                </thead>
-                                <tbody id="my-team-sm-tbody">
-                                    <tr><td colspan="5" class="text-center">Loading...</td></tr>
-                                </tbody>
-                            </table>
-                        </div>
-                    </div>
-
-                    <!-- Cleaners Table -->
-                    <div class="card" style="margin-bottom: 20px;">
-                        <h3>🧹 Cleaners</h3>
-                        <div class="table-responsive">
-                            <table class="data-table">
-                                <thead>
-                                    <tr>
-                                        <th>Name</th>
-                                        <th>Supervisor</th>
-                                        <th class="text-center">Performance</th>
-                                        <th class="text-center">Status</th>
-                                        <th class="text-center">Actions</th>
-                                    </tr>
-                                </thead>
-                                <tbody id="my-team-cleaners-tbody">
-                                    <tr><td colspan="5" class="text-center">Loading...</td></tr>
-                                </tbody>
-                            </table>
-                        </div>
-                    </div>
-                </section>
-
-                <!-- Team Member Detail Modal -->
-                <div id="team-member-modal" class="modal" style="display:none;">
-                    <div class="modal-content large-modal">
-                        <div class="modal-header">
-                            <h2 id="member-modal-name">Team Member Details</h2>
-                            <span class="close-modal" id="close-member-modal">&times;</span>
-                        </div>
-                        <div class="modal-body" id="member-detail-content">
-                            <p style="text-align: center; padding: 40px; color: #666;">Loading member details...</p>
-                        </div>
-                    </div>
-                </div>
-
-                    <!-- SM Leads Detail Panel (hidden until SM is selected) -->
-                    <!-- SM Leads Detail Panel - HIDDEN (Moved to Modal) -->
-                    <div id="sm-leads-detail-panel" class="card" style="display: none !important;">
-                        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
-                            <h3 id="sm-leads-title">📋 Leads for: <span id="selected-sm-name"></span></h3>
-                            <button type="button" class="btn btn-secondary" id="close-sm-leads-panel" style="padding: 8px 15px;">✕ Close</button>
-                        </div>
-                        
-                        <!-- Leads Filter -->
-                        <div class="filter-row" style="display: flex; gap: 15px; flex-wrap: wrap; margin-bottom: 20px;">
-                            <select id="sm-leads-status-filter" style="padding: 10px; border: 1px solid #ddd; border-radius: 6px; min-width: 150px;">
-                                <option value="">All Statuses</option>
-                                <option value="new">New</option>
-                                <option value="contacted">Contacted</option>
-                                <option value="qualified">Qualified</option>
-                                <option value="proposal">Proposal Sent</option>
-                                <option value="negotiation">Negotiation</option>
-                                <option value="converted">Converted</option>
-                                <option value="lost">Lost</option>
-                            </select>
-                            <input type="text" id="sm-leads-search" placeholder="Search leads..." 
-                                   style="padding: 10px; border: 1px solid #ddd; border-radius: 6px; flex: 1; min-width: 200px;">
-                        </div>
-                        
-                        <!-- Leads Table -->
-                        <div class="table-responsive">
-                            <table class="data-table" id="sm-leads-table">
-                                <thead>
-                                    <tr>
-                                        <th>Lead Name</th>
-                                        <th>Phone</th>
-                                        <th>Status</th>
-                                        <th>Location</th>
-                                        <th>Created</th>
-                                        <th>Last Followup</th>
-                                        <th>Actions</th>
-                                    </tr>
-                                </thead>
-                                <tbody id="sm-leads-tbody">
-                                    <tr><td colspan="7">Select a Sales Manager to view leads...</td></tr>
-                                </tbody>
-                            </table>
-                        </div>
-                    </div>
-                    
-                    <!-- Lead Followup History Modal -->
-                    <div id="lead-followup-modal" class="modal" style="display: none;">
-                        <div class="modal-content" style="max-width: 700px;">
-                            <div class="modal-header">
-                                <h3>📞 Lead Followup History</h3>
-                                <span class="close-modal" data-modal="lead-followup-modal">&times;</span>
-                            </div>
-                            <div class="modal-body">
-                                <div id="lead-info-header" style="background: #f8f9fa; padding: 15px; border-radius: 8px; margin-bottom: 20px;">
-                                    <h4 id="followup-lead-name" style="margin-bottom: 8px;"></h4>
-                                    <p id="followup-lead-contact" style="color: #666; font-size: 14px;"></p>
-                                </div>
-                                <h4 style="margin-bottom: 15px;">📝 Activity Timeline</h4>
-                                <div id="followup-timeline" style="max-height: 400px; overflow-y: auto;">
-                                    <p>Loading followup history...</p>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                </section>
-
-
-                <?php if (in_array('manager', $user_roles, true) || in_array('administrator', $user_roles, true)) : ?>
-                <!-- Team Analysis Section (Manager Only) -->
+                <!-- Team Overview Section (Manager Only) -->
                 <section id="team-analysis-section" class="section-content" style="display:none;">
                     <div class="section-header">
-                        <h2 class="section-title">📊 Team Analysis</h2>
-                        <p style="color: #666; margin-top: 8px;">Overview of all Area Managers, Sales Managers, and Cleaners in your assigned states</p>
+                        <h2 class="section-title">👥 Team Overview</h2>
+                        <p style="color: #666; margin-top: 8px;">Complete overview of Area Managers, Sales Managers, and Cleaners across your organization</p>
                     </div>
                     
                     <!-- Team Stats -->
@@ -860,16 +675,15 @@ function sp_area_manager_dashboard_shortcode() {
                             <table class="data-table" id="team-am-table">
                                 <thead>
                                     <tr>
-                                        <th>Name</th>
-                                        <th>Email</th>
-                                        <th>City</th>
-                                        <th>State</th>
+                                        <th>Name & Contact</th>
+                                        <th>Location</th>
                                         <th>Projects</th>
                                         <th>Team Size</th>
+                                        <th>Actions</th>
                                     </tr>
                                 </thead>
                                 <tbody id="team-am-tbody">
-                                    <tr><td colspan="6">Loading area managers...</td></tr>
+                                    <tr><td colspan="5">Loading area managers...</td></tr>
                                 </tbody>
                             </table>
                         </div>
@@ -882,11 +696,11 @@ function sp_area_manager_dashboard_shortcode() {
                             <table class="data-table" id="team-sm-table">
                                 <thead>
                                     <tr>
-                                        <th>Name</th>
-                                        <th>Email</th>
+                                        <th>Name & Contact</th>
                                         <th>Supervising AM</th>
                                         <th>Leads</th>
                                         <th>Conversions</th>
+                                        <th>Actions</th>
                                     </tr>
                                 </thead>
                                 <tbody id="team-sm-tbody">
@@ -903,11 +717,11 @@ function sp_area_manager_dashboard_shortcode() {
                             <table class="data-table" id="team-cleaners-table">
                                 <thead>
                                     <tr>
-                                        <th>Name</th>
-                                        <th>Phone</th>
+                                        <th>Name & Contact</th>
                                         <th>Supervising AM</th>
                                         <th>Completed Visits</th>
                                         <th>Status</th>
+                                        <th>Actions</th>
                                     </tr>
                                 </thead>
                                 <tbody id="team-cleaners-tbody">
@@ -939,13 +753,30 @@ function sp_area_manager_dashboard_shortcode() {
                                 <div class="form-group" style="flex: 1; min-width: 200px;">
                                     <label for="assign_state">State *</label>
                                     <select id="assign_state" name="state" required style="width: 100%; padding: 10px; border: 1px solid #ddd; border-radius: 6px;">
-                                        <option value="">Select your assigned state</option>
+                                        <option value="">Select state</option>
                                         <?php
                                         $manager_states = get_user_meta($user->ID, '_assigned_states', true);
+                                        
+                                        // If manager has assigned states, show only those
+                                        // Otherwise, show all Indian states (Manager can assign anywhere)
+                                        $states_to_show = [];
                                         if (!empty($manager_states) && is_array($manager_states)) {
-                                            foreach ($manager_states as $state) {
-                                                echo '<option value="' . esc_attr($state) . '">' . esc_html($state) . '</option>';
-                                            }
+                                            $states_to_show = $manager_states;
+                                        } else {
+                                            // All Indian states
+                                            $states_to_show = [
+                                                'Andhra Pradesh', 'Arunachal Pradesh', 'Assam', 'Bihar', 'Chhattisgarh',
+                                                'Goa', 'Gujarat', 'Haryana', 'Himachal Pradesh', 'Jharkhand',
+                                                'Karnataka', 'Kerala', 'Madhya Pradesh', 'Maharashtra', 'Manipur',
+                                                'Meghalaya', 'Mizoram', 'Nagaland', 'Odisha', 'Punjab',
+                                                'Rajasthan', 'Sikkim', 'Tamil Nadu', 'Telangana', 'Tripura',
+                                                'Uttar Pradesh', 'Uttarakhand', 'West Bengal',
+                                                'Delhi', 'Jammu and Kashmir', 'Ladakh', 'Puducherry'
+                                            ];
+                                        }
+                                        
+                                        foreach ($states_to_show as $state) {
+                                            echo '<option value="' . esc_attr($state) . '">' . esc_html($state) . '</option>';
                                         }
                                         ?>
                                     </select>
@@ -982,7 +813,6 @@ function sp_area_manager_dashboard_shortcode() {
                         </div>
                     </div>
                 </section>
-                <?php endif; ?>
 
                 <!-- Reset Password Modal -->
                 <div id="reset-password-modal" class="modal" style="display:none;">
@@ -1078,67 +908,77 @@ function sp_area_manager_dashboard_shortcode() {
 
     <!-- Schedule Visit Modal -->
     <div id="schedule-visit-modal" class="modal" style="display:none;">
-        <div class="modal-content" style="max-width: 700px;">
+        <div class="modal-content" style="max-width: 500px;">
             <span class="close-modal">&times;</span>
             <h3>+ Schedule Cleaning Visit</h3>
-            <div style="display: flex; gap: 20px; flex-wrap: wrap;">
-                <!-- Left: Form -->
-                <div style="flex: 1; min-width: 280px;">
-                    <form id="schedule-visit-form">
-                        <input type="hidden" id="schedule_service_id">
-                        <div class="form-group">
-                            <label>Customer</label>
-                            <p id="schedule_customer_name" style="font-weight: 600; margin: 5px 0;"></p>
-                        </div>
-                        <div class="form-group">
-                            <label for="schedule_cleaner_id">Select Cleaner *</label>
-                            <select id="schedule_cleaner_id" name="cleaner_id" required style="width: 100%; padding: 10px; border: 1px solid #ddd; border-radius: 6px;">
-                                <option value="">Loading cleaners...</option>
-                            </select>
-                        </div>
-                        <div class="form-row" style="display: flex; gap: 15px;">
-                            <div class="form-group" style="flex: 1;">
-                                <label for="schedule_date">Date *</label>
-                                <input type="date" id="schedule_date" name="scheduled_date" required style="width: 100%; padding: 10px; border: 1px solid #ddd; border-radius: 6px;">
-                            </div>
-                            <div class="form-group" style="flex: 1;">
-                                <label for="schedule_time">Time *</label>
-                                <input type="time" id="schedule_time" name="scheduled_time" value="09:00" required style="width: 100%; padding: 10px; border: 1px solid #ddd; border-radius: 6px;">
-                            </div>
-                        </div>
-                        <button type="submit" class="btn btn-primary" style="width: 100%; margin-top: 10px;">+ Schedule Visit</button>
-                        <div id="schedule-visit-feedback" style="margin-top: 15px;"></div>
-                    </form>
+            <form id="schedule-visit-form">
+                <input type="hidden" id="schedule_service_id">
+                <div class="form-group">
+                    <label>Customer</label>
+                    <p id="schedule_customer_name" style="font-weight: 600; margin: 5px 0;"></p>
                 </div>
-                
-                <!-- Right: Cleaner Schedule Preview -->
-                <div id="cleaner-schedule-preview" style="flex: 1; min-width: 280px; background: #f8f9fa; border-radius: 8px; padding: 15px; display: none;">
-                    <h4 style="margin-bottom: 15px; color: #333;">📅 <span id="preview-cleaner-name">Cleaner's</span> Schedule</h4>
-                    <div id="cleaner-schedule-content">
-                        <p style="color: #666; font-size: 14px;">Select a cleaner to view their schedule</p>
+                <div class="form-group">
+                    <label for="schedule_cleaner_id">Select Cleaner *</label>
+                    <select id="schedule_cleaner_id" name="cleaner_id" required style="width: 100%; padding: 10px; border: 1px solid #ddd; border-radius: 6px;">
+                        <option value="">Loading cleaners...</option>
+                    </select>
+                </div>
+                <div class="form-row" style="display: flex; gap: 15px;">
+                    <div class="form-group" style="flex: 1;">
+                        <label for="schedule_date">Date *</label>
+                        <input type="date" id="schedule_date" name="scheduled_date" required style="width: 100%; padding: 10px; border: 1px solid #ddd; border-radius: 6px;">
+                    </div>
+                    <div class="form-group" style="flex: 1;">
+                        <label for="schedule_time">Time *</label>
+                        <input type="time" id="schedule_time" name="scheduled_time" value="09:00" required style="width: 100%; padding: 10px; border: 1px solid #ddd; border-radius: 6px;">
                     </div>
                 </div>
-            </div>
+                <button type="submit" class="btn btn-primary" style="width: 100%; margin-top: 10px;">+ Schedule Visit</button>
+                <div id="schedule-visit-feedback" style="margin-top: 15px;"></div>
+            </form>
         </div>
     </div>
 
     <!-- Service Detail Modal -->
+    <div id="service-detail-modal" class="modal" style="display:none;">
+        <div class="modal-content" style="max-width: 700px;">
+            <span class="close-modal">&times;</span>
+            <h3>🧼 Cleaning Service Details</h3>
+            <div id="service-detail-content">
+                <p>Loading...</p>
+            </div>
+        </div>
+    </div>
+
+
+    <!-- Team Member Detail Modal -->
+    <div id="team-member-modal" class="modal" style="display:none;">
+        <div class="modal-content large-modal">
+            <div class="modal-header">
+                <h2 id="member-modal-name">Team Member Details</h2>
+                <span class="close-modal" id="close-member-modal">&times;</span>
+            </div>
+            <div class="modal-body" id="member-detail-content">
+                <p style="text-align: center; padding: 40px; color: #666;">Loading member details...</p>
+            </div>
+        </div>
+    </div>
+
     <!-- Service Details Modal -->
-    <div id="am-service-details-modal" class="modal-overlay" style="display: none;">
-        <div class="modal-content" style="max-width: 800px; max-height: 90vh; overflow-y: auto;">
-            <span class="close-modal-btn" onclick="document.getElementById('am-service-details-modal').style.display='none'">&times;</span>
-            <h3 id="am-service-details-title">Service Details</h3>
+    <div id="service-details-modal" class="modal" style="display:none;">
+        <div class="modal-content" style="max-width: 700px; max-height: 90vh; overflow-y: auto;">
+            <span class="close-modal" onclick="document.getElementById('service-details-modal').style.display='none'">&times;</span>
+            <h3 id="service-details-title">Service Details</h3>
             
-            <div id="am-service-details-content" style="margin-top: 20px;">
+            <div id="service-details-content" style="margin-top: 20px;">
                 <p style="text-align: center; color: #666;">Loading...</p>
             </div>
         </div>
     </div>
 
-
-
     <!-- Toast Container -->
     <div class="toast-container" id="toast-container"></div>
+
 
     <?php
     return ob_get_clean();

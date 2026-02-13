@@ -43,7 +43,7 @@ class KSC_Official_WhatsApp {
      */
     public function send_message($phone, $message) {
         if (empty($this->phone_id) || empty($this->access_token)) {
-            error_log('[KSC Official WhatsApp] Credentials missing.');
+            // error_log('[KSC Official WhatsApp] Credentials missing.');
             return false;
         }
 
@@ -76,7 +76,7 @@ class KSC_Official_WhatsApp {
         ]);
 
         if (is_wp_error($response)) {
-            error_log('[KSC Official WhatsApp] HTTP Error: ' . $response->get_error_message());
+            // error_log('[KSC Official WhatsApp] HTTP Error: ' . $response->get_error_message());
             return false;
         }
 
@@ -86,7 +86,7 @@ class KSC_Official_WhatsApp {
         if ($code >= 200 && $code < 300) {
             return true;
         } else {
-            error_log('[KSC Official WhatsApp] API Error (' . $code . '): ' . print_r($result, true));
+            // error_log('[KSC Official WhatsApp] API Error (' . $code . '): ' . print_r($result, true));
             return false;
         }
     }

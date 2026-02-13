@@ -1,17 +1,17 @@
-console.log('🔥🔥🔥 MARKETPLACE.JS FILE LOADED - TOP OF FILE 🔥🔥🔥');
+// console.log('🔥🔥🔥 MARKETPLACE.JS FILE LOADED - TOP OF FILE 🔥🔥🔥');
 
 jQuery(document).ready(function ($) {
-    console.log('🚀 MARKETPLACE JS LOADED');
-    console.log('marketplace_vars:', typeof marketplace_vars !== 'undefined' ? marketplace_vars : 'UNDEFINED');
+    // console.log('🚀 MARKETPLACE JS LOADED');
+    // console.log('marketplace_vars:', typeof marketplace_vars !== 'undefined' ? marketplace_vars : 'UNDEFINED');
 
     if (typeof marketplace_vars === 'undefined') {
-        console.error('❌ marketplace_vars is NOT defined!');
+        // console.error('❌ marketplace_vars is NOT defined!');
         alert('Marketplace error: Configuration not loaded. The page may not have the correct slug or shortcode.');
         return;
     }
 
-    console.log('✅ marketplace_vars.ajax_url:', marketplace_vars.ajax_url);
-    console.log('✅ marketplace_vars.nonce:', marketplace_vars.nonce);
+    // console.log('✅ marketplace_vars.ajax_url:', marketplace_vars.ajax_url);
+    // console.log('✅ marketplace_vars.nonce:', marketplace_vars.nonce);
 
     const stateSelect = $('#state-filter');
     const citySelect = $('#city-filter');
@@ -69,7 +69,7 @@ jQuery(document).ready(function ($) {
     fetchProjects();
 
     function fetchProjects() {
-        console.log('📡 fetchProjects() called');
+        // console.log('📡 fetchProjects() called');
 
         const container = $('#project-listings-container');
         const spinner = container.find('.loading-spinner');
@@ -87,23 +87,23 @@ jQuery(document).ready(function ($) {
             coverage_only: coverageOnly ? '1' : '0'
         };
 
-        console.log('📤 Sending AJAX request with data:', data);
+        // console.log('📤 Sending AJAX request with data:', data);
 
         $.ajax({
             url: marketplace_vars.ajax_url,
             type: 'POST',
             data: data,
             success: function (response) {
-                console.log('=== MARKETPLACE RESPONSE ===');
-                console.log('Full Response:', response);
-                console.log('Success:', response.success);
-                console.log('Data:', response.data);
+                // console.log('=== MARKETPLACE RESPONSE ===');
+                // console.log('Full Response:', response);
+                // console.log('Success:', response.success);
+                // console.log('Data:', response.data);
                 if (response.data) {
-                    console.log('HTML exists:', !!response.data.html);
-                    console.log('HTML length:', response.data.html ? response.data.html.length : 0);
-                    console.log('Count:', response.data.count);
+                    // console.log('HTML exists:', !!response.data.html);
+                    // console.log('HTML length:', response.data.html ? response.data.html.length : 0);
+                    // console.log('Count:', response.data.count);
                 }
-                console.log('===========================');
+                // console.log('===========================');
 
                 spinner.hide();
                 if (response.success) {
@@ -117,16 +117,16 @@ jQuery(document).ready(function ($) {
                         container.append('<div class="no-projects"><p>No projects found matching your criteria.</p></div>');
                     }
                 } else {
-                    console.error('Error response:', response.data);
+                    // console.error('Error response:', response.data);
                     alert('Error loading projects: ' + (response.data ? response.data.message : 'Unknown error'));
                 }
             },
             error: function (xhr, status, error) {
-                console.error('=== AJAX ERROR ===');
-                console.error('Status:', status);
-                console.error('Error:', error);
-                console.error('Response Text:', xhr.responseText);
-                console.error('==================');
+                // console.error('=== AJAX ERROR ===');
+                // console.error('Status:', status);
+                // console.error('Error:', error);
+                // console.error('Response Text:', xhr.responseText);
+                // console.error('==================');
                 spinner.hide();
                 alert('Network error while loading projects.');
             }
@@ -134,4 +134,4 @@ jQuery(document).ready(function ($) {
     }
 });
 
-console.log('🔥🔥🔥 MARKETPLACE.JS FILE END 🔥🔥🔥');
+// console.log('🔥🔥🔥 MARKETPLACE.JS FILE END 🔥🔥🔥');

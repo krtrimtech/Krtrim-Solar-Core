@@ -42,7 +42,7 @@ class KSC_Lead_Component {
     }
 
     /**
-     * Get lead status options
+     * Get all lead status options (including converted)
      */
     public static function get_status_options() {
         return [
@@ -55,12 +55,22 @@ class KSC_Lead_Component {
     }
 
     /**
+     * Get manual status options (excludes 'converted' - reserved for auto-conversion only)
+     */
+    public static function get_manual_status_options() {
+        $all_statuses = self::get_status_options();
+        unset($all_statuses['converted']); // Remove converted from manual selection
+        return $all_statuses;
+    }
+
+    /**
      * Render the lead management section
      */
     public static function render_lead_section($user_roles, $dashboard_type = 'sales_manager') {
         $can_create_client = self::can_create_client($user_roles);
         $can_delete = self::can_delete_lead($user_roles);
-        $statuses = self::get_status_options();
+        $all_statuses = self::get_status_options(); // For display/filtering
+        $manual_statuses = self::get_manual_status_options(); // For manual selection
         ?>
         <div class="lead-component" data-dashboard="<?php echo esc_attr($dashboard_type); ?>" data-can-create-client="<?php echo $can_create_client ? 'true' : 'false'; ?>" data-can-delete="<?php echo $can_delete ? 'true' : 'false'; ?>">
             
@@ -78,7 +88,7 @@ class KSC_Lead_Component {
                     </select>
                     <select id="filter-lead-status" class="lead-filter-select">
                         <option value="">All Status</option>
-                        <?php foreach ($statuses as $key => $status): ?>
+                        <?php foreach ($all_statuses as $key => $status): ?>
                             <option value="<?php echo esc_attr($key); ?>"><?php echo esc_html($status['label']); ?></option>
                         <?php endforeach; ?>
                     </select>
@@ -119,7 +129,11 @@ class KSC_Lead_Component {
                 <span class="close-lead-modal">&times;</span>
                 <h3>➕ Add New Lead</h3>
                 <form id="create-lead-form">
-                    <?php wp_nonce_field('sp_lead_nonce', 'lead_nonce'); ?>
+                    <?php 
+                    // Add both nonces to support Area Manager and Sales Manager
+                    wp_nonce_field('sp_lead_nonce', 'lead_nonce'); 
+                    wp_nonce_field('sp_sales_manager_nonce', 'sm_nonce'); 
+                    ?>
                     
                     <!-- Lead Type Selection -->
                     <div class="form-group">
@@ -261,7 +275,7 @@ class KSC_Lead_Component {
                 <div class="lead-status-update">
                     <label for="lead-status-select">Update Status:</label>
                     <select id="lead-status-select">
-                        <?php foreach ($statuses as $key => $status): ?>
+                        <?php foreach ($manual_statuses as $key => $status): ?>
                             <option value="<?php echo esc_attr($key); ?>"><?php echo esc_html($status['label']); ?></option>
                         <?php endforeach; ?>
                     </select>

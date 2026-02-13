@@ -9,12 +9,16 @@ class SP_Admin_Menus {
      */
     public function __construct() {
         add_action( 'admin_menu', [ $this, 'register_menus' ] );
-        add_action( 'wp_ajax_assign_area_manager_location', [ $this, 'ajax_assign_location' ] );
+        // Disabled - duplicate of action in class-admin-manager-api.php
+        // add_action( 'wp_ajax_assign_area_manager_location', [ $this, 'ajax_assign_location' ] );
         
         // Manager Report AJAX Handlers
         add_action( 'wp_ajax_generate_manager_report', [ $this, 'ajax_generate_manager_report' ] );
         add_action( 'wp_ajax_email_manager_report', [ $this, 'ajax_email_manager_report' ] );
         add_action( 'wp_ajax_whatsapp_manager_report', [ $this, 'ajax_whatsapp_manager_report' ] );
+        
+        // Hide phone number field for Manager role in profile edit
+        add_action( 'admin_head', [ $this, 'hide_manager_phone_field' ] );
     }
 
     /**
@@ -330,5 +334,35 @@ class SP_Admin_Menus {
         
         wp_send_json_success(['message' => 'Location assigned successfully']);
     }
-}
+    
+    /**
+     * Hide phone number field for Manager role in user profile edit page
+     */
+    public function hide_manager_phone_field() {
+        $screen = get_current_screen();
+        
+        // Only on user edit or profile pages
+        if ( ! $screen || ( $screen->id !== 'user-edit' && $screen->id !== 'profile' ) ) {
+            return;
+        }
+        
+        // Get the user being edited
+        $user_id = isset( $_GET['user_id'] ) ? intval( $_GET['user_id'] ) : get_current_user_id();
+        $user = get_userdata( $user_id );
+        
+        // Check if user has manager role
+        if ( $user && in_array( 'manager', (array) $user->roles ) ) {
+            ?>
+            <style>
+                /* Hide phone number field for Manager role */
+                .user-phone-wrap,
+                tr.user-phone-wrap,
+                .form-field.user-phone-wrap {
+                    display: none !important;
+                }
+            </style>
+            <?php
+        }
+    }
 
+}

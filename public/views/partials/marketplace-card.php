@@ -28,7 +28,16 @@ if (!$thumbnail) {
 <div class="project-card">
     <div class="project-card-image">
         <img src="<?php echo esc_url($thumbnail); ?>" alt="<?php echo esc_attr($project_title); ?>">
-        <div class="project-card-badge">
+        <?php
+// Get bid count for this project
+global $wpdb;
+$bids_table = $wpdb->prefix . 'project_bids';
+$open_bid_count = $wpdb->get_var($wpdb->prepare(
+    "SELECT COUNT(*) FROM {$bids_table} WHERE project_id = %d AND (bid_type = 'open' OR bid_type IS NULL)",
+    $project_id
+));
+?>
+<div class="project-card-badge">
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                 <circle cx="12" cy="12" r="5"></circle>
                 <line x1="12" y1="1" x2="12" y2="3"></line>
@@ -42,6 +51,11 @@ if (!$thumbnail) {
             </svg>
             Open for Bids
         </div>
+        <?php if ($open_bid_count > 0): ?>
+        <div class="project-card-bid-count" style="position: absolute; top: 50px; right: 15px; background: #047857; color: white; padding: 4px 10px; border-radius: 6px; font-size: 12px; font-weight: 600;">
+            <?php echo $open_bid_count; ?> Bid<?php echo $open_bid_count > 1 ? 's' : ''; ?> Placed
+        </div>
+        <?php endif; ?>
     </div>
     
     <div class="project-card-content">

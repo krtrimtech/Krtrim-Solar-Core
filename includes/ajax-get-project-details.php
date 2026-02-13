@@ -11,7 +11,7 @@ function sp_get_project_details() {
     
     // Verify nonce - be lenient for now
     if (isset($_POST['nonce']) && !wp_verify_nonce($_POST['nonce'], 'sp_project_details_nonce')) {
-        error_log('Project details nonce failed');
+        // error_log('Project details nonce failed');
         // Don't fail, just log
     }
     
@@ -78,6 +78,7 @@ function sp_get_project_details() {
     
     $data = [
         'id' => $project_id,
+        'project_id' => $project_id,  // Add this for modal navigation
         'title' => get_the_title($project_id),
         'status' => get_post_meta($project_id, 'project_status', true),
         'project_state' => get_post_meta($project_id, '_project_state', true),
@@ -100,10 +101,11 @@ function sp_get_project_details() {
     $steps_table = $wpdb->prefix . 'solar_process_steps';
     if ($wpdb->get_var("SHOW TABLES LIKE '$steps_table'") == $steps_table) {
         $steps = $wpdb->get_results($wpdb->prepare(
-            "SELECT * FROM $steps_table WHERE project_id = %d ORDER BY step_order ASC",
+            "SELECT * FROM $steps_table WHERE project_id = %d ORDER BY id ASC",
             $project_id
         ), ARRAY_A);
         $data['steps'] = $steps ?: [];
+        // error_log('Project ' . $project_id . ' steps count: ' . count($data['steps']));
     }
     
     wp_send_json_success($data);

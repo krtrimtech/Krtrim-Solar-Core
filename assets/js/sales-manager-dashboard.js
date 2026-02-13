@@ -36,11 +36,27 @@
 
     // Initialize when document is ready
     $(document).ready(function () {
-        initNavigation();
-        initMobileNav();
+        // Initialize Lead Component early to set config
+        initLeadComponent();
+
         initNotifications();
         loadDashboardStats();
         loadTodayFollowups();
+        loadSMCleaners(); // Pre-load cleaners for booking
+        initModals(); // Initialize global modal handlers
+    });
+
+    // --- Tab Data Loading Triggers ---
+    $(document).on('click', '.nav-item[data-section="cleaning-services"]', function () {
+        loadSMCleaningServices();
+    });
+
+    $(document).on('click', '.nav-item[data-section="conversions"]', function () {
+        loadConversions();
+    });
+
+    $(document).on('click', '.nav-item[data-section="my-leads"]', function () {
+        initLeadComponent();
     });
 
     // --- Notification System ---
@@ -105,59 +121,28 @@
     }
 
     // Navigation (sidebar)
-    function initNavigation() {
-        $('.sidebar-nav .nav-item').on('click', function () {
-            navigateToSection($(this).data('section'), $(this));
-        });
-    }
+    // Delegated to DashboardUtils
+    $(document).ready(function () {
+        if (typeof DashboardUtils !== 'undefined') {
+            DashboardUtils.setupTabNavigation('.sales-manager-dashboard');
 
-    // Mobile Bottom Navigation
-    function initMobileNav() {
-        $('.mobile-nav-item').on('click', function (e) {
-            const section = $(this).data('section');
-            if (!section) return; // Logout link doesn't have section
-
-            e.preventDefault();
-            navigateToSection(section, $(this));
-        });
-    }
-
-    // Navigate to section (shared between sidebar and mobile nav)
-    function navigateToSection(section, $clickedNav) {
-        // Update active nav for both sidebar and mobile
-        $('.sidebar-nav .nav-item').removeClass('active');
-        $('.mobile-nav-item').removeClass('active');
-
-        // Set active on clicked and corresponding nav
-        $(`.sidebar-nav .nav-item[data-section="${section}"]`).addClass('active');
-        $(`.mobile-nav-item[data-section="${section}"]`).addClass('active');
-
-        // Update title
-        const titles = {
-            'dashboard': 'Dashboard',
-            'my-leads': 'Leads',
-            'conversions': 'My Conversions'
-        };
-        $('#section-title').text(titles[section] || 'Dashboard');
-
-        // Show/hide sections
-        $('.section-content').hide();
-        $(`#${section}-section`).show();
-
-        // Load data for section
-        switch (section) {
-            case 'dashboard':
-                loadDashboardStats();
-                loadTodayFollowups();
-                break;
-            case 'my-leads':
-                initLeadComponent();
-                break;
-            case 'conversions':
-                loadConversions();
-                break;
+            // Also handle mobile nav if needed, or assume DashboardUtils handles .nav-item globally
+            // DashboardUtils targets .nav-item which covers both sidebar and likely mobile if class matches
+            // However, mobile nav uses .mobile-nav-item in this file. 
+            // Let's add specific handler for mobile nav to use DashboardUtils logic manually or add to DashboardUtils?
+            // For now, let's keep it simple and bind click to trigger dashboard utils logic
+            $('.mobile-nav-item').on('click', function (e) {
+                e.preventDefault();
+                const section = $(this).data('section');
+                if (section) {
+                    // Trigger click on corresponding sidebar item to reuse DashboardUtils logic
+                    $(`.sidebar-nav .nav-item[data-section="${section}"]`).click();
+                }
+            });
         }
-    }
+    });
+
+    // navigateToSection is removed as DashboardUtils handles it via triggerSectionLoad
 
     // Initialize shared lead component
     function initLeadComponent() {
@@ -471,12 +456,12 @@
     // Modals
     function initModals() {
         // Close modal on X click
-        $(document).on('click', '.close-modal', function () {
-            $(this).closest('.modal').css('display', 'none');
+        $(document).on('click', '.close-modal, .close-lead-modal', function () {
+            $(this).closest('.modal, .lead-modal').css('display', 'none');
         });
 
         // Close modal on background click
-        $(document).on('click', '.modal', function (e) {
+        $(document).on('click', '.modal, .lead-modal', function (e) {
             if (e.target === this) {
                 $(this).css('display', 'none');
             }
@@ -680,10 +665,15 @@
     }
 
     // Utility functions
+    // Utility functions
+    // Delegated to DashboardUtils
     function showToast(message, type = 'info') {
-        const toast = $(`<div class="toast ${type}">${message}</div>`);
-        $('#toast-container').append(toast);
-        setTimeout(() => toast.remove(), 4000);
+        if (typeof DashboardUtils !== 'undefined') {
+            DashboardUtils.showToast(message, type);
+        } else {
+            console.error('DashboardUtils not loaded');
+            alert(message);
+        }
     }
     // Expose globally for shared components
     window.showToast = showToast;
@@ -734,5 +724,521 @@
             timeout = setTimeout(later, wait);
         };
     }
+
+    // ===============================
+    // MANUAL BOOKING FUNCTIONALITY
+    // ===============================
+
+    // Open Book Cleaning Modal
+    $(document).on('click', '.btn-book-cleaning', function (e) {
+        e.preventDefault();
+        e.stopPropagation();
+        const leadId = $(this).data('lead-id');
+        const leadName = $(this).data('lead-name');
+
+        $('#book_lead_id').val(leadId);
+        $('#book_customer_name').text(leadName);
+
+        // Populate cleaners
+        const cleanerSelect = $('#book_cleaner_id');
+        cleanerSelect.empty().append('<option value="">Select Cleaner</option>');
+
+        // Always try to load if empty or just to be safe
+        if (smCleanersList && smCleanersList.length > 0) {
+            smCleanersList.forEach(c => {
+                cleanerSelect.append(`<option value="${c.id}">${escapeHtml(c.name)}</option>`);
+            });
+        } else {
+            cleanerSelect.append('<option value="" disabled>Loading cleaners...</option>');
+            // Fetch again
+            $.ajax({
+                url: sm_vars.ajax_url,
+                type: 'POST',
+                data: { action: 'get_cleaners' },
+                success: function (response) {
+                    cleanerSelect.empty().append('<option value="">Select Cleaner</option>');
+                    if (response.success && response.data.length > 0) {
+                        smCleanersList = response.data; // Update global list
+                        response.data.forEach(c => {
+                            cleanerSelect.append(`<option value="${c.id}">${escapeHtml(c.name)}</option>`);
+                        });
+                    } else {
+                        cleanerSelect.append('<option value="" disabled>No cleaners found in your area</option>');
+                    }
+                },
+                error: function () {
+                    cleanerSelect.empty().append('<option value="" disabled>Error loading cleaners</option>');
+                }
+            });
+        }
+
+        // Set default date
+        const today = new Date().toISOString().split('T')[0];
+        $('#book_visit_date').val(today);
+
+        $('#book-cleaning-modal').css('display', 'flex');
+    });
+
+    // Handle Book Cleaning Form
+    initBookCleaningForm();
+
+    function initBookCleaningForm() {
+        $('#book-cleaning-form').on('submit', function (e) {
+            e.preventDefault();
+            const $form = $(this);
+            const $btn = $form.find('button[type="submit"]');
+
+            // Basic validation
+            if (!$('#book_cleaner_id').val()) {
+                showToast('Please select a cleaner', 'error');
+                return;
+            }
+
+            const formData = $form.serialize() + '&action=book_cleaning_service';
+
+            $.ajax({
+                url: sm_vars.ajax_url,
+                type: 'POST',
+                data: formData,
+                beforeSend: function () {
+                    $btn.prop('disabled', true).text('Booking...');
+                },
+                success: function (response) {
+                    if (response.success) {
+                        showToast('Cleaning service booked successfully! 🎉', 'success');
+                        $('#book-cleaning-modal').css('display', 'none');
+                        $form[0].reset();
+                        // Refresh services list
+                        loadSMCleaningServices();
+                    } else {
+                        showToast(response.data.message || 'Error booking service', 'error');
+                    }
+                },
+                error: function () {
+                    showToast('Network error', 'error');
+                },
+                complete: function () {
+                    $btn.prop('disabled', false).text('✅ Book Service');
+                }
+            });
+        });
+    }
+
+    // ===============================
+    // CLEANING SERVICES FUNCTIONALITY
+    // ===============================
+
+    let smCleanersList = [];
+
+    function loadSMCleaningServices() {
+        const tbody = $('#sm-cleaning-services-tbody');
+        tbody.html('<tr><td colspan="6">Loading...</td></tr>');
+
+        $.ajax({
+            url: sm_vars.ajax_url,
+            type: 'POST',
+            data: { action: 'get_cleaning_services' },
+            success: function (response) {
+                if (response.success) {
+                    renderSMCleaningServices(response.data);
+                } else {
+                    tbody.html('<tr><td colspan="6">Error loading services</td></tr>');
+                }
+            },
+            error: function () {
+                tbody.html('<tr><td colspan="6">Error loading services</td></tr>');
+            }
+        });
+
+        // Load cleaners for scheduling
+        loadSMCleaners();
+    }
+
+    function loadSMCleaners() {
+        $.ajax({
+            url: sm_vars.ajax_url,
+            type: 'POST',
+            data: { action: 'get_cleaners' },
+            success: function (response) {
+                if (response.success) {
+                    smCleanersList = response.data;
+                }
+            },
+            error: function (xhr, status, error) {
+                console.error('❌ [SM Dashboard] get_cleaners AJAX Error:', error);
+            }
+        });
+    }
+
+    function renderSMCleaningServices(services) {
+        const tbody = $('#sm-cleaning-services-tbody');
+
+        if (!services || services.length === 0) {
+            tbody.html('<tr><td colspan="6">No cleaning services from your leads yet.</td></tr>');
+            return;
+        }
+
+        const planLabels = {
+            'one_time': 'One-Time',
+            'monthly': 'Monthly',
+            '6_month': '6-Month',
+            'yearly': 'Yearly'
+        };
+
+        let html = '';
+        services.forEach(s => {
+            const paymentBadge = s.payment_status === 'paid'
+                ? '<span style="background:#d1fae5;color:#047857;padding:4px 8px;border-radius:4px;">Paid</span>'
+                : '<span style="background:#fef3c7;color:#b45309;padding:4px 8px;border-radius:4px;">Pending</span>';
+
+            html += `
+                <tr class="sm-cleaning-service-row" data-id="${s.id}" style="cursor:pointer;">
+                    <td><strong>${s.customer_name}</strong><br><small>${s.customer_phone}</small></td>
+                    <td>${planLabels[s.plan_type] || s.plan_type}</td>
+                    <td>${s.system_size_kw} kW</td>
+                    <td>${s.visits_used || 0}/${s.visits_total || 1}</td>
+                    <td>${paymentBadge}</td>
+                    <td>
+                        ${s.next_visit_date
+                    ? `<span style="color:#4f46e5;">✓ ${s.next_visit_date}</span>`
+                    : s.preferred_date
+                        ? `<span style="color:#b45309;">⏳ ${s.preferred_date}</span><br><button class="btn btn-sm sm-schedule-visit-btn" data-id="${s.id}" data-name="${s.customer_name}">+ Schedule</button>`
+                        : `<button class="btn btn-sm sm-schedule-visit-btn" data-id="${s.id}" data-name="${s.customer_name}">+ Schedule</button>`}
+                    </td>
+                </tr>
+            `;
+        });
+        tbody.html(html);
+    }
+
+    // Open schedule visit modal for SM
+    $(document).on('click', '.sm-schedule-visit-btn', function (e) {
+        e.preventDefault();
+        e.stopPropagation();
+
+        const serviceId = $(this).data('id');
+        const customerName = $(this).data('name');
+
+        $('#schedule_service_id').val(serviceId);
+        $('#schedule_customer_name').text(customerName);
+
+        // Set minimum date to today
+        const today = new Date().toISOString().split('T')[0];
+        $('#schedule_date').attr('min', today).val(today);
+
+        // Populate cleaners dropdown
+        const select = $('#schedule_cleaner_id');
+        select.empty().append('<option value="">Select Cleaner</option>');
+
+        if (smCleanersList && smCleanersList.length > 0) {
+            smCleanersList.forEach(cleaner => {
+                select.append(`<option value="${cleaner.id}">${escapeHtml(cleaner.name)} (📞 ${cleaner.phone})</option>`);
+            });
+        } else {
+            select.append('<option value="" disabled>Loading cleaners...</option>');
+            // Fetch again
+            $.ajax({
+                url: sm_vars.ajax_url,
+                type: 'POST',
+                data: { action: 'get_cleaners' },
+                success: function (response) {
+                    select.empty().append('<option value="">Select Cleaner</option>');
+                    if (response.success && response.data.length > 0) {
+                        smCleanersList = response.data; // Update global list
+                        response.data.forEach(cleaner => {
+                            select.append(`<option value="${cleaner.id}">${escapeHtml(cleaner.name)} (📞 ${cleaner.phone})</option>`);
+                        });
+                    } else {
+                        select.append('<option value="" disabled>No cleaners found in your area</option>');
+                    }
+                },
+                error: function () {
+                    select.append('<option value="" disabled>Error loading cleaners</option>');
+                }
+            });
+        }
+
+        $('#schedule-visit-feedback').html('');
+        $('#schedule-visit-modal').css('display', 'flex');
+    });
+
+    // Close modals
+    // Handled by global .close-modal click in initModals()
+
+    // Submit schedule visit form
+    $('#schedule-visit-form').on('submit', function (e) {
+        e.preventDefault();
+
+        const form = $(this);
+        const feedback = $('#schedule-visit-feedback');
+        const submitBtn = form.find('button[type="submit"]');
+
+        const serviceId = $('#schedule_service_id').val();
+        const cleanerId = $('#schedule_cleaner_id').val();
+        const scheduledDate = $('#schedule_date').val();
+        const scheduledTime = $('#schedule_time').val();
+
+        if (!cleanerId) {
+            feedback.html('<div style="background:#f8d7da;color:#721c24;padding:10px;border-radius:6px;">Please select a cleaner</div>');
+            return;
+        }
+
+        submitBtn.prop('disabled', true).text('Scheduling...');
+        feedback.html('');
+
+        $.ajax({
+            url: sm_vars.ajax_url,
+            type: 'POST',
+            data: {
+                action: 'schedule_cleaning_visit',
+                service_id: serviceId,
+                cleaner_id: cleanerId,
+                scheduled_date: scheduledDate,
+                scheduled_time: scheduledTime
+            },
+            success: function (response) {
+                if (response.success) {
+                    feedback.html('<div style="background:#d4edda;color:#155724;padding:10px;border-radius:6px;">✅ ' + response.data.message + '</div>');
+                    showToast('Visit scheduled successfully!', 'success');
+
+                    setTimeout(() => {
+                        $('#schedule-visit-modal').hide();
+                        form[0].reset();
+                        loadSMCleaningServices();
+                    }, 1500);
+                } else {
+                    feedback.html('<div style="background:#f8d7da;color:#721c24;padding:10px;border-radius:6px;">❌ ' + response.data.message + '</div>');
+                }
+            },
+            error: function () {
+                feedback.html('<div style="background:#f8d7da;color:#721c24;padding:10px;border-radius:6px;">❌ Error scheduling visit</div>');
+            },
+            complete: function () {
+                submitBtn.prop('disabled', false).text('+ Schedule Visit');
+            }
+        });
+    });
+
+    // Click on service row to view details
+    $(document).on('click', '.sm-cleaning-service-row', function (e) {
+        if ($(e.target).is('button') || $(e.target).closest('button').length) {
+            return;
+        }
+
+        const serviceId = $(this).data('id');
+        loadSMServiceDetails(serviceId);
+    });
+
+    function loadSMServiceDetails(serviceId) {
+        const content = $('#service-detail-content');
+        content.html('<p>Loading...</p>');
+        $('#service-detail-modal').show();
+
+        $.ajax({
+            url: sm_vars.ajax_url,
+            type: 'POST',
+            data: {
+                action: 'get_cleaning_service_details',
+                service_id: serviceId
+            },
+            success: function (response) {
+                if (response.success) {
+                    const s = response.data.service;
+                    const visits = response.data.visits || [];
+                    const planLabels = {
+                        'one_time': 'One-Time',
+                        'monthly': 'Monthly',
+                        '6_month': '6-Month',
+                        'yearly': 'Yearly'
+                    };
+
+                    let html = `
+                        <div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 15px; margin-bottom: 20px;">
+                            <div style="background: #f8f9fa; padding: 15px; border-radius: 8px;">
+                                <strong>👤 Customer</strong><br>
+                                ${s.customer_name}<br>
+                                <small>📞 ${s.customer_phone}</small>
+                            </div>
+                            <div style="background: #f8f9fa; padding: 15px; border-radius: 8px;">
+                                <strong>📋 Plan</strong><br>
+                                ${planLabels[s.plan_type] || s.plan_type}<br>
+                                <small>${s.system_size_kw} kW System</small>
+                            </div>
+                            <div style="background: #f8f9fa; padding: 15px; border-radius: 8px;">
+                                <strong>🧹 Visits</strong><br>
+                                ${s.visits_used || 0} / ${s.visits_total || 1} Used
+                            </div>
+                            <div style="background: #f8f9fa; padding: 15px; border-radius: 8px;">
+                                <strong>💰 Payment</strong><br>
+                                ₹${Number(s.total_amount || 0).toLocaleString()}<br>
+                                <small style="color: ${s.payment_status === 'paid' ? '#047857' : '#b45309'}">${s.payment_status === 'paid' ? '✅ Paid' : '⏳ Pending'}</small>
+                            </div>
+                        </div>
+                        
+                        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
+                            <h4 style="margin: 0;">🗓️ Visit History</h4>
+                            ${(s.visits_used < s.visits_total) ? `<button class="btn btn-primary sm-schedule-visit-btn" data-id="${serviceId}" data-name="${s.customer_name}" style="padding: 8px 15px;">+ Schedule Visit</button>` : ''}
+                        </div>
+                    `;
+
+                    if (visits && visits.length > 0) {
+                        html += '<table style="width: 100%; border-collapse: collapse;">';
+                        html += '<thead><tr style="background: #f1f5f9;"><th style="padding: 10px; text-align: left;">Date</th><th style="padding: 10px; text-align: left;">Time</th><th style="padding: 10px; text-align: left;">Cleaner</th><th style="padding: 10px; text-align: left;">Status</th></tr></thead>';
+                        html += '<tbody>';
+
+                        visits.forEach(visit => {
+                            const statusColors = {
+                                'scheduled': '#fef3c7',
+                                'completed': '#d1fae5',
+                                'cancelled': '#fee2e2'
+                            };
+                            const statusIcons = {
+                                'scheduled': '⏳',
+                                'completed': '✅',
+                                'cancelled': '❌'
+                            };
+
+                            html += `
+                                <tr style="border-bottom: 1px solid #e5e7eb;">
+                                    <td style="padding: 10px;">${visit.scheduled_date}</td>
+                                    <td style="padding: 10px;">${visit.scheduled_time || '09:00'}</td>
+                                    <td style="padding: 10px;">${visit.cleaner_name || 'Not assigned'}</td>
+                                    <td style="padding: 10px;">
+                                        <div style="display:flex; align-items:center; gap:10px;">
+                                            <span style="background: ${statusColors[visit.status] || '#e5e7eb'}; padding: 4px 10px; border-radius: 4px;">
+                                                ${statusIcons[visit.status] || '❓'} ${visit.status}
+                                            </span>
+                                            ${visit.status === 'scheduled' ? `
+                                                <button class="btn-icon btn-edit-visit" 
+                                                    data-id="${visit.id}" 
+                                                    data-service-id="${s.id}" 
+                                                    data-date="${visit.scheduled_date}" 
+                                                    data-time="${visit.scheduled_time}" 
+                                                    data-cleaner="${visit.cleaner_id}" 
+                                                    data-customer="${s.customer_name}" 
+                                                    title="Edit Visit"
+                                                    style="background:none; border:none; cursor:pointer; font-size:16px;">
+                                                    ✏️
+                                                </button>
+                                                <button class="btn-icon btn-cancel-visit" 
+                                                    data-id="${visit.id}" 
+                                                    title="Cancel Visit"
+                                                    style="background:none; border:none; cursor:pointer; font-size:16px; color: #dc3545;">
+                                                    ❌
+                                                </button>
+                                            ` : ''}
+                                        </div>
+                                    </td>
+                                </tr>
+                            `;
+                        });
+
+                        html += '</tbody></table>';
+                    } else {
+                        html += '<p style="color: #666; text-align: center; padding: 20px;">No visits scheduled yet.</p>';
+                    }
+
+                    content.html(html);
+                } else {
+                    content.html('<p style="color: red;">Error loading service details.</p>');
+                }
+            },
+            error: function () {
+                content.html('<p style="color: red;">Error loading service details.</p>');
+            }
+        });
+    }
+
+    // Edit Visit Handler
+    $(document).on('click', '.btn-edit-visit', function (e) {
+        e.preventDefault();
+        const btn = $(this);
+
+        $('#edit_visit_id').val(btn.data('id'));
+        $('#edit_service_id').val(btn.data('service-id'));
+        $('#edit_customer_name').text(btn.data('customer'));
+        $('#edit_visit_date').val(btn.data('date'));
+        $('#edit_visit_time').val(btn.data('time'));
+
+        // Populate cleaners
+        const select = $('#edit_visit_cleaner');
+        select.empty().append('<option value="">Select Cleaner</option>');
+        select.append('<option value="0">Unassigned</option>'); // Allow unassigning
+
+        if (smCleanersList && smCleanersList.length > 0) {
+            smCleanersList.forEach(c => {
+                const selected = c.id == btn.data('cleaner') ? 'selected' : '';
+                select.append(`<option value="${c.id}" ${selected}>${escapeHtml(c.name)}</option>`);
+            });
+        }
+
+        $('#edit-visit-modal').show();
+    });
+
+    // Submit Edit Visit Form
+    $('#edit-visit-form').on('submit', function (e) {
+        e.preventDefault();
+        const formData = $(this).serialize() + '&action=update_cleaning_visit';
+
+        $.ajax({
+            url: sm_vars.ajax_url,
+            type: 'POST',
+            data: formData,
+            success: function (response) {
+                if (response.success) {
+                    showToast('Visit updated successfully', 'success');
+                    $('#edit-visit-modal').hide();
+                    // Reload details
+                    loadSMServiceDetails($('#edit_service_id').val());
+                } else {
+                    showToast(response.data.message || 'Error updating visit', 'error');
+                }
+            }
+        });
+    });
+
+    // Cancel Visit Handler
+    $(document).on('click', '.btn-cancel-visit', function (e) {
+        e.preventDefault();
+        $('#cancel_visit_id').val($(this).data('id'));
+        $('#cancel_reason').val('');
+        $('#cancel-visit-modal').show();
+    });
+
+    // Submit Cancel Visit Form
+    $('#cancel-visit-form').on('submit', function (e) {
+        e.preventDefault();
+        const formData = $(this).serialize() + '&action=cancel_cleaning_visit';
+
+        $.ajax({
+            url: sm_vars.ajax_url,
+            type: 'POST',
+            data: formData,
+            success: function (response) {
+                if (response.success) {
+                    showToast('Visit cancelled', 'success');
+                    $('#cancel-visit-modal').hide();
+                    // Reload details - need service ID? 
+                    // The modal doesn't have service ID, but we can refresh the details modal if it's open.
+                    // Or better, we should store service ID in cancel modal too or just reload the currently open service detail modal if we can find it?
+                    // Actually, loadSMServiceDetails uses `serviceId`.
+                    // We can get service ID from the View Details modal if it's visible.
+                    // But simpler: just reload the entire services list or just close the modal.
+
+                    // Let's force reload of the open detail modal if possible.
+                    // We can grab service ID from the open details modal context?
+                    // Actually, simpler: Close detail modal and reload services list.
+                    $('#service-detail-modal').hide();
+                    loadSMCleaningServices();
+                } else {
+                    showToast(response.data.message || 'Error cancelling visit', 'error');
+                }
+            }
+        });
+    });
+
+    // Close modals
+    // Generic close modal button
+    // Handled by global .close-modal click
 
 })(jQuery);

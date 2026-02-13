@@ -109,6 +109,18 @@
     background: linear-gradient(90deg, #4facfe 0%, #00f2fe 100%);
 }
 
+.sp-stat-box.sp-cleaning::before {
+    background: linear-gradient(90deg, #667eea 0%, #764ba2 100%);
+}
+
+.sp-stat-box.sp-visit::before {
+    background: linear-gradient(90deg, #fad0c4 0%, #ffd1ff 100%);
+}
+
+.sp-stat-box.sp-progress::before {
+    background: linear-gradient(90deg, #ff9a9e 0%, #fecfef 100%);
+}
+
 .sp-stat-icon {
     font-size: 42px;
     animation: bounce 2s infinite;

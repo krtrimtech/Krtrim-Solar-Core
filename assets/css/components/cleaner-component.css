@@ -1,0 +1,183 @@
+/* Cleaner Component Modal Styles */
+
+/* Overlay - Centered Flex Container */
+.cleaner-component-modal-overlay {
+    display: none;
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(0, 0, 0, 0.85);
+    /* Dark overlay */
+    z-index: 100000;
+    /* Very high z-index to sit on top of everything */
+    justify-content: center;
+    align-items: center;
+    overflow-y: auto;
+    /* Allow scrolling if content is tall */
+    padding: 20px;
+}
+
+/* Modal Content Box */
+.cleaner-component-modal-content {
+    background: #fff;
+    width: 100%;
+    max-width: 600px;
+    border-radius: 12px;
+    position: relative;
+    z-index: 100002;
+    /* Ensure content is above overlay */
+    margin: auto;
+    /* Vertically center in flex container if needed, though align-items handles it */
+    box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25);
+    animation: cleanerModalSlideIn 0.3s ease-out;
+    display: flex;
+    /* Ensure internal layout works */
+    flex-direction: column;
+    max-height: 90vh;
+    /* Prevent overflowing screen height */
+}
+
+/* Modal specific overrides */
+#cleaner-detail-modal .cleaner-component-modal-content {
+    max-width: 800px;
+    /* Wider for profile view */
+}
+
+/* Animation */
+@keyframes cleanerModalSlideIn {
+    from {
+        opacity: 0;
+        transform: translateY(20px) scale(0.95);
+    }
+
+    to {
+        opacity: 1;
+        transform: translateY(0) scale(1);
+    }
+}
+
+/* Scrollable Body */
+.cleaner-modal-body {
+    padding: 20px;
+    overflow-y: auto;
+    flex: 1;
+    /* Take remaining height */
+}
+
+/* Header */
+.cleaner-modal-header {
+    padding: 20px;
+    border-bottom: 1px solid #eee;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+/* Specific Fix for jQuery fadeIn display:block issue */
+.cleaner-component-modal-overlay[style*="display: block"] {
+    display: flex !important;
+}
+
+/* --- Profile Modal Specifics --- */
+.cleaner-profile-header {
+    background: linear-gradient(135deg, #1e3c72 0%, #2a5298 100%) !important;
+    padding: 30px;
+    color: white !important;
+    position: relative;
+    text-align: left;
+    border-radius: 12px 12px 0 0;
+    /* Ensure rounded top corners */
+}
+
+.cleaner-profile-content {
+    display: flex;
+    align-items: center;
+    gap: 25px;
+}
+
+.profile-image-container img {
+    width: 100px !important;
+    height: 100px !important;
+    border-radius: 50% !important;
+    border: 4px solid rgba(255, 255, 255, 0.3);
+    object-fit: cover;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+    display: block;
+    margin: 0;
+    max-width: none;
+    /* Prevent responsive image max-width: 100% from shrinking it */
+}
+
+.profile-details-container h2 {
+    margin: 0 0 5px 0 !important;
+    /* Force override default margins */
+    font-size: 24px;
+    color: white;
+}
+
+.profile-meta-row {
+    display: flex;
+    align-items: center;
+    gap: 15px;
+    margin-bottom: 12px;
+}
+
+.profile-meta-row p {
+    margin: 0;
+    opacity: 0.9;
+    font-size: 15px;
+}
+
+.role-badge {
+    background: rgba(255, 255, 255, 0.2);
+    padding: 4px 10px;
+    border-radius: 20px;
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+.btn-edit-header {
+    background: rgba(255, 255, 255, 0.2);
+    color: white;
+    border: 1px solid rgba(255, 255, 255, 0.4);
+    font-size: 13px;
+    padding: 6px 14px;
+    border-radius: 6px;
+    transition: all 0.2s ease;
+    cursor: pointer;
+    text-decoration: none;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    margin-top: 5px;
+}
+
+.btn-edit-header:hover {
+    background: rgba(255, 255, 255, 0.3);
+    transform: translateY(-1px);
+}
+
+.btn-close-absolute {
+    position: absolute;
+    top: 15px;
+    right: 15px;
+    background: none;
+    border: none;
+    color: white;
+    font-size: 28px;
+    line-height: 1;
+    cursor: pointer;
+    opacity: 0.7;
+    transition: all 0.2s ease;
+    padding: 5px;
+    z-index: 10;
+}
+
+.btn-close-absolute:hover {
+    opacity: 1;
+    transform: rotate(90deg);
+    /* Nice interation */
+}

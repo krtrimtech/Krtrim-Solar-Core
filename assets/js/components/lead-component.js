@@ -41,9 +41,11 @@
 
     // Current state
     let currentLeadId = null;
+    let leadIdToConvert = null;  // Track lead being converted to client
     let canCreateClient = false;
     let canDelete = false;
     let dashboardType = 'sales_manager';
+    let eventsAlreadyBound = false; // Flag to prevent double-binding
 
     // Initialize component
     window.initLeadComponent = function (ajaxUrl, nonce) {
@@ -54,11 +56,28 @@
         canDelete = $component.data('can-delete') === true || $component.data('can-delete') === 'true';
         dashboardType = $component.data('dashboard') || 'sales_manager';
 
-        // Store ajax config
-        window.leadAjax = { url: ajaxUrl, nonce: nonce };
+        // Store ajax config - PRESERVE existing values if called without parameters
+        if (ajaxUrl && nonce) {
+            window.leadAjax = { url: ajaxUrl, nonce: nonce };
+            console.log('🔧 [Lead Component] Initialized');
+            console.log('🌐 AJAX URL:', ajaxUrl);
+            console.log('🔑 Nonce:', nonce);
+        } else if (window.leadAjax) {
+            console.log('⚠️ [Lead Component] Re-initialized without params - preserving existing config');
+            console.log('🌐 Existing AJAX URL:', window.leadAjax.url);
+        } else {
+            console.error('❌ [Lead Component] Cannot initialize without AJAX URL and nonce!');
+            return;
+        }
 
-        // Bind events
-        bindLeadEvents();
+        // Bind events only once to prevent double submissions
+        if (!eventsAlreadyBound) {
+            bindLeadEvents();
+            eventsAlreadyBound = true;
+            console.log('🔗 [Lead Component] Events bound');
+        } else {
+            console.log('⏭️ [Lead Component] Events already bound, skipping');
+        }
 
         // Load leads initially
         loadLeads();
@@ -258,6 +277,7 @@
                     <td class="lead-actions-cell">
                         <a href="https://wa.me/91${lead.phone.replace(/\D/g, '')}" target="_blank" class="lead-quick-action btn-icon" title="WhatsApp">💬</a>
                         <a href="tel:${lead.phone}" class="lead-quick-action btn-icon" title="Call">📞</a>
+                        ${dashboardType === 'sales_manager' ? `<button class="lead-quick-action btn-icon btn-book-cleaning" title="Book Cleaning" data-lead-id="${lead.id}" data-lead-name="${escapeHtml(lead.name)}">🧹</button>` : ''}
                     </td>
                 </tr>
             `;
@@ -278,6 +298,7 @@
                     <div class="lead-card-mobile-actions">
                         <a href="https://wa.me/91${lead.phone.replace(/\D/g, '')}" target="_blank" class="lead-quick-action">WhatsApp</a>
                         <a href="tel:${lead.phone}" class="lead-quick-action">Call</a>
+                        ${dashboardType === 'sales_manager' ? `<button class="lead-quick-action btn-book-cleaning" data-lead-id="${lead.id}" data-lead-name="${escapeHtml(lead.name)}">Book Cleaning</button>` : ''}
                     </div>
                 </div>
             `;
@@ -294,7 +315,7 @@
         $('#lead-followup-thread').html('<p>Loading follow-ups...</p>');
         openModal('#lead-detail-modal');
 
-        const action = dashboardType === 'area_manager' ? 'get_lead_details_for_am' : 'get_lead_details_for_sm';
+        const action = 'get_lead_details';  // Unified API for all roles
 
         $.ajax({
             url: window.leadAjax.url,
@@ -343,6 +364,16 @@
         $('#btn-whatsapp-detail').attr('href', `https://wa.me/91${lead.phone.replace(/\D/g, '')}`);
         $('#btn-call-detail').attr('href', `tel:${lead.phone}`);
 
+        // Add Book Cleaning button for SM
+        if (dashboardType === 'sales_manager') {
+            // Check if button exists, if not append it
+            if ($('#btn-book-cleaning-detail').length === 0) {
+                $('<button class="btn btn-secondary btn-book-cleaning" id="btn-book-cleaning-detail" style="background:#059669;color:white;">🧹 Book Cleaning</button>')
+                    .insertAfter('#btn-call-detail');
+            }
+            $('#btn-book-cleaning-detail').data('lead-id', lead.id).data('lead-name', lead.name);
+        }
+
         // Store lead data for create client
         $('#btn-create-client-detail').data('lead', lead);
 
@@ -384,24 +415,45 @@
         // Form serialization includes lead_nonce from the hidden field
         const formData = $form.serialize() + '&action=' + action;
 
+        console.log('🔵 [Lead Creation] Starting...');
+        console.log('📊 Dashboard Type:', dashboardType);
+        console.log('🎯 Action:', action);
+        console.log('📦 Form Data:', formData);
+
         $.ajax({
             url: window.leadAjax.url,
             type: 'POST',
             data: formData,
             beforeSend: function () {
+                console.log('⏳ [Lead Creation] Sending request...');
                 $form.find('button[type="submit"]').prop('disabled', true).text('Adding...');
             },
             success: function (response) {
+                console.log('✅ [Lead Creation] AJAX Success Response:', response);
+                console.log('📋 Response Success Flag:', response.success);
+                console.log('📋 Response Data:', response.data);
+
                 if (response.success) {
+                    console.log('✨ [Lead Creation] Lead created successfully!');
                     showToast('Lead created successfully! 🎉', 'success');
                     $form[0].reset();
                     closeModal('#add-lead-modal');
                     loadLeads();
                 } else {
+                    console.error('❌ [Lead Creation] Server returned success=false');
+                    console.error('Error Message:', response.data?.message);
                     showToast(response.data?.message || 'Error creating lead', 'error');
                 }
             },
+            error: function (xhr, status, error) {
+                console.error('🔴 [Lead Creation] AJAX Error');
+                console.error('Status:', status);
+                console.error('Error:', error);
+                console.error('XHR Response:', xhr.responseText);
+                showToast('Network error creating lead', 'error');
+            },
             complete: function () {
+                console.log('🏁 [Lead Creation] Request complete');
                 $form.find('button[type="submit"]').prop('disabled', false).text('➕ Add Lead');
             }
         });
@@ -443,11 +495,14 @@
 
     // Update lead status
     function updateLeadStatus(leadId, status) {
+        // Use role-specific action
+        const action = dashboardType === 'area_manager' ? 'update_solar_lead_status' : 'update_lead_by_sales_manager';
+
         $.ajax({
             url: window.leadAjax.url,
             type: 'POST',
             data: {
-                action: 'update_lead_by_sales_manager',
+                action: action,
                 nonce: window.leadAjax.nonce,
                 lead_id: leadId,
                 lead_status: status
@@ -460,7 +515,12 @@
                         .text(formatStatus(status))
                         .css({ background: statusStyle.bg, color: statusStyle.color });
                     loadLeads();
+                } else {
+                    showToast(response.data?.message || 'Failed to update status', 'error');
                 }
+            },
+            error: function () {
+                showToast('Network error while updating status', 'error');
             }
         });
     }
@@ -468,16 +528,73 @@
     // Navigate to create client (Area Manager only)
     function navigateToCreateClient(lead) {
         closeModal('#lead-detail-modal');
-        // Switch to Create Client section
-        $('.nav-item[data-section="create-client"]').click();
-        // Pre-fill form
-        setTimeout(() => {
-            $('#client_name').val(lead.name);
-            $('#client_email').val(lead.email || '');
-            const username = (lead.email || lead.name).split('@')[0].toLowerCase().replace(/\s/g, '_');
-            $('#client_username').val(username);
-        }, 100);
+
+        // Store lead ID for auto-conversion after client creation
+        leadIdToConvert = lead.id;
+        window.leadIdToConvert = lead.id;  // Make globally accessible for dashboard scripts
+
+        // Try to navigate to Create Client section
+        const $createClientNav = $('.nav-item[data-section="create-client"]');
+        if ($createClientNav.length) {
+            // Section navigation exists
+            $createClientNav.click();
+            // Pre-fill form after navigation
+            setTimeout(() => {
+                $('#client_name').val(lead.name);
+                $('#client_email').val(lead.email || '');
+                const username = (lead.email || lead.name).split('@')[0].toLowerCase().replace(/\s/g, '_');
+                $('#client_username').val(username);
+            }, 100);
+        } else {
+            // Fallback: Open client creation modal if it exists
+            const $createClientModal = $('#create-client-modal');
+            if ($createClientModal.length) {
+                $('#client_name').val(lead.name);
+                $('#client_email').val(lead.email || '');
+                const username = (lead.email || lead.name).split('@')[0].toLowerCase().replace(/\s/g, '_');
+                $('#client_username').val(username);
+                $createClientModal.css('display', 'flex');
+            } else {
+                showToast('Create Client feature not available in this view', 'error');
+            }
+        }
     }
+
+    // Auto-convert lead to 'converted' status when client is created
+    // This function should be called from dashboard scripts after successful client creation
+    window.autoConvertLeadToClient = function () {
+        if (window.leadIdToConvert && window.leadAjax) {
+            const leadId = window.leadIdToConvert;
+
+            // Determine the correct action based on dashboard type
+            const action = dashboardType === 'area_manager' ? 'update_solar_lead_status' : 'update_lead_by_sales_manager';
+
+            $.ajax({
+                url: window.leadAjax.url,
+                type: 'POST',
+                data: {
+                    action: action,
+                    nonce: window.leadAjax.nonce,
+                    lead_id: leadId,
+                    lead_status: 'converted'
+                },
+                success: function (response) {
+                    if (response.success) {
+                        showToast('Lead automatically marked as converted! 🎉', 'success');
+                        // Refresh leads list
+                        if (typeof loadLeads === 'function') {
+                            loadLeads();
+                        }
+                    }
+                },
+                complete: function () {
+                    // Clear the stored lead ID
+                    window.leadIdToConvert = null;
+                    leadIdToConvert = null;
+                }
+            });
+        }
+    };
 
     // Helper functions
     function openModal(selector) {
@@ -549,7 +666,7 @@
         if (typeof window.showToast === 'function') {
             window.showToast(message, type);
         } else {
-            console.log(`[${type}] ${message}`);
+            // console.log(`[${type}] ${message}`);
         }
     }
 

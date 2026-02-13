@@ -137,7 +137,7 @@ class KSC_Cleaning_Notifications {
         }
 
         // Log the notification attempt
-        error_log('[KSC Cleaning] Pre-service reminder sent to: ' . $phone);
+        // error_log('[KSC Cleaning] Pre-service reminder sent to: ' . $phone);
     }
 
     /**
@@ -189,7 +189,7 @@ class KSC_Cleaning_Notifications {
         do_action('ksc_send_whatsapp_message', $phone, $message);
 
         // Log the notification
-        error_log('[KSC Cleaning] Review request sent to: ' . $phone);
+        // error_log('[KSC Cleaning] Review request sent to: ' . $phone);
     }
 
     /**

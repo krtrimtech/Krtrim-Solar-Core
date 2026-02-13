@@ -1,9 +1,9 @@
 <?php
 /**
  * Plugin Name:       Krtrim Solar Core
- * Plugin URI:        https://krtrim.tech/tool
+ * Plugin URI:        https://krtrim.tech/wordpress
  * Description:       A comprehensive project management and bidding platform for solar companies, developed by Krtrim.
- * Version:           1.2.0
+ * Version:           1.3.3
  * Author:            Krtrim
  * Author URI:        https://krtrim.tech
  * License:           GPL-2.0+
@@ -23,7 +23,7 @@ if ( ! defined( 'WPINC' ) ) {
 final class Krtrim_Solar_Core {
 
 	private static $instance = null;
-	public $version = '1.2.0';
+	public $version = '1.3.3';
 	public $file = __FILE__;
 	public $dir_path;
 	public $dir_url;
@@ -58,6 +58,10 @@ final class Krtrim_Solar_Core {
 		require_once $this->dir_path . 'includes/class-process-steps-manager.php';
 		require_once $this->dir_path . 'includes/class-notifications-manager.php';
 		require_once $this->dir_path . 'includes/class-error-logger.php';
+        
+        // Components
+        require_once $this->dir_path . 'includes/components/class-lead-manager-component.php';
+
 		require_once $this->dir_path . 'includes/post-types/class-cleaning-cpts.php';
         require_once $this->dir_path . 'includes/post-types/class-coupon-cpt.php';
 		require_once $this->dir_path . 'includes/api/class-cleaner-api.php';
@@ -80,6 +84,7 @@ final class Krtrim_Solar_Core {
 		require_once $this->dir_path . 'public/views/view-client-dashboard.php';
 		require_once $this->dir_path . 'public/views/view-vendor-dashboard.php';
 		require_once $this->dir_path . 'public/views/view-area-manager-dashboard.php';
+		require_once $this->dir_path . 'public/views/view-manager-dashboard.php';
 		require_once $this->dir_path . 'public/views/view-sales-manager-dashboard.php';
 		require_once $this->dir_path . 'public/views/view-marketplace.php';
 		require_once $this->dir_path . 'public/views/view-vendor-registration.php';
@@ -104,6 +109,7 @@ final class Krtrim_Solar_Core {
 
 		add_shortcode( 'unified_solar_dashboard', [ $this, 'shortcode_unified_dashboard' ] );
 		add_shortcode( 'area_manager_dashboard', 'sp_area_manager_dashboard_shortcode' );
+		add_shortcode( 'manager_dashboard', 'sp_manager_dashboard_shortcode' );
 		add_shortcode( 'sales_manager_dashboard', 'sp_sales_manager_dashboard_shortcode' );
 		add_shortcode( 'vendor_registration_form', 'sp_vendor_registration_form_shortcode' );
 		add_shortcode( 'solar_project_marketplace', 'sp_project_marketplace_shortcode' );
@@ -156,9 +162,9 @@ final class Krtrim_Solar_Core {
                     return home_url( '/vendor-status/' );
                 }
             }
-            // Manager (generic)
+            // Manager (regional manager with multi-state access)
             if ( in_array( 'manager', $user->roles ) ) {
-                return home_url( '/solar-dashboard/' );
+                return home_url( '/manager-dashboard/' );
             }
         }
         return $redirect_to; // Default for administrators
@@ -356,9 +362,14 @@ final class Krtrim_Solar_Core {
             wp_enqueue_style('toast-css', $this->dir_url . 'assets/css/toast.css', [], '1.0.0');
             wp_enqueue_style('password-field-css', $this->dir_url . 'assets/css/password-field.css', [], '1.0.0');
             wp_enqueue_script( 'chart-js', 'https://cdn.jsdelivr.net/npm/chart.js', [], '3.7.0', true );
+            wp_enqueue_script('ksc-dashboard-utils', $this->dir_url . 'assets/js/components/dashboard-utils.js', ['jquery'], $this->version, true);
+            wp_enqueue_script('ksc-project-modal-component', $this->dir_url . 'assets/js/components/project-modal-component.js', ['jquery', 'ksc-dashboard-utils'], $this->version, true);
             wp_enqueue_script('project-modal-js', $this->dir_url . 'assets/js/project-modal.js', ['jquery'], '1.0.0', true);
-            wp_enqueue_script('lead-component-js', $this->dir_url . 'assets/js/components/lead-component.js', ['jquery'], '1.0.1', true);
-			wp_enqueue_script( 'area-manager-dashboard-js', $this->dir_url . 'assets/js/area-manager-dashboard.js', [ 'jquery', 'chart-js', 'lead-component-js' ], '1.0.7', true );
+            wp_enqueue_script('lead-component-js', $this->dir_url . 'assets/js/components/lead-component.js', ['jquery', 'ksc-dashboard-utils'], '1.0.6', true);
+            wp_enqueue_style('cleaner-component-css', $this->dir_url . 'assets/css/components/cleaner-component.css', [], '1.0.2');
+            wp_enqueue_script('cleaner-component-js', $this->dir_url . 'assets/js/components/cleaner-component.js', ['jquery', 'ksc-dashboard-utils'], '1.0.1', true);
+            wp_enqueue_script('ksc-team-analysis-component', $this->dir_url . 'assets/js/components/team-analysis-component.js', ['jquery'], $this->version, true);
+			wp_enqueue_script( 'area-manager-dashboard-js', $this->dir_url . 'assets/js/area-manager-dashboard.js', [ 'jquery', 'chart-js', 'lead-component-js', 'cleaner-component-js', 'ksc-dashboard-utils', 'ksc-project-modal-component', 'ksc-team-analysis-component' ], '1.0.9', true );
 			wp_localize_script('area-manager-dashboard-js', 'sp_area_dashboard_vars', [
 				'ajax_url' => admin_url('admin-ajax.php'),
 				'create_project_nonce' => wp_create_nonce('sp_create_project_nonce_field'),
@@ -376,7 +387,55 @@ final class Krtrim_Solar_Core {
                 'delete_lead_nonce' => wp_create_nonce('delete_lead_nonce'),
                 'send_message_nonce' => wp_create_nonce('send_message_nonce'),
                 'get_clients_nonce' => wp_create_nonce('get_clients_nonce'),
+                'get_clients_nonce' => wp_create_nonce('get_clients_nonce'),
                 'reset_password_nonce' => wp_create_nonce('reset_password_nonce'),
+                'cleaner_nonce' => wp_create_nonce('ksc_cleaner_nonce'),
+				'states_cities_json_url' => $this->dir_url . 'assets/data/indian-states-cities.json',
+			]);
+		}
+
+		// ✅ MANAGER DASHBOARD (Regional Manager with multi-state access)
+		global $post;
+		$is_manager_dash = is_a( $post, 'WP_Post' ) && ( has_shortcode( $post->post_content, 'manager_dashboard' ) || is_page( 'manager-dashboard' ) );
+		
+        if ( $is_manager_dash ) {
+			wp_enqueue_style('area-manager-modern', $this->dir_url . 'assets/css/area-manager-modern.css', [], '1.0.0');
+            wp_enqueue_style('cleaner-component-css', $this->dir_url . 'assets/css/components/cleaner-component.css', [], '1.0.2');
+			wp_enqueue_style('lead-component-css', $this->dir_url . 'assets/css/components/lead-component.css', [], '1.0.1');
+            wp_enqueue_style('leads-clients-enhanced', $this->dir_url . 'assets/css/leads-clients-enhanced.css', [], '1.0.0');
+            wp_enqueue_style('project-modal', $this->dir_url . 'assets/css/project-modal.css', [], '1.0.0');
+            wp_enqueue_style('date-picker-enhanced', $this->dir_url . 'assets/css/date-picker-enhanced.css', [], '1.0.0');
+            wp_enqueue_style('toast-css', $this->dir_url . 'assets/css/toast.css', [], '1.0.0');
+            wp_enqueue_style('password-field-css', $this->dir_url . 'assets/css/password-field.css', [], '1.0.0');
+            wp_enqueue_style('manager-dashboard-overrides', $this->dir_url . 'assets/css/manager-dashboard-overrides.css', [], '1.0.0');
+            wp_enqueue_script( 'chart-js', 'https://cdn.jsdelivr.net/npm/chart.js', [], '3.7.0', true );
+            wp_enqueue_script('ksc-dashboard-utils', $this->dir_url . 'assets/js/components/dashboard-utils.js', ['jquery'], $this->version, true);
+            wp_enqueue_script('ksc-project-modal-component', $this->dir_url . 'assets/js/components/project-modal-component.js', ['jquery', 'ksc-dashboard-utils'], $this->version, true);
+            wp_enqueue_script('project-modal-js', $this->dir_url . 'assets/js/project-modal.js', ['jquery'], '1.0.0', true);
+            wp_enqueue_script('lead-component-js', $this->dir_url . 'assets/js/components/lead-component.js', ['jquery', 'ksc-dashboard-utils'], '1.0.6', true);
+            wp_enqueue_script('cleaner-component-js', $this->dir_url . 'assets/js/components/cleaner-component.js', ['jquery', 'ksc-dashboard-utils'], '1.0.0', true);
+            wp_enqueue_script('ksc-team-analysis-component', $this->dir_url . 'assets/js/components/team-analysis-component.js', ['jquery'], $this->version, true);
+			wp_enqueue_script( 'manager-dashboard-js', $this->dir_url . 'assets/js/manager-dashboard.js', [ 'jquery', 'chart-js', 'lead-component-js', 'cleaner-component-js', 'ksc-dashboard-utils', 'ksc-project-modal-component', 'ksc-team-analysis-component' ], '1.0.4', true );
+			wp_localize_script('manager-dashboard-js', 'sp_area_dashboard_vars', [
+				'ajax_url' => admin_url('admin-ajax.php'),
+				'create_project_nonce' => wp_create_nonce('sp_create_project_nonce_field'),
+				'update_project_nonce' => wp_create_nonce('sp_update_project_nonce'),
+				'project_details_nonce' => wp_create_nonce('sp_project_details_nonce'),
+				'review_submission_nonce' => wp_create_nonce('sp_review_nonce'),
+				'award_bid_nonce' => wp_create_nonce('award_bid_nonce'),
+				'get_dashboard_stats_nonce' => wp_create_nonce('get_dashboard_stats_nonce'),
+				'get_projects_nonce' => wp_create_nonce('get_projects_nonce'),
+				'get_reviews_nonce' => wp_create_nonce('get_reviews_nonce'),
+				'get_vendor_approvals_nonce' => wp_create_nonce('get_vendor_approvals_nonce'),
+				'create_client_nonce' => wp_create_nonce('create_client_nonce'),
+                'get_leads_nonce' => wp_create_nonce('get_leads_nonce'),
+                'create_lead_nonce' => wp_create_nonce('create_lead_nonce'),
+                'delete_lead_nonce' => wp_create_nonce('delete_lead_nonce'),
+                'send_message_nonce' => wp_create_nonce('send_message_nonce'),
+                'get_clients_nonce' => wp_create_nonce('get_clients_nonce'),
+                'get_clients_nonce' => wp_create_nonce('get_clients_nonce'),
+                'reset_password_nonce' => wp_create_nonce('reset_password_nonce'),
+                'cleaner_nonce' => wp_create_nonce('ksc_cleaner_nonce'),
 				'states_cities_json_url' => $this->dir_url . 'assets/data/indian-states-cities.json',
 			]);
 		}
@@ -389,8 +448,9 @@ final class Krtrim_Solar_Core {
 			wp_enqueue_style('sales-manager-dashboard-css', $this->dir_url . 'assets/css/sales-manager-dashboard.css', ['area-manager-modern', 'lead-component-css'], '1.0.1');
 			wp_enqueue_style('toast-css', $this->dir_url . 'assets/css/toast.css', [], '1.0.0');
 			wp_enqueue_script('chart-js', 'https://cdn.jsdelivr.net/npm/chart.js', [], '3.7.0', true);
-			wp_enqueue_script('lead-component-js', $this->dir_url . 'assets/js/components/lead-component.js', ['jquery'], '1.0.1', true);
-			wp_enqueue_script('sales-manager-dashboard-js', $this->dir_url . 'assets/js/sales-manager-dashboard.js', ['jquery', 'chart-js', 'lead-component-js'], '1.0.1', true);
+            wp_enqueue_script('ksc-dashboard-utils', $this->dir_url . 'assets/js/components/dashboard-utils.js', ['jquery'], $this->version, true);
+			wp_enqueue_script('lead-component-js', $this->dir_url . 'assets/js/components/lead-component.js', ['jquery', 'ksc-dashboard-utils'], '1.0.6', true);
+			wp_enqueue_script('sales-manager-dashboard-js', $this->dir_url . 'assets/js/sales-manager-dashboard.js', ['jquery', 'chart-js', 'lead-component-js', 'ksc-dashboard-utils'], '1.0.2', true);
 			wp_localize_script('sales-manager-dashboard-js', 'sm_vars', [
 				'ajax_url' => admin_url('admin-ajax.php'),
 				'nonce' => wp_create_nonce('sp_sales_manager_nonce'),
@@ -524,7 +584,7 @@ final class Krtrim_Solar_Core {
 		
 		// Only load admin.js if it exists
 		if ( file_exists( $this->dir_path . 'assets/js/admin.js' ) ) {
-			wp_enqueue_script( 'ksc-admin-scripts', $this->dir_url . 'assets/js/admin.js', [ 'jquery' ], $this->version, true );
+			wp_enqueue_script( 'ksc-admin-scripts', $this->dir_url . 'assets/js/admin.js', [ 'jquery' ], time(), true );
 		}
 
 		if ( 'user-edit.php' === $hook || 'profile.php' === $hook ) {
@@ -572,6 +632,7 @@ final class Krtrim_Solar_Core {
 		return $template;
 	}
 }
+add_action('admin_init', 'sp_create_plugin_essentials');
 
 function run_krtrim_solar_core() {
 	return Krtrim_Solar_Core::instance();
@@ -665,6 +726,24 @@ function sp_create_plugin_essentials() {
 	) $charset_collate;";
 	dbDelta( $sql_followups );
 
+    // ✅ ACTIVITY LOGS TABLE (Hierarchical Visibility)
+    $table_logs = $wpdb->prefix . 'solar_activity_logs';
+    $sql_logs = "CREATE TABLE IF NOT EXISTS $table_logs (
+        id bigint(20) NOT NULL AUTO_INCREMENT,
+        user_id bigint(20) NOT NULL,
+        user_role varchar(50) NOT NULL,
+        action_type varchar(50) NOT NULL,
+        target_id bigint(20),
+        target_name varchar(255),
+        details text,
+        created_at datetime DEFAULT CURRENT_TIMESTAMP,
+        PRIMARY KEY (id),
+        KEY user_id (user_id),
+        KEY user_role (user_role),
+        KEY created_at (created_at)
+    ) $charset_collate;";
+    dbDelta( $sql_logs );
+
 	// Create custom roles
 	$roles = [
 		'manager'      => [
@@ -708,6 +787,7 @@ function sp_create_plugin_essentials() {
 		['title' => 'Dashboard', 'slug' => 'solar-dashboard', 'content' => '[unified_solar_dashboard]'],
 		['title' => 'Area Manager Dashboard', 'slug' => 'area-manager-dashboard', 'content' => '[area_manager_dashboard]'],
 		['title' => 'Sales Manager Dashboard', 'slug' => 'sales-manager-dashboard', 'content' => '[sales_manager_dashboard]'],
+		['title' => 'Manager Dashboard', 'slug' => 'manager-dashboard', 'content' => '[manager_dashboard]'],
 		['title' => 'Cleaner Dashboard', 'slug' => 'cleaner-dashboard', 'content' => '[cleaner_dashboard]'],
 		['title' => 'Vendor Registration', 'slug' => 'vendor-registration', 'content' => '[vendor_registration_form]'],
 		['title' => 'Project Marketplace', 'slug' => 'project-marketplace', 'content' => '[solar_project_marketplace]'],

@@ -961,7 +961,7 @@ function toggleProjectDetails(projectId) {
                     <h2 style="color: #333; margin-bottom: 10px;">No Cleaning Service</h2>
                     <p>You don't have an active solar panel cleaning subscription.</p>
                     <p style="margin-top: 20px;">
-                        <a href="<?php echo home_url('/cleaning-booking/'); ?>" style="display: inline-block; padding: 12px 24px; background: linear-gradient(135deg, #10b981 0%, #059669 100%); color: white; text-decoration: none; border-radius: 8px; font-weight: 600;">
+                        <a href="<?php echo home_url('/book-solar-cleaning/'); ?>" style="display: inline-block; padding: 12px 24px; background: linear-gradient(135deg, #10b981 0%, #059669 100%); color: white; text-decoration: none; border-radius: 8px; font-weight: 600;">
                             🧹 Book Cleaning Service
                         </a>
                     </p>

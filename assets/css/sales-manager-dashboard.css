@@ -418,34 +418,53 @@
 
 /* Modal Styles */
 .sales-manager-dashboard .modal,
+.sales-manager-dashboard .lead-modal,
 #add-lead-modal,
 #add-followup-modal,
-#lead-detail-modal {
-    position: fixed;
-    z-index: 10000;
-    left: 0;
-    top: 0;
-    width: 100%;
-    height: 100%;
-    background-color: rgba(0, 0, 0, 0.5);
-    display: flex;
-    align-items: center;
-    justify-content: center;
+#lead-detail-modal,
+#book-cleaning-modal,
+#schedule-visit-modal,
+#service-detail-modal,
+#edit-visit-modal,
+#cancel-visit-modal {
+    position: fixed !important;
+    z-index: 10000 !important;
+    left: 0 !important;
+    right: 0 !important;
+    top: 0 !important;
+    bottom: 0 !important;
+    width: 100% !important;
+    height: 100% !important;
+    background-color: rgba(0, 0, 0, 0.5) !important;
+    display: none;
+    /* JS will set to flex */
+    align-items: center !important;
+    justify-content: center !important;
+    margin: 0 !important;
+    padding: 0 !important;
 }
 
 .sales-manager-dashboard .modal-content,
+.sales-manager-dashboard .lead-modal-content,
 #add-lead-modal .modal-content,
 #add-followup-modal .modal-content,
-#lead-detail-modal .modal-content {
-    background: white;
-    border-radius: 16px;
-    padding: 32px;
-    max-width: 500px;
-    width: 90%;
-    max-height: 90vh;
-    overflow-y: auto;
-    position: relative;
-    animation: modalFadeIn 0.2s ease-out;
+#lead-detail-modal .modal-content,
+#book-cleaning-modal .modal-content,
+#schedule-visit-modal .modal-content,
+#service-detail-modal .modal-content,
+#edit-visit-modal .modal-content,
+#cancel-visit-modal .modal-content {
+    background: white !important;
+    border-radius: 16px !important;
+    padding: 32px !important;
+    max-width: 500px !important;
+    width: 90% !important;
+    max-height: 90vh !important;
+    overflow-y: auto !important;
+    /* position: relative !important; */
+    margin: auto !important;
+    animation: modalFadeIn 0.2s ease-out !important;
+    box-shadow: 0 10px 25px rgba(0, 0, 0, 0.2) !important;
 }
 
 @keyframes modalFadeIn {
@@ -461,23 +480,35 @@
 }
 
 .sales-manager-dashboard .close-modal,
+.sales-manager-dashboard .close-lead-modal,
 #add-lead-modal .close-modal,
 #add-followup-modal .close-modal,
-#lead-detail-modal .close-modal {
-    position: absolute;
-    right: 20px;
-    top: 20px;
-    font-size: 28px;
-    font-weight: bold;
-    color: #9ca3af;
-    cursor: pointer;
-    transition: color 0.2s;
+#lead-detail-modal .close-modal,
+#book-cleaning-modal .close-modal,
+#schedule-visit-modal .close-modal,
+#service-detail-modal .close-modal,
+#edit-visit-modal .close-modal,
+#cancel-visit-modal .close-modal {
+    position: absolute !important;
+    right: 20px !important;
+    top: 20px !important;
+    font-size: 28px !important;
+    font-weight: bold !important;
+    color: #9ca3af !important;
+    cursor: pointer !important;
+    transition: color 0.2s !important;
+    line-height: 1 !important;
 }
 
 .sales-manager-dashboard .close-modal:hover,
 #add-lead-modal .close-modal:hover,
 #add-followup-modal .close-modal:hover,
-#lead-detail-modal .close-modal:hover {
+#lead-detail-modal .close-modal:hover,
+#book-cleaning-modal .close-modal:hover,
+#schedule-visit-modal .close-modal:hover,
+#service-detail-modal .close-modal:hover,
+#edit-visit-modal .close-modal:hover,
+#cancel-visit-modal .close-modal:hover {
     color: #111827;
 }
 
