@@ -2227,7 +2227,8 @@
                 if (response.success) {
                     renderInlineLeadHistory(response.data.followups, historyContainer);
                 } else {
-                    historyContainer.html('<div style="text-align:center; color:#dc2626; padding:10px;">Error loading history.</div>');
+                    const msg = response.data && response.data.message ? response.data.message : 'Error loading history.';
+                    historyContainer.html(`<div style="text-align:center; color:#dc2626; padding:10px;">${msg}</div>`);
                 }
             },
             error: function () {

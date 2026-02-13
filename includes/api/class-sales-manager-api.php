@@ -155,8 +155,14 @@ class KSC_Sales_Manager_API {
             'filter_meta' => [] 
         ];
 
-         if (!empty($status_filter)) {
+        if (!empty($status_filter)) {
             $args['filter_meta']['status'] = $status_filter;
+        }
+        
+        // Add lead_type filter
+        $lead_type = isset($_POST['lead_type']) ? sanitize_text_field($_POST['lead_type']) : '';
+        if (!empty($lead_type)) {
+            $args['filter_meta']['lead_type'] = $lead_type;
         }
 
         // Use Component

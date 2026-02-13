@@ -461,7 +461,7 @@
     width: 90% !important;
     max-height: 90vh !important;
     overflow-y: auto !important;
-    position: relative !important;
+    /* position: relative !important; */
     margin: auto !important;
     animation: modalFadeIn 0.2s ease-out !important;
     box-shadow: 0 10px 25px rgba(0, 0, 0, 0.2) !important;

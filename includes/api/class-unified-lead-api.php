@@ -109,6 +109,11 @@ class KSC_Unified_Lead_API {
         // Check if created by Sales Manager
         $created_by_sm = get_post_meta($lead_id, '_created_by_sales_manager', true);
         
+        // Fallback to post author if meta is missing (for older leads or direct creation)
+        if (!$created_by_sm) {
+            $created_by_sm = $lead->post_author;
+        }
+        
         if ($created_by_sm) {
             // Creator SM has access
             if ($created_by_sm == $user->ID) {
@@ -117,7 +122,9 @@ class KSC_Unified_Lead_API {
             
             // Area Manager supervising this SM
             $sm_supervisor = get_user_meta($created_by_sm, '_supervised_by_area_manager', true);
-            if ($sm_supervisor == $user->ID) {
+            $sm_assigned_am = get_user_meta($created_by_sm, '_assigned_area_manager', true);
+            
+            if ($sm_supervisor == $user->ID || $sm_assigned_am == $user->ID) {
                 return true;
             }
             
