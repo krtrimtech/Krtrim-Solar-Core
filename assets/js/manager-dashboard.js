@@ -2202,33 +2202,80 @@
                                 'cancelled': '❌'
                             };
 
+                            // Timeline Logic
+                            const isCompleted = visit.status === 'completed';
+                            const isStarted = visit.status === 'in_progress' || isCompleted;
+                            const timelineId = `visit-timeline-${visit.id}`;
+                            const cleanerPill = visit.cleaner_name ? `<span style="font-size:11px; background:#f3f4f6; padding:2px 6px; border-radius:4px; margin-left:5px;">👤 ${visit.cleaner_name}</span>` : '';
+
                             html += `
-                                <div style="background: white; padding: 15px; border-radius: 6px; margin-bottom: 10px; border-left: 4px solid ${statusColors[visit.status] || '#6b7280'};">
-                                    <div style="display: flex; justify-content: space-between; align-items: start; margin-bottom: 8px;">
-                                        <strong>${statusIcons[visit.status] || '📍'} Visit ${index + 1}</strong>
-                                        <span style="background: ${statusColors[visit.status] || '#6b7280'}; color: white; padding: 2px 8px; border-radius: 4px; font-size: 12px;">${visit.status.toUpperCase()}</span>
-                                    </div>
-                                    <div style="font-size: 14px; color: #666;">
-                                        <div><strong>Date:</strong> ${visit.scheduled_date} at ${visit.scheduled_time || 'N/A'}</div>
-                                        <div><strong>Cleaner:</strong> ${visit.cleaner_name || 'Not assigned'}</div>
-                                        ${visit.completed_at ? `<div><strong>Completed:</strong> ${visit.completed_at}</div>` : ''}
-                                        ${visit.completion_notes ? `<div><strong>Notes:</strong> ${visit.completion_notes}</div>` : ''}
-                                    </div>
-                                    ${visit.status === 'scheduled' ? `
-                                        <div style="display: flex; gap: 8px; margin-top: 10px;">
-                                            <button class="btn btn-sm edit-visit-btn" 
-                                                    data-visit-id="${visit.id}" 
-                                                    data-service-id="${serviceId}"
-                                                    data-date="${visit.scheduled_date}"
-                                                    data-time="${visit.scheduled_time || ''}"
-                                                    data-cleaner-id="${visit.cleaner_id || ''}"
-                                                    style="background: #eab308; color: white;">✏️ Edit</button>
-                                            <button class="btn btn-sm cancel-visit-btn" 
-                                                    data-visit-id="${visit.id}" 
-                                                    style="background: #ef4444; color: white;">✕ Cancel</button>
+                            <div style="background: white; border-radius: 6px; margin-bottom: 10px; border-left: 4px solid ${statusColors[visit.status] || '#6b7280'}; box-shadow: 0 1px 2px rgba(0,0,0,0.05);">
+                                <div style="padding: 15px; display: flex; justify-content: space-between; align-items: center; cursor: pointer;" onclick="jQuery('#${timelineId}').slideToggle()">
+                                    <div>
+                                        <div style="font-weight: 600; color: #374151; display:flex; align-items:center;">
+                                            ${statusIcons[visit.status] || '📍'} Visit ${index + 1}
+                                            ${cleanerPill}
                                         </div>
-                                    ` : ''}
+                                        <div style="font-size: 12px; color: #6b7280; margin-top: 2px;">${visit.scheduled_date} • ${visit.scheduled_time || 'N/A'}</div>
+                                    </div>
+                                    <div style="display: flex; align-items: center; gap: 10px;">
+                                        <span style="background: ${statusColors[visit.status] || '#6b7280'}; color: white; padding: 2px 8px; border-radius: 4px; font-size: 11px; text-transform: uppercase;">${visit.status}</span>
+                                        <span style="color: #9ca3af; font-size: 12px;">▼</span>
+                                    </div>
                                 </div>
+                                
+                                <div id="${timelineId}" style="display: none; border-top: 1px solid #f3f4f6; padding: 15px; background: #f9fafb;">
+                                    <div style="position: relative; padding-left: 20px; border-left: 2px solid #e5e7eb; margin-left: 5px;">
+                                        <!-- Scheduled / Start Node -->
+                                        <div style="margin-bottom: 20px; position: relative;">
+                                            <div style="position: absolute; left: -26px; top: 0; background: ${isStarted ? '#10b981' : '#e5e7eb'}; width: 10px; height: 10px; border-radius: 50%; border: 2px solid white; box-shadow: 0 0 0 1px #d1d5db;"></div>
+                                            <div style="font-size: 13px; font-weight: 600; color: #374151;">Started / Check-in</div>
+                                            <div style="font-size: 12px; color: #6b7280;">
+                                                 ${visit.start_time ? `Time: ${visit.start_time}` : (isStarted ? 'Started (Time N/A)' : 'Not started yet')}
+                                            </div>
+                                            
+                                            ${visit.before_photo ? `
+                                            <div style="margin-top: 8px;">
+                                                <a href="${visit.before_photo}" target="_blank" style="display: inline-block;">
+                                                    <img src="${visit.before_photo}" style="width: 80px; height: 80px; object-fit: cover; border-radius: 4px; border: 1px solid #d1d5db;">
+                                                </a>
+                                                <div style="font-size: 10px; color: #6b7280; margin-top:2px;">Before Cleaning</div>
+                                            </div>` : ''}
+                                        </div>
+
+                                        <!-- Completion Node -->
+                                        <div style="position: relative;">
+                                            <div style="position: absolute; left: -26px; top: 0; background: ${isCompleted ? '#10b981' : '#e5e7eb'}; width: 10px; height: 10px; border-radius: 50%; border: 2px solid white; box-shadow: 0 0 0 1px #d1d5db;"></div>
+                                            <div style="font-size: 13px; font-weight: 600; color: #374151;">Completed</div>
+                                            ${visit.completed_at ? `<div style="font-size: 12px; color: #6b7280;">Time: ${visit.completed_at}</div>` : '<div style="font-size: 12px; color: #9ca3af;">Pending completion</div>'}
+                                            
+                                            ${visit.completion_notes ? `<div style="font-size: 12px; font-style: italic; color: #4b5563; margin-top:5px; background: white; padding: 8px; border-radius: 4px; border: 1px solid #e5e7eb;">"${visit.completion_notes}"</div>` : ''}
+
+                                            ${visit.completion_photo ? `
+                                            <div style="margin-top: 8px;">
+                                                <a href="${visit.completion_photo}" target="_blank" style="display: inline-block;">
+                                                    <img src="${visit.completion_photo}" style="width: 80px; height: 80px; object-fit: cover; border-radius: 4px; border: 1px solid #d1d5db;">
+                                                </a>
+                                                <div style="font-size: 10px; color: #6b7280; margin-top:2px;">After Cleaning</div>
+                                            </div>` : ''}
+                                        </div>
+                                    </div>
+
+                                    ${visit.status === 'scheduled' ? `
+                                    <div style="margin-top: 15px; padding-top: 15px; border-top: 1px dashed #e5e7eb; display: flex; gap: 10px; justify-content: flex-end;">
+                                         <button class="btn btn-sm edit-visit-btn" 
+                                                data-visit-id="${visit.id}" 
+                                                data-service-id="${serviceId}"
+                                                data-date="${visit.scheduled_date}"
+                                                data-time="${visit.scheduled_time || ''}"
+                                                data-cleaner-id="${visit.cleaner_id || ''}"
+                                                style="background: #eab308; color: white; border:none; padding: 5px 12px; border-radius:4px; cursor:pointer;">✏️ Edit</button>
+                                        <button class="btn btn-sm cancel-visit-btn" 
+                                                data-visit-id="${visit.id}" 
+                                                style="background: #ef4444; color: white; border:none; padding: 5px 12px; border-radius:4px; cursor:pointer;">✕ Cancel</button>
+                                    </div>` : ''}
+                                </div>
+                            </div>
                             `;
                         });
                         html += '</div>';
@@ -2237,7 +2284,7 @@
                     html += '</div>';
 
                     content.html(html);
-                    $('#service-details-title').text(`Service Details - ${service.customer_name}`);
+                    $('#service-details-title').text(`Service Details - ${service.customer_name} `);
                 } else {
                     content.html('<p style="color: red; text-align: center;">Error loading service details.</p>');
                 }
@@ -2334,7 +2381,7 @@
         if (data.area_managers && data.area_managers.length > 0) {
             data.area_managers.forEach(am => {
                 amHtml += `
-                    <tr>
+                                < tr >
                         <td>${am.display_name || 'N/A'}</td>
                         <td>${am.email || 'N/A'}</td>
                         <td>${am.city || '-'}</td>
@@ -2350,8 +2397,8 @@
                                 👁️ View
                             </button>
                         </td>
-                    </tr>
-                `;
+                    </tr >
+                                `;
             });
         } else {
             amHtml = '<tr><td colspan="6">No area managers in your assigned states</td></tr>';
@@ -2363,7 +2410,7 @@
         if (data.sales_managers && data.sales_managers.length > 0) {
             data.sales_managers.forEach(sm => {
                 smHtml += `
-                    <tr>
+                                < tr >
                         <td>${sm.display_name || 'N/A'}</td>
                         <td>${sm.email || 'N/A'}</td>
                         <td>${sm.supervising_am || '-'}</td>
@@ -2378,8 +2425,8 @@
                                 👁️ View
                             </button>
                         </td>
-                    </tr>
-                `;
+                    </tr >
+                                `;
             });
         } else {
             smHtml = '<tr><td colspan="5">No sales managers found</td></tr>';
@@ -2392,7 +2439,7 @@
             data.cleaners.forEach(cleaner => {
                 const statusClass = cleaner.status === 'active' ? 'status-success' : 'status-warning';
                 cleanerHtml += `
-                    <tr>
+                                < tr >
                         <td>${cleaner.name || 'N/A'}</td>
                         <td>${cleaner.phone || '-'}</td>
                         <td>${cleaner.supervising_am || '-'}</td>
@@ -2407,8 +2454,8 @@
                                 👁️ View
                             </button>
                         </td>
-                    </tr>
-                `;
+                    </tr >
+                                `;
             });
         } else {
             cleanerHtml = '<tr><td colspan="5">No cleaners found</td></tr>';
@@ -2439,7 +2486,7 @@
                 let html = '<option value="">Select Area Manager</option>';
                 if (response.success && response.data.managers) {
                     response.data.managers.forEach(am => {
-                        html += `<option value="${am.ID}">${am.display_name} (${am.email})</option>`;
+                        html += `< option value = "${am.ID}" > ${am.display_name} (${am.email})</option > `;
                     });
                 }
                 $('#assign_am_id').html(html);
@@ -2460,7 +2507,7 @@
                 if (response.success && response.data.assignments && response.data.assignments.length > 0) {
                     response.data.assignments.forEach(assignment => {
                         html += `
-                            <tr>
+                            < tr >
                                 <td>${assignment.am_name}</td>
                                 <td>${assignment.state}</td>
                                 <td>${assignment.city}</td>
@@ -2470,8 +2517,8 @@
                                         🗑️ Remove
                                     </button>
                                 </td>
-                            </tr>
-                        `;
+                            </tr >
+                            `;
                     });
                 } else {
                     html = '<tr><td colspan="4">No area assignments found</td></tr>';
@@ -2501,7 +2548,7 @@
                 let html = '<option value="">Select City</option>';
                 if (response.success && response.data.cities) {
                     response.data.cities.forEach(city => {
-                        html += `<option value="${city}">${city}</option>`;
+                        html += `< option value = "${city}" > ${city}</option > `;
                     });
                 }
                 $('#assign_city').html(html);
@@ -2647,24 +2694,24 @@
         html += '<div class="detail-section">';
         html += '<h3>📋 Basic Information</h3>';
         html += '<div class="member-stats-grid">';
-        html += `<div class="member-stat-card"><h4>${data.user_info.name}</h4><span>Name</span></div>`;
-        html += `<div class="member-stat-card"><h4>${data.user_info.email}</h4><span>Email</span></div>`;
+        html += `< div class="member-stat-card" ><h4>${data.user_info.name}</h4><span>Name</span></div > `;
+        html += `< div class="member-stat-card" ><h4>${data.user_info.email}</h4><span>Email</span></div > `;
         if (data.user_info.phone) {
-            html += `<div class="member-stat-card"><h4>${data.user_info.phone}</h4><span>Phone</span></div>`;
+            html += `< div class="member-stat-card" ><h4>${data.user_info.phone}</h4><span>Phone</span></div > `;
         }
         // Show Photo if available
         if (data.user_info.photo_url) {
-            html += `<div class="member-stat-card">
-                <img src="${data.user_info.photo_url}" style="width:50px; height:50px; border-radius:50%; object-fit:cover; margin-bottom:5px;">
-                <span>Photo</span>
-             </div>`;
+            html += `< div class="member-stat-card" >
+                            <img src="${data.user_info.photo_url}" style="width:50px; height:50px; border-radius:50%; object-fit:cover; margin-bottom:5px;">
+                                <span>Photo</span>
+                            </div>`;
         }
 
         if (data.user_info.state) {
-            html += `<div class="member-stat-card"><h4>${data.user_info.state}</h4><span>State</span></div>`;
+            html += `< div class="member-stat-card" ><h4>${data.user_info.state}</h4><span>State</span></div > `;
         }
         if (data.user_info.city) {
-            html += `<div class="member-stat-card"><h4>${data.user_info.city}</h4><span>City</span></div>`;
+            html += `< div class="member-stat-card" ><h4>${data.user_info.city}</h4><span>City</span></div > `;
         }
         html += '</div></div>';
 
@@ -2674,13 +2721,13 @@
             html += '<h3>📑 Documents</h3>';
             html += '<div class="member-stats-grid">';
             if (data.user_info.aadhaar_number) {
-                html += `<div class="member-stat-card"><h4>${data.user_info.aadhaar_number}</h4><span>Aadhaar Number</span></div>`;
+                html += `< div class="member-stat-card" ><h4>${data.user_info.aadhaar_number}</h4><span>Aadhaar Number</span></div > `;
             }
             if (data.user_info.aadhaar_image_url) {
-                html += `<div class="member-stat-card">
+                html += `< div class="member-stat-card" >
                     <a href="${data.user_info.aadhaar_image_url}" target="_blank" class="btn btn-sm btn-info">👁️ View Aadhaar Card</a>
                     <span style="margin-top:5px;">Document</span>
-                 </div>`;
+                 </div > `;
             }
             html += '</div></div>';
         }
@@ -2691,17 +2738,17 @@
         html += '<div class="member-stats-grid">';
 
         if (role === 'area_manager') {
-            html += `<div class="member-stat-card"><h4>${data.stats.total_projects || 0}</h4><span>Total Projects</span></div>`;
-            html += `<div class="member-stat-card"><h4>${data.stats.total_leads || 0}</h4><span>Total Leads</span></div>`;
-            html += `<div class="member-stat-card"><h4>${data.stats.team_size || 0}</h4><span>Team Size</span></div>`;
+            html += `< div class="member-stat-card" ><h4>${data.stats.total_projects || 0}</h4><span>Total Projects</span></div > `;
+            html += `< div class="member-stat-card" ><h4>${data.stats.total_leads || 0}</h4><span>Total Leads</span></div > `;
+            html += `< div class="member-stat-card" ><h4>${data.stats.team_size || 0}</h4><span>Team Size</span></div > `;
         } else if (role === 'sales_manager') {
-            html += `<div class="member-stat-card"><h4>${data.stats.total_leads || 0}</h4><span>Total Leads</span></div>`;
-            html += `<div class="member-stat-card"><h4>${data.stats.conversions || 0}</h4><span>Conversions</span></div>`;
-            html += `<div class="member-stat-card"><h4>${data.stats.conversion_rate || 0}%</h4><span>Conversion Rate</span></div>`;
+            html += `< div class="member-stat-card" ><h4>${data.stats.total_leads || 0}</h4><span>Total Leads</span></div > `;
+            html += `< div class="member-stat-card" ><h4>${data.stats.conversions || 0}</h4><span>Conversions</span></div > `;
+            html += `< div class="member-stat-card" ><h4>${data.stats.conversion_rate || 0}%</h4><span>Conversion Rate</span></div > `;
         } else if (role === 'cleaner') {
-            html += `<div class="member-stat-card"><h4>${data.stats.completed_visits || 0}</h4><span>Completed Visits</span></div>`;
-            html += `<div class="member-stat-card"><h4>${data.stats.pending_visits || 0}</h4><span>Pending Visits</span></div>`;
-            html += `<div class="member-stat-card"><h4>${data.stats.completion_rate || 0}%</h4><span>Completion Rate</span></div>`;
+            html += `< div class="member-stat-card" ><h4>${data.stats.completed_visits || 0}</h4><span>Completed Visits</span></div > `;
+            html += `< div class="member-stat-card" ><h4>${data.stats.pending_visits || 0}</h4><span>Pending Visits</span></div > `;
+            html += `< div class="member-stat-card" ><h4>${data.stats.completion_rate || 0}%</h4><span>Completion Rate</span></div > `;
         }
         html += '</div></div>';
 
@@ -2712,12 +2759,12 @@
             html += '<div class="table-responsive">';
             html += '<table class="data-table"><thead><tr><th>Project</th><th>Status</th><th>Location</th><th>Cost</th></tr></thead><tbody>';
             data.projects.slice(0, 10).forEach(project => {
-                html += `<tr>
+                html += `< tr >
                     <td>${project.title}</td>
                     <td><span class="badge badge-${project.status}">${project.status}</span></td>
                     <td>${project.city}, ${project.state}</td>
                     <td>₹${parseFloat(project.cost || 0).toLocaleString()}</td>
-                </tr>`;
+                </tr > `;
             });
             html += '</tbody></table></div></div>';
         }
@@ -2729,13 +2776,13 @@
             html += '<div class="table-responsive">';
             html += '<table class="data-table"><thead><tr><th>Name</th><th>Phone</th><th>Status</th><th>Location</th><th>Created</th></tr></thead><tbody>';
             data.leads.slice(0, 10).forEach(lead => {
-                html += `<tr>
+                html += `< tr >
                     <td>${lead.name}</td>
                     <td>${lead.phone}</td>
                     <td><span class="badge badge-${lead.status}">${lead.status}</span></td>
                     <td>${lead.city}</td>
                     <td>${lead.created_date}</td>
-                </tr>`;
+                </tr > `;
             });
             html += '</tbody></table></div></div>';
         }
@@ -2747,14 +2794,14 @@
             html += '<div class="table-responsive">';
             html += '<table class="data-table"><thead><tr><th>Name</th><th>Role</th><th>Email</th><th>Phone</th><th>Leads</th><th>Joined</th></tr></thead><tbody>';
             data.team_members.forEach(member => {
-                html += `<tr>
+                html += `< tr >
                     <td>${member.name}</td>
                     <td><span class="badge badge-info">${member.role}</span></td>
                     <td>${member.email}</td>
                     <td>${member.phone || '-'}</td>
                     <td>${member.lead_count || 0}</td>
                     <td>${member.joined_date}</td>
-                </tr>`;
+                </tr > `;
             });
             html += '</tbody></table></div></div>';
         }
@@ -2766,12 +2813,12 @@
             html += '<div class="table-responsive">';
             html += '<table class="data-table"><thead><tr><th>Date</th><th>Client</th><th>Location</th><th>Status</th></tr></thead><tbody>';
             data.visits.slice(0, 10).forEach(visit => {
-                html += `<tr>
+                html += `< tr >
                     <td>${visit.visit_date}</td>
                     <td>${visit.client_name}</td>
                     <td>${visit.location}</td>
                     <td><span class="badge badge-${visit.status}">${visit.status}</span></td>
-                </tr>`;
+                </tr > `;
             });
             html += '</tbody></table></div></div>';
         }
@@ -2782,10 +2829,10 @@
             html += '<h3>⏱️ Recent Activity</h3>';
             html += '<div class="activity-timeline">';
             data.recent_activity.forEach(activity => {
-                html += `<div class="activity-item">
+                html += `< div class="activity-item" >
                     <div class="activity-time">${activity.time}</div>
                     <p class="activity-desc">${activity.description}</p>
-                </div>`;
+                </div > `;
             });
             html += '</div></div>';
         }
@@ -2822,7 +2869,7 @@
                     options += '<option value="0">Not Assigned</option>'; // Allow unassigning
                     response.data.forEach(cleaner => {
                         const isSelected = selectedId && String(cleaner.id) === String(selectedId) ? 'selected' : '';
-                        options += `<option value="${cleaner.id}" ${isSelected}>${cleaner.name} (${cleaner.phone})</option>`;
+                        options += `< option value = "${cleaner.id}" ${isSelected}> ${cleaner.name} (${cleaner.phone})</option > `;
                     });
                     select.html(options);
                 } else {
@@ -2837,39 +2884,39 @@
 
     // Append Edit Modal to Body
     $('body').append(`
-        <div id="edit-visit-modal" class="modal" style="display: none; position: fixed; z-index: 1050; left: 0; top: 0; width: 100%; height: 100%; overflow: auto; background-color: rgba(0,0,0,0.4);">
-            <div class="modal-content" style="background-color: #fefefe; margin: 10% auto; padding: 20px; border: 1px solid #888; width: 90%; max-width: 500px; border-radius: 8px;">
-                <span class="close-modal" data-modal="edit-visit-modal" style="color: #aaa; float: right; font-size: 28px; font-weight: bold; cursor: pointer;">&times;</span>
-                <h3 style="margin-top: 0; color: #1f2937;">✏️ Edit Visit</h3>
-                <form id="edit-visit-form">
-                    <input type="hidden" id="edit_visit_id" name="visit_id">
-                    <input type="hidden" id="edit_service_id" name="service_id">
-                    
-                    <div class="form-group" style="margin-bottom: 15px;">
-                        <label style="display: block; margin-bottom: 5px; font-weight: 500;">📅 Date</label>
-                        <input type="date" id="edit_scheduled_date" name="scheduled_date" required style="width: 100%; padding: 8px; border: 1px solid #d1d5db; border-radius: 4px;">
-                    </div>
+            < div id = "edit-visit-modal" class="modal" style = "display: none; position: fixed; z-index: 1050; left: 0; top: 0; width: 100%; height: 100%; overflow: auto; background-color: rgba(0,0,0,0.4);" >
+                <div class="modal-content" style="background-color: #fefefe; margin: 10% auto; padding: 20px; border: 1px solid #888; width: 90%; max-width: 500px; border-radius: 8px;">
+                    <span class="close-modal" data-modal="edit-visit-modal" style="color: #aaa; float: right; font-size: 28px; font-weight: bold; cursor: pointer;">&times;</span>
+                    <h3 style="margin-top: 0; color: #1f2937;">✏️ Edit Visit</h3>
+                    <form id="edit-visit-form">
+                        <input type="hidden" id="edit_visit_id" name="visit_id">
+                            <input type="hidden" id="edit_service_id" name="service_id">
 
-                    <div class="form-group" style="margin-bottom: 15px;">
-                        <label style="display: block; margin-bottom: 5px; font-weight: 500;">⏰ Time</label>
-                        <input type="time" id="edit_scheduled_time" name="scheduled_time" style="width: 100%; padding: 8px; border: 1px solid #d1d5db; border-radius: 4px;">
-                    </div>
+                                <div class="form-group" style="margin-bottom: 15px;">
+                                    <label style="display: block; margin-bottom: 5px; font-weight: 500;">📅 Date</label>
+                                    <input type="date" id="edit_scheduled_date" name="scheduled_date" required style="width: 100%; padding: 8px; border: 1px solid #d1d5db; border-radius: 4px;">
+                                </div>
 
-                    <div class="form-group" style="margin-bottom: 15px;">
-                        <label style="display: block; margin-bottom: 5px; font-weight: 500;">👤 Cleaner</label>
-                        <select id="edit_cleaner_id" name="cleaner_id" style="width: 100%; padding: 8px; border: 1px solid #d1d5db; border-radius: 4px;">
-                            <option value="">Loading...</option>
-                        </select>
-                    </div>
+                                <div class="form-group" style="margin-bottom: 15px;">
+                                    <label style="display: block; margin-bottom: 5px; font-weight: 500;">⏰ Time</label>
+                                    <input type="time" id="edit_scheduled_time" name="scheduled_time" style="width: 100%; padding: 8px; border: 1px solid #d1d5db; border-radius: 4px;">
+                                </div>
 
-                    <div style="text-align: right; margin-top: 20px;">
-                        <button type="button" class="btn close-modal-btn" data-modal="edit-visit-modal" style="background: #9ca3af; color: white; padding: 8px 16px; border: none; border-radius: 4px; margin-right: 10px;">Cancel</button>
-                        <button type="submit" class="btn" style="background: #3b82f6; color: white; padding: 8px 16px; border: none; border-radius: 4px;">Update Visit</button>
-                    </div>
-                </form>
-            </div>
-        </div>
-    `);
+                                <div class="form-group" style="margin-bottom: 15px;">
+                                    <label style="display: block; margin-bottom: 5px; font-weight: 500;">👤 Cleaner</label>
+                                    <select id="edit_cleaner_id" name="cleaner_id" style="width: 100%; padding: 8px; border: 1px solid #d1d5db; border-radius: 4px;">
+                                        <option value="">Loading...</option>
+                                    </select>
+                                </div>
+
+                                <div style="text-align: right; margin-top: 20px;">
+                                    <button type="button" class="btn close-modal-btn" data-modal="edit-visit-modal" style="background: #9ca3af; color: white; padding: 8px 16px; border: none; border-radius: 4px; margin-right: 10px;">Cancel</button>
+                                    <button type="submit" class="btn" style="background: #3b82f6; color: white; padding: 8px 16px; border: none; border-radius: 4px;">Update Visit</button>
+                                </div>
+                            </form>
+                        </div>
+                </div>
+        `);
 
     // Edit Visit Button Click
     $(document).on('click', '.edit-visit-btn', function (e) {
@@ -2935,7 +2982,7 @@
     // Close Modal Handlers (Generic)
     $(document).on('click', '.close-modal, .close-modal-btn', function () {
         const modalId = $(this).data('modal');
-        $(`#${modalId}`).hide();
+        $(`#${modalId} `).hide();
     });
 
     $(window).on('click', function (e) {

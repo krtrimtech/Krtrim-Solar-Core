@@ -244,7 +244,10 @@ class KSC_Cleaning_Services_API {
                 'status' => get_post_meta($visit->ID, '_status', true),
                 'cleaner_id' => $cleaner_id,
                 'cleaner_name' => $cleaner_name,
-                'completion_photo' => get_post_meta($visit->ID, '_completion_photo', true),
+                'start_time' => get_post_meta($visit->ID, '_start_time', true),
+                'start_location' => get_post_meta($visit->ID, '_start_location', true),
+                'before_photo' => $this->get_photo_url_helper(get_post_meta($visit->ID, '_before_photo', true)),
+                'completion_photo' => $this->get_photo_url_helper(get_post_meta($visit->ID, '_completion_photo', true)),
                 'completion_notes' => get_post_meta($visit->ID, '_completion_notes', true),
                 'completed_at' => get_post_meta($visit->ID, '_completed_at', true),
             ];
@@ -268,6 +271,19 @@ class KSC_Cleaning_Services_API {
             ],
             'visits' => $visit_data,
         ]);
+    }
+
+    /**
+     * Helper to get photo URL from ID or string
+     */
+    private function get_photo_url_helper($photo_val) {
+        if (empty($photo_val)) {
+            return '';
+        }
+        if (is_numeric($photo_val)) {
+            return wp_get_attachment_url($photo_val);
+        }
+        return $photo_val;
     }
 
     /**

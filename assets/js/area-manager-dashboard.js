@@ -2534,33 +2534,80 @@
                                 'cancelled': '❌'
                             };
 
+                            // Timeline Logic
+                            const isCompleted = visit.status === 'completed';
+                            const isStarted = visit.status === 'in_progress' || isCompleted;
+                            const timelineId = `visit-timeline-${visit.id}`;
+                            const cleanerPill = visit.cleaner_name ? `<span style="font-size:11px; background:#f3f4f6; padding:2px 6px; border-radius:4px; margin-left:5px;">👤 ${visit.cleaner_name}</span>` : '';
+
                             html += `
-                                <div style="background: white; padding: 15px; border-radius: 6px; margin-bottom: 10px; border-left: 4px solid ${statusColors[visit.status] || '#6b7280'};">
-                                    <div style="display: flex; justify-content: space-between; align-items: start; margin-bottom: 8px;">
-                                        <strong>${statusIcons[visit.status] || '📍'} Visit ${index + 1}</strong>
-                                        <span style="background: ${statusColors[visit.status] || '#6b7280'}; color: white; padding: 2px 8px; border-radius: 4px; font-size: 12px;">${visit.status.toUpperCase()}</span>
-                                    </div>
-                                    <div style="font-size: 14px; color: #666; margin-bottom: 10px;">
-                                        <div><strong>Date:</strong> ${visit.scheduled_date} at ${visit.scheduled_time || 'N/A'}</div>
-                                        <div><strong>Cleaner:</strong> ${visit.cleaner_name || '<span style="color: #dc2626;">Not assigned</span>'}</div>
-                                        ${visit.completed_at ? `<div><strong>Completed:</strong> ${visit.completed_at}</div>` : ''}
-                                        ${visit.completion_notes ? `<div><strong>Notes:</strong> ${visit.completion_notes}</div>` : ''}
-                                    </div>
-                                    ${visit.status === 'scheduled' ? `
-                                        <div style="display: flex; gap: 8px; margin-top: 10px;">
-                                            <button class="btn btn-sm edit-visit-btn" 
-                                                    data-visit-id="${visit.id}"
-                                                    data-service-id="${serviceId}"
-                                                    data-date="${visit.scheduled_date}"
-                                                    data-time="${visit.scheduled_time || ''}"
-                                                    data-cleaner-id="${visit.cleaner_id || ''}"
-                                                    style="background: #eab308; color: white;">✏️ Edit</button>
-                                            <button class="btn btn-sm cancel-visit-btn" 
-                                                    data-visit-id="${visit.id}" 
-                                                    style="background: #ef4444; color: white;">✕ Cancel</button>
+                            <div style="background: white; border-radius: 6px; margin-bottom: 10px; border-left: 4px solid ${statusColors[visit.status] || '#6b7280'}; box-shadow: 0 1px 2px rgba(0,0,0,0.05);">
+                                <div style="padding: 15px; display: flex; justify-content: space-between; align-items: center; cursor: pointer;" onclick="jQuery('#${timelineId}').slideToggle()">
+                                    <div>
+                                        <div style="font-weight: 600; color: #374151; display:flex; align-items:center;">
+                                            ${statusIcons[visit.status] || '📍'} Visit ${index + 1}
+                                            ${cleanerPill}
                                         </div>
-                                    ` : ''}
+                                        <div style="font-size: 12px; color: #6b7280; margin-top: 2px;">${visit.scheduled_date} • ${visit.scheduled_time || 'N/A'}</div>
+                                    </div>
+                                    <div style="display: flex; align-items: center; gap: 10px;">
+                                        <span style="background: ${statusColors[visit.status] || '#6b7280'}; color: white; padding: 2px 8px; border-radius: 4px; font-size: 11px; text-transform: uppercase;">${visit.status}</span>
+                                        <span style="color: #9ca3af; font-size: 12px;">▼</span>
+                                    </div>
                                 </div>
+                                
+                                <div id="${timelineId}" style="display: none; border-top: 1px solid #f3f4f6; padding: 15px; background: #f9fafb;">
+                                    <div style="position: relative; padding-left: 20px; border-left: 2px solid #e5e7eb; margin-left: 5px;">
+                                        <!-- Scheduled / Start Node -->
+                                        <div style="margin-bottom: 20px; position: relative;">
+                                            <div style="position: absolute; left: -26px; top: 0; background: ${isStarted ? '#10b981' : '#e5e7eb'}; width: 10px; height: 10px; border-radius: 50%; border: 2px solid white; box-shadow: 0 0 0 1px #d1d5db;"></div>
+                                            <div style="font-size: 13px; font-weight: 600; color: #374151;">Started / Check-in</div>
+                                            <div style="font-size: 12px; color: #6b7280;">
+                                                 ${visit.start_time ? `Time: ${visit.start_time}` : (isStarted ? 'Started (Time N/A)' : 'Not started yet')}
+                                            </div>
+                                            
+                                            ${visit.before_photo ? `
+                                            <div style="margin-top: 8px;">
+                                                <a href="${visit.before_photo}" target="_blank" style="display: inline-block;">
+                                                    <img src="${visit.before_photo}" style="width: 80px; height: 80px; object-fit: cover; border-radius: 4px; border: 1px solid #d1d5db;">
+                                                </a>
+                                                <div style="font-size: 10px; color: #6b7280; margin-top:2px;">Before Cleaning</div>
+                                            </div>` : ''}
+                                        </div>
+
+                                        <!-- Completion Node -->
+                                        <div style="position: relative;">
+                                            <div style="position: absolute; left: -26px; top: 0; background: ${isCompleted ? '#10b981' : '#e5e7eb'}; width: 10px; height: 10px; border-radius: 50%; border: 2px solid white; box-shadow: 0 0 0 1px #d1d5db;"></div>
+                                            <div style="font-size: 13px; font-weight: 600; color: #374151;">Completed</div>
+                                            ${visit.completed_at ? `<div style="font-size: 12px; color: #6b7280;">Time: ${visit.completed_at}</div>` : '<div style="font-size: 12px; color: #9ca3af;">Pending completion</div>'}
+                                            
+                                            ${visit.completion_notes ? `<div style="font-size: 12px; font-style: italic; color: #4b5563; margin-top:5px; background: white; padding: 8px; border-radius: 4px; border: 1px solid #e5e7eb;">"${visit.completion_notes}"</div>` : ''}
+
+                                            ${visit.completion_photo ? `
+                                            <div style="margin-top: 8px;">
+                                                <a href="${visit.completion_photo}" target="_blank" style="display: inline-block;">
+                                                    <img src="${visit.completion_photo}" style="width: 80px; height: 80px; object-fit: cover; border-radius: 4px; border: 1px solid #d1d5db;">
+                                                </a>
+                                                <div style="font-size: 10px; color: #6b7280; margin-top:2px;">After Cleaning</div>
+                                            </div>` : ''}
+                                        </div>
+                                    </div>
+
+                                    ${visit.status === 'scheduled' ? `
+                                    <div style="margin-top: 15px; padding-top: 15px; border-top: 1px dashed #e5e7eb; display: flex; gap: 10px; justify-content: flex-end;">
+                                         <button class="btn btn-sm edit-visit-btn" 
+                                                data-visit-id="${visit.id}"
+                                                data-service-id="${serviceId}"
+                                                data-date="${visit.scheduled_date}"
+                                                data-time="${visit.scheduled_time || ''}"
+                                                data-cleaner-id="${visit.cleaner_id || ''}"
+                                                style="background: #eab308; color: white; border:none; padding: 5px 12px; border-radius:4px; cursor:pointer;">✏️ Edit</button>
+                                        <button class="btn btn-sm cancel-visit-btn" 
+                                                data-visit-id="${visit.id}" 
+                                                style="background: #ef4444; color: white; border:none; padding: 5px 12px; border-radius:4px; cursor:pointer;">✕ Cancel</button>
+                                    </div>` : ''}
+                                </div>
+                            </div>
                             `;
                         });
                         html += '</div>';
