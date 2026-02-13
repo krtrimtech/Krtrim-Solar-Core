@@ -2651,10 +2651,22 @@ class KSC_Admin_Manager_API extends KSC_API_Base {
         $sm_data = [];
         $cleaner_data = [];
         $total_projects = 0;
+        
+        // Date range for "this month"
+        $first_day_this_month = date('Y-m-01 00:00:00');
 
         foreach ($ams as $am) {
             $project_ids = $this->get_am_visible_project_ids($am->ID);
             $total_projects += count($project_ids);
+            
+            // Calculate projects this month
+            $projects_this_month = 0;
+            foreach ($project_ids as $pid) {
+                $post_date = get_the_date('Y-m-d H:i:s', $pid);
+                if ($post_date >= $first_day_this_month) {
+                    $projects_this_month++;
+                }
+            }
             
             // Get SMs for this AM
             $sms = get_users([
@@ -2670,13 +2682,18 @@ class KSC_Admin_Manager_API extends KSC_API_Base {
                 'meta_value' => $am->ID
             ]);
 
+            $city = get_user_meta($am->ID, 'city', true) ?: '-';
+            $state = get_user_meta($am->ID, 'state', true) ?: '-';
+
             $am_data[] = [
                 'id' => $am->ID,
                 'display_name' => $am->display_name,
                 'email' => $am->user_email,
-                'city' => get_user_meta($am->ID, 'city', true) ?: '-',
-                'state' => get_user_meta($am->ID, 'state', true) ?: '-',
+                'city' => $city,
+                'state' => $state,
+                'location' => ($city !== '-' && $state !== '-') ? "$city, $state" : 'Not Assigned',
                 'project_count' => count($project_ids),
+                'projects_this_month' => $projects_this_month,
                 'team_size' => count($sms) + count($cleaners)
             ];
 
@@ -2687,6 +2704,13 @@ class KSC_Admin_Manager_API extends KSC_API_Base {
                     "SELECT COUNT(*) FROM {$wpdb->posts} WHERE post_type = 'solar_lead' AND post_author = %d",
                     $sm->ID
                 ));
+                
+                $leads_this_month = $wpdb->get_var($wpdb->prepare(
+                    "SELECT COUNT(*) FROM {$wpdb->posts} WHERE post_type = 'solar_lead' AND post_author = %d AND post_date >= %s",
+                    $sm->ID,
+                    $first_day_this_month
+                ));
+                
                 $converted = $wpdb->get_var($wpdb->prepare(
                     "SELECT COUNT(*) FROM {$wpdb->posts} WHERE post_type = 'solar_lead' AND post_author = %d AND post_status = 'publish' AND ID IN (SELECT post_id FROM {$wpdb->postmeta} WHERE meta_key = 'lead_status' AND meta_value = 'converted')",
                     $sm->ID
@@ -2698,17 +2722,80 @@ class KSC_Admin_Manager_API extends KSC_API_Base {
                     'email' => $sm->user_email,
                     'supervising_am' => $am->display_name,
                     'lead_count' => intval($lead_count),
+                    'leads_this_month' => intval($leads_this_month),
                     'conversion_count' => intval($converted)
                 ];
             }
 
             foreach ($cleaners as $c) {
-                 // Get completed visits
-                 global $wpdb;
-                 $completed_visits = $wpdb->get_var($wpdb->prepare(
-                     "SELECT COUNT(*) FROM {$wpdb->prefix}solar_cleaning_visits WHERE cleaner_id = %d AND status = 'completed'",
-                     $c->ID
-                 ));
+                 // Get completed visits for this cleaner
+                 $completed_visits = new WP_Query([
+                     'post_type' => 'cleaning_visit',
+                     'post_status' => 'publish',
+                     'meta_query' => [
+                         'relation' => 'AND',
+                         [
+                             'key' => '_cleaner_id',
+                             'value' => $c->ID
+                         ],
+                         [
+                             'key' => '_status',
+                             'value' => 'completed'
+                         ]
+                     ],
+                     'fields' => 'ids' // Only get IDs for performance
+                 ]);
+                 $completed_count = $completed_visits->found_posts;
+                 
+                 // Check for active status (visit in progress or assigned today)
+                 $today = date('Y-m-d');
+                 $active_visit_query = new WP_Query([
+                     'post_type' => 'cleaning_visit',
+                     'post_status' => 'publish',
+                     'posts_per_page' => 1,
+                     'meta_query' => [
+                         'relation' => 'AND',
+                         [
+                             'key' => '_cleaner_id',
+                             'value' => $c->ID
+                         ],
+                         [
+                             'relation' => 'OR',
+                             [
+                                 'key' => '_status',
+                                 'value' => 'in_progress'
+                             ],
+                             [
+                                 'relation' => 'AND',
+                                 [
+                                     'key' => '_status',
+                                     'value' => 'assigned'
+                                 ],
+                                 [
+                                     'key' => '_scheduled_date',
+                                     'value' => $today
+                                 ]
+                             ]
+                         ]
+                     ],
+                     'fields' => 'ids'
+                 ]);
+                 
+                 $status = 'offline';
+                 $status_label = 'Offline';
+                 
+                 if ($active_visit_query->have_posts()) {
+                     $active_visit_id = $active_visit_query->posts[0];
+                     $visit_status = get_post_meta($active_visit_id, '_status', true);
+                     
+                     if ($visit_status === 'in_progress') {
+                         $status = 'on_job';
+                         $status_label = 'On Job';
+                     } else {
+                         $status = 'active';
+                         $status_label = 'Active Today';
+                     }
+                 }
 
                 $cleaner_data[] = [
                     'id' => $c->ID,
@@ -2716,7 +2803,8 @@ class KSC_Admin_Manager_API extends KSC_API_Base {
                     'phone' => get_user_meta($c->ID, 'phone', true) ?: '-',
                     'supervising_am' => $am->display_name,
                     'completed_visits' => intval($completed_visits),
-                    'status' => 'active' // Simplified for now
+                    'status' => $status,
+                    'status_label' => $status_label
                 ];
             }
         }
@@ -3091,39 +3179,101 @@ class KSC_Admin_Manager_API extends KSC_API_Base {
         global $wpdb;
         
         // Get cleaning visits
-        $visits_query = $wpdb->prepare(
-            "SELECT * FROM {$wpdb->prefix}cleaning_visits WHERE cleaner_id = %d ORDER BY visit_date DESC LIMIT 20",
-            $user_id
-        );
-        $visits_raw = $wpdb->get_results($visits_query);
+        // Get cleaning visits
+        $visits_query = new WP_Query([
+            'post_type' => 'cleaning_visit',
+            'post_status' => 'publish',
+            'posts_per_page' => 20,
+            'meta_key' => '_scheduled_date',
+            'orderby' => 'meta_value',
+            'order' => 'DESC',
+            'meta_query' => [
+                [
+                    'key' => '_cleaner_id',
+                    'value' => $user_id
+                ]
+            ]
+        ]);
         
         $visits = [];
         $completed = 0;
         $pending = 0;
+        $total_found = $visits_query->found_posts; // Approximate total for rate calculation
         
-        foreach ($visits_raw as $visit) {
-            if ($visit->status === 'completed') {
+        foreach ($visits_query->posts as $visit) {
+            $status = get_post_meta($visit->ID, '_status', true);
+            $scheduled_date = get_post_meta($visit->ID, '_scheduled_date', true);
+            $service_id = get_post_meta($visit->ID, '_service_id', true);
+            
+            // Get client details from service
+            $client_name = 'N/A';
+            $location = 'N/A';
+            
+            if ($service_id) {
+                $client_name = get_post_meta($service_id, '_customer_name', true) ?: 'N/A';
+                $location = get_post_meta($service_id, '_customer_city', true) ?: get_post_meta($service_id, '_customer_address', true) ?: 'N/A';
+            }
+            
+            if ($status === 'completed') {
                 $completed++;
-            } else {
+            } elseif ($status !== 'cancelled') {
                 $pending++;
             }
             
             $visits[] = [
-                'id' => $visit->id,
-                'visit_date' => date('M d, Y', strtotime($visit->visit_date)),
-                'client_name' => $visit->client_name ?: 'N/A',
-                'location' => $visit->location ?: 'N/A',
-                'status' => $visit->status
+                'id' => $visit->ID,
+                'visit_date' => $scheduled_date ? date('M d, Y', strtotime($scheduled_date)) : 'N/A',
+                'client_name' => $client_name,
+                'location' => $location,
+                'status' => $status ?: 'pending'
             ];
         }
         
-        $total_visits = count($visits_raw);
-        $completion_rate = $total_visits > 0 ? round(($completed / $total_visits) * 100, 1) : 0;
+        // Calculate total stats
+        $completed_query = new WP_Query([
+            'post_type' => 'cleaning_visit',
+            'post_status' => 'publish',
+            'meta_query' => [
+                'relation' => 'AND',
+                [
+                    'key' => '_cleaner_id',
+                    'value' => $user_id
+                ],
+                [
+                    'key' => '_status',
+                    'value' => 'completed'
+                ]
+            ],
+            'fields' => 'ids'
+        ]);
+        $total_completed = $completed_query->found_posts;
+
+        $pending_query = new WP_Query([
+            'post_type' => 'cleaning_visit',
+            'post_status' => 'publish',
+            'meta_query' => [
+                'relation' => 'AND',
+                [
+                    'key' => '_cleaner_id',
+                    'value' => $user_id
+                ],
+                [
+                    'key' => '_status',
+                    'compare' => 'NOT IN',
+                    'value' => ['completed', 'cancelled']
+                ]
+            ],
+            'fields' => 'ids'
+        ]);
+        $total_pending = $pending_query->found_posts;
+        
+        $grand_total = $total_completed + $total_pending;
+        $completion_rate = $grand_total > 0 ? round(($total_completed / $grand_total) * 100, 1) : 0;
         
         // Stats
         $stats = [
-            'completed_visits' => $completed,
-            'pending_visits' => $pending,
+            'completed_visits' => $total_completed,
+            'pending_visits' => $total_pending,
             'completion_rate' => $completion_rate
         ];
         

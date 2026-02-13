@@ -154,12 +154,84 @@ tr[data-project-id],
     justify-content: center;
 }
 
+/* ===================================
+   MODAL STYLES (Fix for missing CSS)
+   =================================== */
+.modal {
+    display: none;
+    position: fixed;
+    z-index: 10000;
+    left: 0;
+    top: 0;
+    width: 100%;
+    height: 100%;
+    overflow: auto;
+    background-color: rgba(0, 0, 0, 0.5);
+    backdrop-filter: blur(4px);
+}
+
+/* Close Modal Button */
+.close-modal {
+    color: #aaa;
+    float: right;
+    font-size: 28px;
+    font-weight: bold;
+    cursor: pointer;
+    transition: color 0.2s;
+    line-height: 1;
+}
+
+.close-modal:hover,
+.close-modal:focus {
+    color: #000;
+    text-decoration: none;
+    cursor: pointer;
+}
+
+/* Modal Header */
+.modal-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 20px;
+    border-bottom: 1px solid #e2e8f0;
+    background: #f8fafc;
+    border-radius: 8px 8px 0 0;
+}
+
+.modal-header h2 {
+    margin: 0;
+    font-size: 1.25rem;
+    color: #1e293b;
+}
+
+/* Modal Body */
+.modal-body {
+    padding: 25px;
+    background: #fff;
+}
+
+/* Modal Content Override for Dashboard.css interaction */
+.modal-content {
+    background-color: #fefefe;
+    border: 1px solid #888;
+    border-radius: 8px;
+    box-shadow: 0 10px 25px rgba(0, 0, 0, 0.2);
+    /* Dashboard.css usually handles positioning, but we ensure it here if needed */
+}
+
+
 /* Team Member Detail Modal */
 .large-modal {
     width: 90%;
     max-width: 1200px;
     max-height: 85vh;
     overflow-y: auto;
+    /* Re-assert positioning if dashboard.css conflicts */
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
 }
 
 .member-stats-grid {

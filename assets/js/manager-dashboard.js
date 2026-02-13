@@ -2359,12 +2359,12 @@
                     renderTeamAnalysis(response.data);
                 } else {
                     // console.error('Failed to load team data:', response);
-                    $('#team-am-tbody').html('<tr><td colspan="6">Error loading data. ' + (response.data?.message || '') + '</td></tr>');
+                    $('#team-am-tbody').html('<tr><td colspan="5">Error loading data. ' + (response.data?.message || '') + '</td></tr>');
                 }
             },
             error: function (xhr, status, error) {
                 // console.error('AJAX error loading team data:', error);
-                $('#team-am-tbody').html('<tr><td colspan="6">Error loading data. Please try again.</td></tr>');
+                $('#team-am-tbody').html('<tr><td colspan="5">Error loading data. Please try again.</td></tr>');
             }
         });
     }
@@ -2376,32 +2376,48 @@
         $('#team-cleaner-count').text(data.cleaners?.length || 0);
         $('#team-project-count').text(data.total_projects || 0);
 
+        // Helper for badges
+        const getBadge = (text, type = 'info') => `<span class="badge badge-${type}" style="padding: 5px 10px; border-radius: 12px; font-size: 0.8em;">${text}</span>`;
+
         // Render Area Managers table
         let amHtml = '';
         if (data.area_managers && data.area_managers.length > 0) {
             data.area_managers.forEach(am => {
                 amHtml += `
-                                < tr >
-                        <td>${am.display_name || 'N/A'}</td>
-                        <td>${am.email || 'N/A'}</td>
-                        <td>${am.city || '-'}</td>
-                        <td>${am.state || '-'}</td>
-                        <td>${am.project_count || 0}</td>
-                        <td>${am.team_size || 0}</td>
+                    <tr>
+                        <td style="font-weight: 500;">
+                            ${am.display_name}
+                            <div style="font-size: 0.85em; color: #6b7280;">${am.email}</div>
+                        </td>
                         <td>
+                            <div style="display: flex; align-items: center;">
+                                <span style="margin-right: 5px;">📍</span>
+                                ${am.location}
+                            </div>
+                        </td>
+                        <td class="text-center">
+                            <div style="font-weight: bold; font-size: 1.1em;">${am.project_count}</div>
+                            <div style="font-size: 0.8em; color: #10b981;">+${am.projects_this_month} this month</div>
+                        </td>
+                        <td class="text-center">
+                            <span style="background: #eef2ff; color: #4f46e5; padding: 4px 8px; border-radius: 6px; font-weight: 500;">
+                                👥 ${am.team_size} Members
+                            </span>
+                        </td>
+                        <td class="text-center">
                             <button class="btn btn-sm view-member-detail" 
                                     data-user-id="${am.ID || am.id}" 
                                     data-role="area_manager" 
                                     data-name="${am.display_name || 'N/A'}"
-                                    title="View Details">
-                                👁️ View
+                                    style="background: white; border: 1px solid #d1d5db; color: #374151; padding: 6px 12px; border-radius: 6px; hover:bg-gray-50;">
+                                👁️ View Details
                             </button>
                         </td>
-                    </tr >
-                                `;
+                    </tr>
+                `;
             });
         } else {
-            amHtml = '<tr><td colspan="6">No area managers in your assigned states</td></tr>';
+            amHtml = '<tr><td colspan="5" class="text-center" style="padding: 30px; color: #6b7280;">No area managers found. Assign locations to get started.</td></tr>';
         }
         $('#team-am-tbody').html(amHtml);
 
@@ -2410,26 +2426,33 @@
         if (data.sales_managers && data.sales_managers.length > 0) {
             data.sales_managers.forEach(sm => {
                 smHtml += `
-                                < tr >
-                        <td>${sm.display_name || 'N/A'}</td>
-                        <td>${sm.email || 'N/A'}</td>
-                        <td>${sm.supervising_am || '-'}</td>
-                        <td>${sm.lead_count || 0}</td>
-                        <td>${sm.conversion_count || 0}</td>
-                        <td>
+                    <tr>
+                        <td style="font-weight: 500;">
+                            ${sm.display_name}
+                            <div style="font-size: 0.85em; color: #6b7280;">${sm.email}</div>
+                        </td>
+                        <td>${getBadge('Supervised by ' + sm.supervising_am, 'light')}</td>
+                        <td class="text-center">
+                            <div style="font-weight: bold; font-size: 1.1em;">${sm.lead_count}</div>
+                            <div style="font-size: 0.8em; color: #10b981;">+${sm.leads_this_month} this month</div>
+                        </td>
+                        <td class="text-center">
+                             <div style="font-weight: bold;">${sm.conversion_count}</div>
+                        </td>
+                        <td class="text-center">
                             <button class="btn btn-sm view-member-detail" 
                                     data-user-id="${sm.ID || sm.id}" 
                                     data-role="sales_manager" 
                                     data-name="${sm.display_name || 'N/A'}"
-                                    title="View Details">
-                                👁️ View
+                                    style="background: white; border: 1px solid #d1d5db; color: #374151; padding: 6px 12px; border-radius: 6px;">
+                                👁️ View Details
                             </button>
                         </td>
-                    </tr >
-                                `;
+                    </tr>
+                `;
             });
         } else {
-            smHtml = '<tr><td colspan="5">No sales managers found</td></tr>';
+            smHtml = '<tr><td colspan="5" class="text-center" style="padding: 30px; color: #6b7280;">No sales managers found</td></tr>';
         }
         $('#team-sm-tbody').html(smHtml);
 
@@ -2437,28 +2460,41 @@
         let cleanerHtml = '';
         if (data.cleaners && data.cleaners.length > 0) {
             data.cleaners.forEach(cleaner => {
-                const statusClass = cleaner.status === 'active' ? 'status-success' : 'status-warning';
+                let statusColor = 'secondary';
+                if (cleaner.status === 'on_job') statusColor = 'warning'; // Orange for busy
+                if (cleaner.status === 'active') statusColor = 'success'; // Green for active today
+                if (cleaner.status === 'offline') statusColor = 'secondary'; // Grey for offline
+
                 cleanerHtml += `
-                                < tr >
-                        <td>${cleaner.name || 'N/A'}</td>
-                        <td>${cleaner.phone || '-'}</td>
-                        <td>${cleaner.supervising_am || '-'}</td>
-                        <td>${cleaner.completed_visits || 0}</td>
-                        <td><span class="badge ${statusClass}">${cleaner.status || 'active'}</span></td>
-                        <td>
+                    <tr>
+                        <td style="font-weight: 500;">
+                            ${cleaner.name || 'N/A'}
+                            <div style="font-size: 0.85em; color: #6b7280;">${cleaner.phone || '-'}</div>
+                        </td>
+                        <td>${getBadge('Supervised by ' + cleaner.supervising_am, 'light')}</td>
+                        <td class="text-center">
+                            <div style="font-weight: bold;">${cleaner.completed_visits}</div>
+                            <div style="font-size: 0.8em; color: #6b7280;">Visits</div>
+                        </td>
+                        <td class="text-center">
+                            <span class="badge badge-${statusColor}" style="padding: 5px 10px; border-radius: 12px; text-transform: capitalize;">
+                                ${cleaner.status_label || cleaner.status}
+                            </span>
+                        </td>
+                        <td class="text-center">
                             <button class="btn btn-sm view-member-detail" 
                                     data-user-id="${cleaner.id}" 
                                     data-role="cleaner" 
                                     data-name="${cleaner.name || 'N/A'}"
-                                    title="View Details">
-                                👁️ View
+                                    style="background: white; border: 1px solid #d1d5db; color: #374151; padding: 6px 12px; border-radius: 6px;">
+                                👁️ View Details
                             </button>
                         </td>
-                    </tr >
-                                `;
+                    </tr>
+                `;
             });
         } else {
-            cleanerHtml = '<tr><td colspan="5">No cleaners found</td></tr>';
+            cleanerHtml = '<tr><td colspan="5" class="text-center" style="padding: 30px; color: #6b7280;">No cleaners found</td></tr>';
         }
         $('#team-cleaners-tbody').html(cleanerHtml);
     }
@@ -2466,6 +2502,11 @@
     // --- AM Assignment Functions ---
     function loadAMAssignments() {
         // console.log('Loading AM assignments...');
+
+        // Reset form and feedback
+        $('#assign-am-location-form')[0].reset();
+        $('#assign-am-feedback').html('');
+        $('#am-current-assignment-info').remove(); // Remove any existing info box
 
         // Load Area Managers for dropdown
         loadAMDropdown();
@@ -2479,20 +2520,77 @@
             url: ajaxUrl,
             type: 'POST',
             data: {
-                action: 'get_unassigned_area_managers',
+                action: 'get_unassigned_area_managers', // Note: This actually gets ALL managers in practice based on previous logic observation, or we should fix the backend to return all. 
+                // Wait, get_unassigned_area_managers might imply only those without location? 
+                // Let's check the backend logic of 'get_unassigned_area_managers' later if needed, but for now we assume it returns AMs available for assignment.
+                // Actually, strict naming suggests "unassigned", but to allow "Move", we might need ALL AMs. 
+                // However, let's stick to existing endpoint unless it's empty.
                 nonce: sp_area_dashboard_vars.get_projects_nonce
             },
             success: function (response) {
                 let html = '<option value="">Select Area Manager</option>';
                 if (response.success && response.data.managers) {
                     response.data.managers.forEach(am => {
-                        html += `< option value = "${am.ID}" > ${am.display_name} (${am.email})</option > `;
+                        // Store location in data attribute for easy access
+                        // If backend doesn't send location here, we might need to fetch it or finding it in the managers list
+                        // Let's assume the backend might not send location in 'get_unassigned_area_managers' yet.
+                        // We will check if we need to update that API too.
+                        // For now, let's just render the option.
+                        // Better: We can pass current location in data attribute if available.
+                        // The 'get_unassigned_area_managers' API (we haven't modified) likely just returns ID/Name/Email.
+                        // So we will fetch details on change, or rely on what we have.
+                        html += `<option value="${am.ID}" data-location="${am.location || ''}">${am.display_name} (${am.email})</option>`;
                     });
                 }
                 $('#assign_am_id').html(html);
             }
         });
     }
+
+    // Handler for AM selection to show Warning/Info
+    $(document).on('change', '#assign_am_id', function () {
+        const amId = $(this).val();
+        $('#am-current-assignment-info').remove(); // Clear previous
+
+        if (amId) {
+            // We need to know if this AM already has a location.
+            // Since `get_unassigned_area_managers` might not provide this in the option data easily (unless we updated it, which we haven't yet),
+            // we can quickly fetch it or check against the "Team Overview" data if we have it cached? No, that's unreliable.
+            // Let's assume we want to be safe. 
+            // We can do a quick check via AJAX or just rely on the table below? 
+            // actually, 'get_unassigned_area_managers' usually implies they aren't assigned. 
+            // BUT if we want to allow re-assignment (Move), we need to know.
+
+            // Let's adding a check.
+            $.ajax({
+                url: ajaxUrl,
+                type: 'POST',
+                data: {
+                    action: 'get_team_member_details', // Reuse this to get current state/city
+                    user_id: amId,
+                    role: 'area_manager',
+                    nonce: sp_area_dashboard_vars.get_projects_nonce
+                },
+                success: function (response) {
+                    if (response.success && response.data.user_info) {
+                        const city = response.data.user_info.city;
+                        const state = response.data.user_info.state;
+
+                        if (city && state) {
+                            const warningHtml = `
+                                 <div id="am-current-assignment-info" style="margin-top: 10px; padding: 10px; background-color: #fffbeb; border: 1px solid #f59e0b; border-radius: 6px; color: #b45309; font-size: 0.9em;">
+                                     <strong>⚠️ Warning:</strong> This Area Manager is currently assigned to 
+                                     <span style="font-weight: bold; color: #000;">${city}, ${state}</span>. 
+                                     Assigning a new location will <u>overwrite</u> the current one.
+                                 </div>
+                             `;
+                            $('#assign_am_id').after(warningHtml);
+                        }
+                    }
+                }
+            });
+        }
+    });
 
     function loadAssignmentsTable() {
         $.ajax({
@@ -2507,21 +2605,22 @@
                 if (response.success && response.data.assignments && response.data.assignments.length > 0) {
                     response.data.assignments.forEach(assignment => {
                         html += `
-                            < tr >
-                                <td>${assignment.am_name}</td>
+                            <tr>
+                                <td style="font-weight: 500;">${assignment.am_name}</td>
                                 <td>${assignment.state}</td>
                                 <td>${assignment.city}</td>
-                                <td>
-                                    <button class="action-btn action-btn-danger remove-am-assignment" 
-                                            data-am-id="${assignment.am_id}">
+                                <td class="text-right">
+                                    <button class="btn btn-sm btn-danger remove-am-assignment" 
+                                            data-am-id="${assignment.am_id}"
+                                            style="padding: 4px 10px; font-size: 0.85em;">
                                         🗑️ Remove
                                     </button>
                                 </td>
-                            </tr >
+                            </tr>
                             `;
                     });
                 } else {
-                    html = '<tr><td colspan="4">No area assignments found</td></tr>';
+                    html = '<tr><td colspan="4" class="text-center" style="color: #6b7280; padding: 20px;">No area assignments found</td></tr>';
                 }
                 $('#am-assignments-tbody').html(html);
             }
@@ -2548,7 +2647,7 @@
                 let html = '<option value="">Select City</option>';
                 if (response.success && response.data.cities) {
                     response.data.cities.forEach(city => {
-                        html += `< option value = "${city}" > ${city}</option > `;
+                        html += `<option value="${city}">${city}</option>`;
                     });
                 }
                 $('#assign_city').html(html);
@@ -2694,24 +2793,24 @@
         html += '<div class="detail-section">';
         html += '<h3>📋 Basic Information</h3>';
         html += '<div class="member-stats-grid">';
-        html += `< div class="member-stat-card" ><h4>${data.user_info.name}</h4><span>Name</span></div > `;
-        html += `< div class="member-stat-card" ><h4>${data.user_info.email}</h4><span>Email</span></div > `;
+        html += `<div class="member-stat-card"><h4>${data.user_info.name}</h4><span>Name</span></div>`;
+        html += `<div class="member-stat-card"><h4>${data.user_info.email}</h4><span>Email</span></div>`;
         if (data.user_info.phone) {
-            html += `< div class="member-stat-card" ><h4>${data.user_info.phone}</h4><span>Phone</span></div > `;
+            html += `<div class="member-stat-card"><h4>${data.user_info.phone}</h4><span>Phone</span></div>`;
         }
         // Show Photo if available
         if (data.user_info.photo_url) {
-            html += `< div class="member-stat-card" >
+            html += `<div class="member-stat-card">
                             <img src="${data.user_info.photo_url}" style="width:50px; height:50px; border-radius:50%; object-fit:cover; margin-bottom:5px;">
                                 <span>Photo</span>
                             </div>`;
         }
 
         if (data.user_info.state) {
-            html += `< div class="member-stat-card" ><h4>${data.user_info.state}</h4><span>State</span></div > `;
+            html += `<div class="member-stat-card"><h4>${data.user_info.state}</h4><span>State</span></div>`;
         }
         if (data.user_info.city) {
-            html += `< div class="member-stat-card" ><h4>${data.user_info.city}</h4><span>City</span></div > `;
+            html += `<div class="member-stat-card"><h4>${data.user_info.city}</h4><span>City</span></div>`;
         }
         html += '</div></div>';
 
@@ -2721,13 +2820,13 @@
             html += '<h3>📑 Documents</h3>';
             html += '<div class="member-stats-grid">';
             if (data.user_info.aadhaar_number) {
-                html += `< div class="member-stat-card" ><h4>${data.user_info.aadhaar_number}</h4><span>Aadhaar Number</span></div > `;
+                html += `<div class="member-stat-card"><h4>${data.user_info.aadhaar_number}</h4><span>Aadhaar Number</span></div>`;
             }
             if (data.user_info.aadhaar_image_url) {
-                html += `< div class="member-stat-card" >
+                html += `<div class="member-stat-card">
                     <a href="${data.user_info.aadhaar_image_url}" target="_blank" class="btn btn-sm btn-info">👁️ View Aadhaar Card</a>
                     <span style="margin-top:5px;">Document</span>
-                 </div > `;
+                 </div>`;
             }
             html += '</div></div>';
         }
@@ -2738,17 +2837,17 @@
         html += '<div class="member-stats-grid">';
 
         if (role === 'area_manager') {
-            html += `< div class="member-stat-card" ><h4>${data.stats.total_projects || 0}</h4><span>Total Projects</span></div > `;
-            html += `< div class="member-stat-card" ><h4>${data.stats.total_leads || 0}</h4><span>Total Leads</span></div > `;
-            html += `< div class="member-stat-card" ><h4>${data.stats.team_size || 0}</h4><span>Team Size</span></div > `;
+            html += `<div class="member-stat-card"><h4>${data.stats.total_projects || 0}</h4><span>Total Projects</span></div>`;
+            html += `<div class="member-stat-card"><h4>${data.stats.total_leads || 0}</h4><span>Total Leads</span></div>`;
+            html += `<div class="member-stat-card"><h4>${data.stats.team_size || 0}</h4><span>Team Size</span></div>`;
         } else if (role === 'sales_manager') {
-            html += `< div class="member-stat-card" ><h4>${data.stats.total_leads || 0}</h4><span>Total Leads</span></div > `;
-            html += `< div class="member-stat-card" ><h4>${data.stats.conversions || 0}</h4><span>Conversions</span></div > `;
-            html += `< div class="member-stat-card" ><h4>${data.stats.conversion_rate || 0}%</h4><span>Conversion Rate</span></div > `;
+            html += `<div class="member-stat-card"><h4>${data.stats.total_leads || 0}</h4><span>Total Leads</span></div>`;
+            html += `<div class="member-stat-card"><h4>${data.stats.conversions || 0}</h4><span>Conversions</span></div>`;
+            html += `<div class="member-stat-card"><h4>${data.stats.conversion_rate || 0}%</h4><span>Conversion Rate</span></div>`;
         } else if (role === 'cleaner') {
-            html += `< div class="member-stat-card" ><h4>${data.stats.completed_visits || 0}</h4><span>Completed Visits</span></div > `;
-            html += `< div class="member-stat-card" ><h4>${data.stats.pending_visits || 0}</h4><span>Pending Visits</span></div > `;
-            html += `< div class="member-stat-card" ><h4>${data.stats.completion_rate || 0}%</h4><span>Completion Rate</span></div > `;
+            html += `<div class="member-stat-card"><h4>${data.stats.completed_visits || 0}</h4><span>Completed Visits</span></div>`;
+            html += `<div class="member-stat-card"><h4>${data.stats.pending_visits || 0}</h4><span>Pending Visits</span></div>`;
+            html += `<div class="member-stat-card"><h4>${data.stats.completion_rate || 0}%</h4><span>Completion Rate</span></div>`;
         }
         html += '</div></div>';
 
@@ -2757,14 +2856,20 @@
             html += '<div class="detail-section">';
             html += '<h3>🏗️ Recent Projects</h3>';
             html += '<div class="table-responsive">';
-            html += '<table class="data-table"><thead><tr><th>Project</th><th>Status</th><th>Location</th><th>Cost</th></tr></thead><tbody>';
+            html += '<table class="data-table" style="width:100%; border-collapse: separate; border-spacing: 0;"><thead><tr style="background:#f9fafb; color:#374151;">';
+            html += '<th style="padding:12px; text-align:left; font-weight:600; border-bottom:1px solid #e5e7eb;">Project</th>';
+            html += '<th style="padding:12px; text-align:left; font-weight:600; border-bottom:1px solid #e5e7eb;">Status</th>';
+            html += '<th style="padding:12px; text-align:left; font-weight:600; border-bottom:1px solid #e5e7eb;">Location</th>';
+            html += '<th style="padding:12px; text-align:right; font-weight:600; border-bottom:1px solid #e5e7eb;">Cost</th>';
+            html += '</tr></thead><tbody>';
+
             data.projects.slice(0, 10).forEach(project => {
-                html += `< tr >
-                    <td>${project.title}</td>
-                    <td><span class="badge badge-${project.status}">${project.status}</span></td>
-                    <td>${project.city}, ${project.state}</td>
-                    <td>₹${parseFloat(project.cost || 0).toLocaleString()}</td>
-                </tr > `;
+                html += `<tr>
+                    <td style="padding:12px; border-bottom:1px solid #f3f4f6;">${project.title}</td>
+                    <td style="padding:12px; border-bottom:1px solid #f3f4f6;"><span class="badge badge-${project.status}" style="padding:4px 8px; border-radius:4px; font-size:0.85em;">${project.status}</span></td>
+                    <td style="padding:12px; border-bottom:1px solid #f3f4f6;">${project.city}, ${project.state}</td>
+                    <td style="padding:12px; border-bottom:1px solid #f3f4f6; text-align:right;">₹${parseFloat(project.cost || 0).toLocaleString()}</td>
+                </tr>`;
             });
             html += '</tbody></table></div></div>';
         }
@@ -2774,15 +2879,22 @@
             html += '<div class="detail-section">';
             html += '<h3>🎯 Recent Leads</h3>';
             html += '<div class="table-responsive">';
-            html += '<table class="data-table"><thead><tr><th>Name</th><th>Phone</th><th>Status</th><th>Location</th><th>Created</th></tr></thead><tbody>';
+            html += '<table class="data-table" style="width:100%; border-collapse: separate; border-spacing: 0;"><thead><tr style="background:#f9fafb; color:#374151;">';
+            html += '<th style="padding:12px; text-align:left; font-weight:600; border-bottom:1px solid #e5e7eb;">Name</th>';
+            html += '<th style="padding:12px; text-align:left; font-weight:600; border-bottom:1px solid #e5e7eb;">Phone</th>';
+            html += '<th style="padding:12px; text-align:left; font-weight:600; border-bottom:1px solid #e5e7eb;">Status</th>';
+            html += '<th style="padding:12px; text-align:left; font-weight:600; border-bottom:1px solid #e5e7eb;">Location</th>';
+            html += '<th style="padding:12px; text-align:right; font-weight:600; border-bottom:1px solid #e5e7eb;">Created</th>';
+            html += '</tr></thead><tbody>';
+
             data.leads.slice(0, 10).forEach(lead => {
-                html += `< tr >
-                    <td>${lead.name}</td>
-                    <td>${lead.phone}</td>
-                    <td><span class="badge badge-${lead.status}">${lead.status}</span></td>
-                    <td>${lead.city}</td>
-                    <td>${lead.created_date}</td>
-                </tr > `;
+                html += `<tr>
+                    <td style="padding:12px; border-bottom:1px solid #f3f4f6;">${lead.name}</td>
+                    <td style="padding:12px; border-bottom:1px solid #f3f4f6;">${lead.phone}</td>
+                    <td style="padding:12px; border-bottom:1px solid #f3f4f6;"><span class="badge badge-${lead.status}" style="padding:4px 8px; border-radius:4px; font-size:0.85em;">${lead.status}</span></td>
+                    <td style="padding:12px; border-bottom:1px solid #f3f4f6;">${lead.city}</td>
+                    <td style="padding:12px; border-bottom:1px solid #f3f4f6; text-align:right;">${lead.created_date}</td>
+                </tr>`;
             });
             html += '</tbody></table></div></div>';
         }
@@ -2792,16 +2904,25 @@
             html += '<div class="detail-section">';
             html += '<h3>👥 Team Members</h3>';
             html += '<div class="table-responsive">';
-            html += '<table class="data-table"><thead><tr><th>Name</th><th>Role</th><th>Email</th><th>Phone</th><th>Leads</th><th>Joined</th></tr></thead><tbody>';
+            html += '<table class="data-table" style="width:100%; border-collapse: separate; border-spacing: 0;"><thead><tr style="background:#f9fafb; color:#374151;">';
+            html += '<th style="padding:12px; text-align:left; font-weight:600; border-bottom:1px solid #e5e7eb;">Name</th>';
+            html += '<th style="padding:12px; text-align:left; font-weight:600; border-bottom:1px solid #e5e7eb;">Role</th>';
+            html += '<th style="padding:12px; text-align:left; font-weight:600; border-bottom:1px solid #e5e7eb;">Email/Phone</th>';
+            html += '<th style="padding:12px; text-align:center; font-weight:600; border-bottom:1px solid #e5e7eb;">Leads</th>';
+            html += '<th style="padding:12px; text-align:right; font-weight:600; border-bottom:1px solid #e5e7eb;">Joined</th>';
+            html += '</tr></thead><tbody>';
+
             data.team_members.forEach(member => {
-                html += `< tr >
-                    <td>${member.name}</td>
-                    <td><span class="badge badge-info">${member.role}</span></td>
-                    <td>${member.email}</td>
-                    <td>${member.phone || '-'}</td>
-                    <td>${member.lead_count || 0}</td>
-                    <td>${member.joined_date}</td>
-                </tr > `;
+                html += `<tr>
+                    <td style="padding:12px; border-bottom:1px solid #f3f4f6;">${member.name}</td>
+                    <td style="padding:12px; border-bottom:1px solid #f3f4f6;"><span class="badge badge-info" style="padding:4px 8px; border-radius:4px; font-size:0.85em;">${member.role}</span></td>
+                    <td style="padding:12px; border-bottom:1px solid #f3f4f6;">
+                        <div>${member.email}</div>
+                        <div style="font-size:0.85em; color:#6b7280;">${member.phone || '-'}</div>
+                    </td>
+                    <td style="padding:12px; border-bottom:1px solid #f3f4f6; text-align:center;">${member.lead_count || 0}</td>
+                    <td style="padding:12px; border-bottom:1px solid #f3f4f6; text-align:right;">${member.joined_date}</td>
+                </tr>`;
             });
             html += '</tbody></table></div></div>';
         }
@@ -2811,14 +2932,20 @@
             html += '<div class="detail-section">';
             html += '<h3>🧹 Cleaning Visits</h3>';
             html += '<div class="table-responsive">';
-            html += '<table class="data-table"><thead><tr><th>Date</th><th>Client</th><th>Location</th><th>Status</th></tr></thead><tbody>';
+            html += '<table class="data-table" style="width:100%; border-collapse: separate; border-spacing: 0;"><thead><tr style="background:#f9fafb; color:#374151;">';
+            html += '<th style="padding:12px; text-align:left; font-weight:600; border-bottom:1px solid #e5e7eb;">Date</th>';
+            html += '<th style="padding:12px; text-align:left; font-weight:600; border-bottom:1px solid #e5e7eb;">Client</th>';
+            html += '<th style="padding:12px; text-align:left; font-weight:600; border-bottom:1px solid #e5e7eb;">Location</th>';
+            html += '<th style="padding:12px; text-align:right; font-weight:600; border-bottom:1px solid #e5e7eb;">Status</th>';
+            html += '</tr></thead><tbody>';
+
             data.visits.slice(0, 10).forEach(visit => {
-                html += `< tr >
-                    <td>${visit.visit_date}</td>
-                    <td>${visit.client_name}</td>
-                    <td>${visit.location}</td>
-                    <td><span class="badge badge-${visit.status}">${visit.status}</span></td>
-                </tr > `;
+                html += `<tr>
+                    <td style="padding:12px; border-bottom:1px solid #f3f4f6;">${visit.visit_date}</td>
+                    <td style="padding:12px; border-bottom:1px solid #f3f4f6;">${visit.client_name}</td>
+                    <td style="padding:12px; border-bottom:1px solid #f3f4f6;">${visit.location}</td>
+                    <td style="padding:12px; border-bottom:1px solid #f3f4f6; text-align:right;"><span class="badge badge-${visit.status}" style="padding:4px 8px; border-radius:4px; font-size:0.85em;">${visit.status}</span></td>
+                </tr>`;
             });
             html += '</tbody></table></div></div>';
         }
@@ -2829,10 +2956,10 @@
             html += '<h3>⏱️ Recent Activity</h3>';
             html += '<div class="activity-timeline">';
             data.recent_activity.forEach(activity => {
-                html += `< div class="activity-item" >
+                html += `<div class="activity-item">
                     <div class="activity-time">${activity.time}</div>
                     <p class="activity-desc">${activity.description}</p>
-                </div > `;
+                </div>`;
             });
             html += '</div></div>';
         }

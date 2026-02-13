@@ -675,17 +675,15 @@ function sp_manager_dashboard_shortcode() {
                             <table class="data-table" id="team-am-table">
                                 <thead>
                                     <tr>
-                                        <th>Name</th>
-                                        <th>Email</th>
-                                        <th>City</th>
-                                        <th>State</th>
+                                        <th>Name & Contact</th>
+                                        <th>Location</th>
                                         <th>Projects</th>
                                         <th>Team Size</th>
                                         <th>Actions</th>
                                     </tr>
                                 </thead>
                                 <tbody id="team-am-tbody">
-                                    <tr><td colspan="6">Loading area managers...</td></tr>
+                                    <tr><td colspan="5">Loading area managers...</td></tr>
                                 </tbody>
                             </table>
                         </div>
@@ -698,8 +696,7 @@ function sp_manager_dashboard_shortcode() {
                             <table class="data-table" id="team-sm-table">
                                 <thead>
                                     <tr>
-                                        <th>Name</th>
-                                        <th>Email</th>
+                                        <th>Name & Contact</th>
                                         <th>Supervising AM</th>
                                         <th>Leads</th>
                                         <th>Conversions</th>
@@ -720,8 +717,7 @@ function sp_manager_dashboard_shortcode() {
                             <table class="data-table" id="team-cleaners-table">
                                 <thead>
                                     <tr>
-                                        <th>Name</th>
-                                        <th>Phone</th>
+                                        <th>Name & Contact</th>
                                         <th>Supervising AM</th>
                                         <th>Completed Visits</th>
                                         <th>Status</th>
