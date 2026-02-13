@@ -3,7 +3,7 @@
  * Plugin Name:       Krtrim Solar Core
  * Plugin URI:        https://krtrim.tech/wordpress
  * Description:       A comprehensive project management and bidding platform for solar companies, developed by Krtrim.
- * Version:           1.3.0
+ * Version:           1.3.3
  * Author:            Krtrim
  * Author URI:        https://krtrim.tech
  * License:           GPL-2.0+
@@ -23,7 +23,7 @@ if ( ! defined( 'WPINC' ) ) {
 final class Krtrim_Solar_Core {
 
 	private static $instance = null;
-	public $version = '1.3.2';
+	public $version = '1.3.3';
 	public $file = __FILE__;
 	public $dir_path;
 	public $dir_url;

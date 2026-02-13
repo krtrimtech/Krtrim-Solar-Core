@@ -89,6 +89,7 @@ function sp_area_manager_dashboard_shortcode() {
                 <a href="javascript:void(0)" class="nav-item" data-section="projects"><span>🏗️</span> Projects</a>
                 <a href="javascript:void(0)" class="nav-item" data-section="create-project"><span>➕</span> Create Project</a>
                 <a href="javascript:void(0)" class="nav-item" data-section="project-reviews"><span>📝</span> Project Reviews</a>
+                <a href="javascript:void(0)" class="nav-item" data-section="marketplace"><span>🏪</span> Marketplace</a>
                 <a href="javascript:void(0)" class="nav-item" data-section="bid-management"><span>🔨</span> Bid Management</a>
 
                 <a href="javascript:void(0)" class="nav-item" data-section="leads"><span>🎯</span> Leads</a>
@@ -514,7 +515,7 @@ function sp_area_manager_dashboard_shortcode() {
                 <section id="project-reviews-section" class="section-content" style="display:none;">
                     <h2>Project Reviews</h2>
                     <div id="project-reviews-container">
-                        <p>Loading reviews...</p>
+                        <p>Select a project to view reviews.</p>
                     </div>
                 </section>
 

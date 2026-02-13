@@ -1635,8 +1635,17 @@ class KSC_Admin_Manager_API extends KSC_API_Base {
             
             // error_log('Reviews found: ' . count($reviews));
         } else {
-            // Area Manager - show only their own projects
-            // error_log('AREA MANAGER MODE: Fetching own projects only');
+            // Area Manager - show all visible projects (authored, assigned, or location-match)
+            $project_ids = $this->get_am_visible_project_ids($manager->ID);
+            
+            if (empty($project_ids)) {
+                wp_send_json_success(['reviews' => []]);
+                return;
+            }
+            
+            // Sanitize IDs for SQL IN clause
+            $ids_placeholder = implode(',', array_fill(0, count($project_ids), '%d'));
+            
             $reviews = $wpdb->get_results($wpdb->prepare(
                 "SELECT ps.*, p.post_title as project_title, p.ID as project_id,
                         pm_city.meta_value as project_city,
@@ -1647,11 +1656,11 @@ class KSC_Admin_Manager_API extends KSC_API_Base {
                  LEFT JOIN {$wpdb->postmeta} pm_city ON p.ID = pm_city.post_id AND pm_city.meta_key = '_project_city'
                  LEFT JOIN {$wpdb->postmeta} pm_state ON p.ID = pm_state.post_id AND pm_state.meta_key = '_project_state'
                  LEFT JOIN {$wpdb->postmeta} pm_size ON p.ID = pm_size.post_id AND pm_size.meta_key = 'solar_system_size_kw'
-                 WHERE p.post_author = %d 
+                 WHERE p.ID IN ($ids_placeholder) 
                  AND ps.admin_status = 'under_review'
                  ORDER BY ps.updated_at DESC
                  LIMIT %d OFFSET %d",
-                $manager->ID, $limit, $offset
+                array_merge($project_ids, [$limit, $offset])
             ), ARRAY_A);
             // error_log('Reviews found (AM): ' . count($reviews));
         }
