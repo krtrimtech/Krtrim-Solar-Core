@@ -442,12 +442,49 @@
             loadCleaningServices();
         } else if (section === 'my-team') {
             loadMyTeam();
+        } else if (section === 'my-team') {
+            loadMyTeam();
         } else if (section === 'team-analysis') {
             loadTeamAnalysis();
         } else if (section === 'am-assignment') {
             loadAMAssignments();
         }
     };
+
+    function loadTeamAnalysis() {
+        // console.log('Loading team analysis...');
+        $('#team-sm-tbody').html('<tr><td colspan="5" class="text-center">Loading...</td></tr>');
+        $('#team-cleaners-tbody').html('<tr><td colspan="5" class="text-center">Loading...</td></tr>');
+
+        // Ensure shared component is loaded
+        if (typeof KSC_TeamAnalysis === 'undefined') {
+            // console.error('KSC_TeamAnalysis component not loaded. Retrying in 500ms...');
+            setTimeout(loadTeamAnalysis, 500);
+            return;
+        }
+
+        $.ajax({
+            url: ajaxUrl,
+            type: 'POST',
+            data: {
+                action: 'get_team_analysis_data',
+                nonce: sp_area_dashboard_vars.get_dashboard_stats_nonce
+            },
+            success: function (response) {
+                if (response.success) {
+                    KSC_TeamAnalysis.render(response.data);
+                } else {
+                    $('#team-sm-tbody').html('<tr><td colspan="5" class="text-center">Error loading data. ' + (response.data?.message || '') + '</td></tr>');
+                    $('#team-cleaners-tbody').html('<tr><td colspan="5" class="text-center">Error loading data.</td></tr>');
+                }
+            },
+            error: function (xhr, status, error) {
+                // console.error('AJAX error loading team analysis:', error);
+                $('#team-sm-tbody').html('<tr><td colspan="5" class="text-center">Error loading data.</td></tr>');
+                $('#team-cleaners-tbody').html('<tr><td colspan="5" class="text-center">Error loading data.</td></tr>');
+            }
+        });
+    }
 
     // Load data when section becomes visible
     $(document).on('click', '.nav-item', function () {
@@ -1907,8 +1944,15 @@
     // MY TEAM FUNCTIONS (for Area Managers to view their Sales Managers)
     // ========================================
 
+    // --- Team Analysis & Details (Unified Design) ---
+
+    // Load My Team Data using Shared Component
     function loadMyTeam() {
         // console.log('Loading my team data...');
+
+        // Initial Loading State
+        $('#my-team-sm-tbody').html('<tr><td colspan="5" class="text-center">Loading...</td></tr>');
+        $('#my-team-cleaners-tbody').html('<tr><td colspan="5" class="text-center">Loading...</td></tr>');
 
         $.ajax({
             url: ajaxUrl,
@@ -1919,98 +1963,316 @@
             },
             success: function (response) {
                 if (response.success) {
-                    renderMyTeam(response.data);
+                    // Use Shared Component to Render
+                    if (typeof KSC_TeamAnalysis !== 'undefined') {
+                        KSC_TeamAnalysis.render(response.data, {
+                            smTable: '#my-team-sm-tbody',
+                            cleanerTable: '#my-team-cleaners-tbody',
+                            smCount: '#my-team-sm-count',
+                            cleanerCount: '#my-team-cleaner-count',
+                            projectCount: '#my-team-project-count'
+                        });
+                    } else {
+                        console.error('KSC_TeamAnalysis component not found');
+                    }
                 } else {
-                    // console.error('Failed to load team data:', response);
-                    $('#my-team-sm-tbody').html('<tr><td colspan="7">Error loading team. ' + (response.data?.message || '') + '</td></tr>');
+                    $('#my-team-sm-tbody').html('<tr><td colspan="5" class="text-center">Error loading team. ' + (response.data?.message || '') + '</td></tr>');
+                    $('#my-team-cleaners-tbody').html('<tr><td colspan="5" class="text-center">Error loading team.</td></tr>');
                 }
             },
             error: function (xhr, status, error) {
-                // console.error('AJAX error loading team data:', error);
-                $('#my-team-sm-tbody').html('<tr><td colspan="7">Error loading team. Please try again.</td></tr>');
+                $('#my-team-sm-tbody').html('<tr><td colspan="5" class="text-center">Error loading team.</td></tr>');
+                $('#my-team-cleaners-tbody').html('<tr><td colspan="5" class="text-center">Error loading team.</td></tr>');
             }
         });
     }
 
-    function renderMyTeam(data) {
-        // Update stats
-        const smCount = data.sales_managers?.length || 0;
-        const cleanerCount = data.cleaners?.length || 0;
-        let totalLeads = 0;
-        let totalConversions = 0;
+    // --- Member Detail Modal Handlers ---
 
-        if (data.sales_managers) {
-            data.sales_managers.forEach(sm => {
-                totalLeads += parseInt(sm.lead_count) || 0;
-                totalConversions += parseInt(sm.conversion_count) || 0;
-            });
+    $(document).on('click', '.view-member-detail', function () {
+        const userId = $(this).data('user-id');
+        const role = $(this).data('role');
+        const memberName = $(this).data('name');
+
+        $('#member-modal-name').text(memberName + ' - Details');
+        $('#team-member-modal').fadeIn(200);
+        loadMemberDetails(userId, role);
+    });
+
+    // Close modal
+    $(document).on('click', '#close-member-modal', function () {
+        $('#team-member-modal').fadeOut(200);
+    });
+
+    // Close modal when clicking outside
+    $(document).on('click', '#team-member-modal', function (e) {
+        if ($(e.target).is('#team-member-modal')) {
+            $('#team-member-modal').fadeOut(200);
+        }
+    });
+
+    /**
+     * Load team member details via AJAX
+     */
+    function loadMemberDetails(userId, role) {
+        $('#member-detail-content').html('<p style="text-align: center; padding: 40px; color: #666;">Loading member details...</p>');
+
+        $.ajax({
+            url: ajaxUrl,
+            type: 'POST',
+            data: {
+                action: 'get_team_member_details',
+                nonce: sp_area_dashboard_vars.get_projects_nonce,
+                user_id: userId,
+                role: role
+            },
+            success: function (response) {
+                if (response.success) {
+                    renderMemberDetails(response.data, role);
+                } else {
+                    $('#member-detail-content').html('<p class="error" style="color: #dc2626; text-align: center; padding: 40px;">' + (response.data.message || 'Error loading details') + '</p>');
+                }
+            },
+            error: function () {
+                $('#member-detail-content').html('<p class="error" style="color: #dc2626; text-align: center; padding: 40px;">Network error. Please try again.</p>');
+            }
+        });
+    }
+
+    /**
+     * Render member details based on role
+     */
+    function renderMemberDetails(data, role) {
+        let html = '';
+
+        // User Info Section
+        html += '<div class="detail-section">';
+        html += '<h3>📋 Basic Information</h3>';
+        html += '<div class="member-stats-grid">';
+        html += `<div class="member-stat-card"><h4>${data.user_info.name}</h4><span>Name</span></div>`;
+        html += `<div class="member-stat-card"><h4>${data.user_info.email}</h4><span>Email</span></div>`;
+        if (data.user_info.phone) {
+            html += `<div class="member-stat-card"><h4>${data.user_info.phone}</h4><span>Phone</span></div>`;
+        }
+        // Show Photo if available
+        if (data.user_info.photo_url) {
+            html += `<div class="member-stat-card">
+                            <img src="${data.user_info.photo_url}" style="width:50px; height:50px; border-radius:50%; object-fit:cover; margin-bottom:5px;">
+                                <span>Photo</span>
+                            </div>`;
         }
 
-        $('#my-team-sm-count').text(smCount);
-        $('#my-team-cleaner-count').text(cleanerCount);
-        $('#my-team-leads-count').text(totalLeads);
-        $('#my-team-conversions-count').text(totalConversions);
+        if (data.user_info.state) {
+            html += `<div class="member-stat-card"><h4>${data.user_info.state}</h4><span>State</span></div>`;
+        }
+        if (data.user_info.city) {
+            html += `<div class="member-stat-card"><h4>${data.user_info.city}</h4><span>City</span></div>`;
+        }
+        html += '</div></div>';
 
-        // Render Sales Managers table
-        let smHtml = '';
-        if (data.sales_managers && data.sales_managers.length > 0) {
-            data.sales_managers.forEach(sm => {
-                const leads = parseInt(sm.lead_count) || 0;
-                const conversions = parseInt(sm.conversion_count) || 0;
-                const rate = leads > 0 ? ((conversions / leads) * 100).toFixed(1) : '0.0';
-                const phone = sm.phone || '-';
-                const whatsappLink = phone !== '-' ? `https://wa.me/${phone.replace(/[^0-9]/g, '')}` : '#';
+        // Documents Section (Mainly for Cleaners)
+        if (data.user_info.aadhaar_number || data.user_info.aadhaar_image_url) {
+            html += '<div class="detail-section">';
+            html += '<h3>📑 Documents</h3>';
+            html += '<div class="member-stats-grid">';
+            if (data.user_info.aadhaar_number) {
+                html += `<div class="member-stat-card"><h4>${data.user_info.aadhaar_number}</h4><span>Aadhaar Number</span></div>`;
+            }
+            if (data.user_info.aadhaar_image_url) {
+                html += `<div class="member-stat-card">
+                            <a href="${data.user_info.aadhaar_image_url}" target="_blank" style="color:#2563eb; text-decoration:underline;">View Image</a>
+                            <span>Aadhaar Card</span>
+                          </div>`;
+            }
+            html += '</div></div>';
+        }
 
-                smHtml += `
-                    <tr>
-                        <td><strong>${sm.display_name || 'N/A'}</strong></td>
-                        <td>${sm.email || 'N/A'}</td>
-                        <td>${phone}</td>
-                        <td>${leads}</td>
-                        <td>${conversions}</td>
-                        <td><span class="badge ${rate >= 20 ? 'badge-success' : rate >= 10 ? 'badge-warning' : 'badge-info'}">${rate}%</span></td>
-                        <td>
-                            <button class="action-btn action-btn-primary view-sm-leads" 
-                                    data-sm-id="${sm.ID}" 
-                                    data-sm-name="${sm.display_name}" 
-                                    title="View Leads">📋 View Leads</button>
-                            ${phone !== '-' ? `<a href="${whatsappLink}" target="_blank" class="action-btn action-btn-success" title="WhatsApp">📱</a>` : ''}
-                            <a href="mailto:${sm.email}" class="action-btn action-btn-info" title="Email">✉️</a>
-                        </td>
-                    </tr>
-                `;
+        // Stats Section
+        html += '<div class="detail-section">';
+        html += '<h3>📊 Performance Stats</h3>';
+        html += '<div class="member-stats-grid">';
+
+        if (role === 'sales_manager') {
+            html += `<div class="member-stat-card"><h4>${data.stats.total_leads || 0}</h4><span>Total Leads</span></div>`;
+            html += `<div class="member-stat-card"><h4>${data.stats.conversions || 0}</h4><span>Conversions</span></div>`;
+            html += `<div class="member-stat-card"><h4>${data.stats.conversion_rate || 0}%</h4><span>Conversion Rate</span></div>`;
+        } else if (role === 'cleaner') {
+            html += `<div class="member-stat-card"><h4>${data.stats.completed_visits || 0}</h4><span>Completed Visits</span></div>`;
+            html += `<div class="member-stat-card"><h4>${data.stats.active_visits || 0}</h4><span>Active/Assigned</span></div>`;
+            // Calculate completion rate if available or possible
+            const completionRate = data.stats.total_visits > 0 ? Math.round((data.stats.completed_visits / data.stats.total_visits) * 100) : 0;
+            html += `<div class="member-stat-card"><h4>${completionRate}%</h4><span>Completion Rate</span></div>`;
+        }
+        html += '</div></div>';
+
+        // Leads Section (for Sales Managers) - MATCH MANAGER DESIGN
+        if (role === 'sales_manager' && data.leads && data.leads.length > 0) {
+            html += '<div class="detail-section">';
+            html += '<h3>🎯 Recent Leads</h3>';
+            html += '<div class="table-responsive">';
+            html += '<table class="data-table" style="width:100%; border-collapse: separate; border-spacing: 0;"><thead><tr style="background:#f9fafb; color:#374151;">';
+            html += '<th style="padding:12px; width:40px;"></th>'; // Toggle Column
+            html += '<th style="padding:12px; text-align:left; font-weight:600; border-bottom:1px solid #e5e7eb;">Name</th>';
+            html += '<th style="padding:12px; text-align:left; font-weight:600; border-bottom:1px solid #e5e7eb;">Phone</th>';
+            html += '<th style="padding:12px; text-align:left; font-weight:600; border-bottom:1px solid #e5e7eb;">Status</th>';
+            html += '<th style="padding:12px; text-align:left; font-weight:600; border-bottom:1px solid #e5e7eb;">Location</th>';
+            html += '<th style="padding:12px; text-align:right; font-weight:600; border-bottom:1px solid #e5e7eb;">Created</th>';
+            html += '</tr></thead><tbody>';
+
+            data.leads.slice(0, 10).forEach(lead => {
+                const rowId = `lead-row-${lead.id}`;
+                const detailRowId = `lead-detail-${lead.id}`;
+
+                html += `<tr class="lead-row" id="${rowId}">
+                    <td style="padding:12px; border-bottom:1px solid #f3f4f6; text-align:center;">
+                        <button class="toggle-lead-details" data-lead-id="${lead.id}" style="background:none; border:none; cursor:pointer; font-size:1.2em; color:#6b7280; transition: transform 0.3s ease;">
+                            ▶
+                        </button>
+                    </td>
+                    <td style="padding:12px; border-bottom:1px solid #f3f4f6;">${lead.name}</td>
+                    <td style="padding:12px; border-bottom:1px solid #f3f4f6;">${lead.phone}</td>
+                    <td style="padding:12px; border-bottom:1px solid #f3f4f6;"><span class="badge badge-${lead.status}" style="padding:4px 8px; border-radius:4px; font-size:0.85em;">${lead.status}</span></td>
+                    <td style="padding:12px; border-bottom:1px solid #f3f4f6;">${lead.city}</td>
+                    <td style="padding:12px; border-bottom:1px solid #f3f4f6; text-align:right;">${lead.created_date}</td>
+                </tr>
+                <tr id="${detailRowId}" style="display:none; background-color:#f8fafc;">
+                    <td colspan="6" style="padding:20px;">
+                        <div class="lead-history-container" id="history-${lead.id}">
+                            <div style="text-align:center; color:#666;">Loading history...</div>
+                        </div>
+                    </td>
+                </tr>`;
             });
+            html += '</tbody></table></div>';
+            html += '</div>';
+        }
+
+        // Cleaning Visits (for Cleaners) - MATCH MANAGER DESIGN
+        if (role === 'cleaner' && data.visits && data.visits.length > 0) {
+            html += '<div class="detail-section">';
+            html += '<h3>🧹 Cleaning Visits</h3>';
+            html += '<div class="table-responsive">';
+            html += '<table class="data-table" style="width:100%; border-collapse: separate; border-spacing: 0;"><thead><tr style="background:#f9fafb; color:#374151;">';
+            html += '<th style="padding:12px; text-align:left; font-weight:600; border-bottom:1px solid #e5e7eb;">Date</th>';
+            html += '<th style="padding:12px; text-align:left; font-weight:600; border-bottom:1px solid #e5e7eb;">Client</th>';
+            html += '<th style="padding:12px; text-align:left; font-weight:600; border-bottom:1px solid #e5e7eb;">Location</th>';
+            html += '<th style="padding:12px; text-align:right; font-weight:600; border-bottom:1px solid #e5e7eb;">Status</th>';
+            html += '</tr></thead><tbody>';
+
+            data.visits.slice(0, 10).forEach(visit => {
+                html += `<tr>
+                    <td style="padding:12px; border-bottom:1px solid #f3f4f6;">${visit.visit_date}</td>
+                    <td style="padding:12px; border-bottom:1px solid #f3f4f6;">${visit.client_name}</td>
+                    <td style="padding:12px; border-bottom:1px solid #f3f4f6;">${visit.location}</td>
+                    <td style="padding:12px; border-bottom:1px solid #f3f4f6; text-align:right;"><span class="badge badge-${visit.status}" style="padding:4px 8px; border-radius:4px; font-size:0.85em;">${visit.status}</span></td>
+                </tr>`;
+            });
+            html += '</tbody></table></div></div>';
+        }
+
+        // Recent Activity - MATCH MANAGER DESIGN (Timeline)
+        if (data.recent_activity && data.recent_activity.length > 0) {
+            html += '<div class="detail-section">';
+            html += '<h3>⏱️ Recent Activity</h3>'; // Icon changed to match manager
+            html += '<div class="activity-timeline">'; // Class changed to match manager
+            data.recent_activity.forEach(activity => {
+                html += `<div class="activity-item">
+                    <div class="activity-time">${activity.time}</div>
+                    <p class="activity-desc">${activity.description}</p>
+                </div>`;
+            });
+            html += '</div></div>';
         } else {
-            smHtml = '<tr><td colspan="7">No Sales Managers assigned to you yet</td></tr>';
+            html += '<div class="detail-section"><p style="text-align: center; color: #999; padding: 20px;">No recent activity.</p></div>';
         }
-        $('#my-team-sm-tbody').html(smHtml);
 
-        // Render Cleaners table
-        let cleanerHtml = '';
-        if (data.cleaners && data.cleaners.length > 0) {
-            data.cleaners.forEach(cleaner => {
-                const statusBadge = cleaner.status === 'on_job'
-                    ? '<span class="status-badge" style="background:#fff3cd;color:#856404;padding:4px 8px;border-radius:12px;">On Job</span>'
-                    : cleaner.status === 'active'
-                        ? '<span class="status-badge" style="background:#d4edda;color:#155724;padding:4px 8px;border-radius:12px;">Active Today</span>'
-                        : '<span class="status-badge" style="background:#f8f9fa;color:#6c757d;padding:4px 8px;border-radius:12px;">Offline</span>';
+        $('#member-detail-content').html(html);
+    }
 
-                cleanerHtml += `
-                    <tr>
-                        <td><strong>${cleaner.name || 'N/A'}</strong></td>
-                        <td>${cleaner.phone || '-'}</td>
-                        <td>${cleaner.completed_visits || 0} visits</td>
-                        <td>${statusBadge}</td>
-                        <td>
-                            <button class="btn btn-sm btn-info" onclick="if(window.CleanerComponent) CleanerComponent.openProfileModal(${cleaner.id})">👤 Profile</button>
-                        </td>
-                    </tr>
-                `;
-            });
+    // Toggle Lead Detail Row - Lazy Load History
+    $(document).on('click', '.toggle-lead-details', function (e) {
+        e.preventDefault();
+        e.stopPropagation();
+        const leadId = $(this).data('lead-id');
+        const detailRow = $(`#lead-detail-${leadId}`);
+        const icon = $(this);
+
+        if (detailRow.is(':visible')) {
+            detailRow.hide();
+            icon.css('transform', 'rotate(0deg)');
+            icon.text('▶');
         } else {
-            cleanerHtml = '<tr><td colspan="5">No cleaners assigned to you yet</td></tr>';
+            detailRow.show();
+            icon.css('transform', 'rotate(90deg)');
+            icon.text('▼');
+
+            if (!icon.data('loaded')) {
+                loadLeadHistoryInModal(leadId);
+                icon.data('loaded', true);
+            }
         }
-        $('#my-team-cleaners-tbody').html(cleanerHtml);
+    });
+
+    function loadLeadHistoryInModal(leadId) {
+        const historyContainer = $(`#history-${leadId}`);
+        $.ajax({
+            url: sp_area_dashboard_vars.ajax_url,
+            type: 'POST',
+            data: {
+                action: 'get_lead_details',
+                lead_id: leadId,
+                nonce: sp_area_dashboard_vars.get_leads_nonce
+            },
+            success: function (response) {
+                if (response.success) {
+                    renderInlineLeadHistory(response.data.followups, historyContainer);
+                } else {
+                    historyContainer.html('<div style="text-align:center; color:#dc2626; padding:10px;">Error loading history.</div>');
+                }
+            },
+            error: function () {
+                historyContainer.html('<div style="text-align:center; color:#dc2626; padding:10px;">Network error.</div>');
+            }
+        });
+    }
+
+    function renderInlineLeadHistory(followups, container) {
+        if (!followups || followups.length === 0) {
+            container.html('<div style="text-align:center; color:#9ca3af; padding:10px; font-style:italic;">No follow-up history found.</div>');
+            return;
+        }
+
+        let html = '<div class="activity-timeline" style="margin-top:0; padding-left:15px; border-left:2px solid #e5e7eb;">';
+
+        followups.forEach(item => {
+            const icon = getInlineActivityIcon(item.activity_type);
+            html += `
+            <div class="activity-item" style="margin-bottom:15px; padding:12px; background:#fff; border:1px solid #e5e7eb; border-radius:6px; margin-left:10px; position:relative;">
+                <div style="font-size:0.85em; color:#6b7280; margin-bottom:6px; display:flex; justify-content:space-between; align-items:center;">
+                    <span style="display:flex; align-items:center; gap:6px;">
+                        <span style="font-size:1.2em;">${icon}</span> 
+                        <strong style="text-transform:uppercase; font-size:0.9em; letter-spacing:0.02em;">${item.activity_type.replace(/_/g, ' ')}</strong>
+                    </span>
+                    <span style="font-size:0.9em;">${item.activity_date || ''}</span>
+                </div>
+                <div style="color:#374151; font-size:0.95em; line-height:1.4;">${item.notes || 'No notes provided.'}</div>
+                <div style="font-size:0.8em; color:#9ca3af; margin-top:8px; text-align:right; border-top:1px dashed #f3f4f6; padding-top:4px;">
+                    by ${item.added_by_name || 'System'}
+                </div>
+            </div>`;
+        });
+
+        html += '</div>';
+        container.html(html);
+    }
+
+    function getInlineActivityIcon(type) {
+        const icons = {
+            'phone_call': '📞', 'whatsapp': '💬', 'email': '📧',
+            'meeting_offline': '🤝', 'meeting_online': '💻', 'site_visit': '🏠',
+            'note': '📝', 'status_change': '🔄', 'system': '⚙️'
+        };
+        return icons[type] || '📝';
     }
 
     // --- SM Leads Detail Functions ---
@@ -2024,6 +2286,10 @@
 
         currentSmId = smId;
         $('#selected-sm-name').text(smName);
+
+        // Close member detail modal if open
+        $('#team-member-modal').fadeOut(200);
+
         $('#sm-leads-detail-panel').slideDown();
         $('#sm-leads-status-filter').val('');
         $('#sm-leads-search').val('');
@@ -2827,4 +3093,17 @@
             }
         });
     });
+
+    // Close AM Edit Visit Modal
+    $(document).on('click', '.close-modal[data-modal="am-edit-visit-modal"], .close-modal-btn[data-modal="am-edit-visit-modal"]', function () {
+        $('#am-edit-visit-modal').hide();
+    });
+
+    // Close modal when clicking outside
+    $(document).on('click', '#am-edit-visit-modal', function (e) {
+        if (e.target.id === 'am-edit-visit-modal') {
+            $(this).hide();
+        }
+    });
+
 })(jQuery);

@@ -321,3 +321,8 @@ tr[data-project-id],
 .btn-sm:hover {
     background: #5568d3;
 }
+
+/* Fix for Visit Edit Modal Z-Index */
+#edit-visit-modal {
+    z-index: 10002 !important;
+}

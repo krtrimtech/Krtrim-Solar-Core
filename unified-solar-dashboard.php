@@ -368,7 +368,8 @@ final class Krtrim_Solar_Core {
             wp_enqueue_script('lead-component-js', $this->dir_url . 'assets/js/components/lead-component.js', ['jquery', 'ksc-dashboard-utils'], '1.0.6', true);
             wp_enqueue_style('cleaner-component-css', $this->dir_url . 'assets/css/components/cleaner-component.css', [], '1.0.2');
             wp_enqueue_script('cleaner-component-js', $this->dir_url . 'assets/js/components/cleaner-component.js', ['jquery', 'ksc-dashboard-utils'], '1.0.1', true);
-			wp_enqueue_script( 'area-manager-dashboard-js', $this->dir_url . 'assets/js/area-manager-dashboard.js', [ 'jquery', 'chart-js', 'lead-component-js', 'cleaner-component-js', 'ksc-dashboard-utils', 'ksc-project-modal-component' ], '1.0.8', true );
+            wp_enqueue_script('ksc-team-analysis-component', $this->dir_url . 'assets/js/components/team-analysis-component.js', ['jquery'], $this->version, true);
+			wp_enqueue_script( 'area-manager-dashboard-js', $this->dir_url . 'assets/js/area-manager-dashboard.js', [ 'jquery', 'chart-js', 'lead-component-js', 'cleaner-component-js', 'ksc-dashboard-utils', 'ksc-project-modal-component', 'ksc-team-analysis-component' ], '1.0.9', true );
 			wp_localize_script('area-manager-dashboard-js', 'sp_area_dashboard_vars', [
 				'ajax_url' => admin_url('admin-ajax.php'),
 				'create_project_nonce' => wp_create_nonce('sp_create_project_nonce_field'),
@@ -413,7 +414,8 @@ final class Krtrim_Solar_Core {
             wp_enqueue_script('project-modal-js', $this->dir_url . 'assets/js/project-modal.js', ['jquery'], '1.0.0', true);
             wp_enqueue_script('lead-component-js', $this->dir_url . 'assets/js/components/lead-component.js', ['jquery', 'ksc-dashboard-utils'], '1.0.6', true);
             wp_enqueue_script('cleaner-component-js', $this->dir_url . 'assets/js/components/cleaner-component.js', ['jquery', 'ksc-dashboard-utils'], '1.0.0', true);
-			wp_enqueue_script( 'manager-dashboard-js', $this->dir_url . 'assets/js/manager-dashboard.js', [ 'jquery', 'chart-js', 'lead-component-js', 'cleaner-component-js', 'ksc-dashboard-utils', 'ksc-project-modal-component' ], '1.0.3', true );
+            wp_enqueue_script('ksc-team-analysis-component', $this->dir_url . 'assets/js/components/team-analysis-component.js', ['jquery'], $this->version, true);
+			wp_enqueue_script( 'manager-dashboard-js', $this->dir_url . 'assets/js/manager-dashboard.js', [ 'jquery', 'chart-js', 'lead-component-js', 'cleaner-component-js', 'ksc-dashboard-utils', 'ksc-project-modal-component', 'ksc-team-analysis-component' ], '1.0.4', true );
 			wp_localize_script('manager-dashboard-js', 'sp_area_dashboard_vars', [
 				'ajax_url' => admin_url('admin-ajax.php'),
 				'create_project_nonce' => wp_create_nonce('sp_create_project_nonce_field'),

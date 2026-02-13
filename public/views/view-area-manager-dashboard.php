@@ -655,11 +655,13 @@ function sp_area_manager_dashboard_shortcode() {
                     </div>
                 </section>
 
-                <!-- My Team Section (for all AMs - shows assigned Sales Managers) -->
+                    <!-- My Team Section (for all AMs - shows assigned Sales Managers) -->
+                <!-- My Team Section (Restricted Team Analysis) -->
+                <!-- My Team Section (Restricted Team Analysis) -->
                 <section id="my-team-section" class="section-content" style="display:none;">
-                     <div class="section-header">
-                        <h2 class="section-title">👥 My Sales Team</h2>
-                        <p style="color: #666; margin-top: 8px;">Performance overview of your assigned Sales Managers</p>
+                    <div class="section-header">
+                        <h2 class="section-title">👥 My Team Overview</h2>
+                        <p style="color: #666; margin-top: 8px;">Performance overview of your assigned team</p>
                     </div>
 
                     <!-- Stats Row -->
@@ -678,69 +680,74 @@ function sp_area_manager_dashboard_shortcode() {
                                 <span>Cleaners</span>
                             </div>
                         </div>
-                        <div class="stat-card stat-info">
-                            <div class="stat-icon">🎯</div>
+                        <div class="stat-card">
+                            <div class="stat-icon">🏗️</div>
                             <div class="stat-details">
-                                <h3 id="my-team-leads-count">0</h3>
-                                <span>Total Leads</span>
-                            </div>
-                        </div>
-                        <div class="stat-card stat-success">
-                            <div class="stat-icon">✅</div>
-                            <div class="stat-details">
-                                <h3 id="my-team-conversions-count">0</h3>
-                                <span>Conversions</span>
+                                <h3 id="my-team-project-count">0</h3>
+                                <span>Active Projects</span>
                             </div>
                         </div>
                     </div>
 
-                    <!-- Sales Managers Grid/Table -->
+                    <!-- Sales Managers Table -->
                     <div class="card" style="margin-bottom: 20px;">
-                        <h3>👥 My Sales Managers</h3>
-                        <p style="color: #666; font-size: 14px; margin-bottom: 15px;">Click on "View Leads" to see all leads and activities for each Sales Manager</p>
+                        <h3>👥 Sales Managers</h3>
                         <div class="table-responsive">
-                            <table class="data-table" id="my-team-sm-table">
+                            <table class="data-table">
                                 <thead>
                                     <tr>
                                         <th>Name</th>
-                                        <th>Email</th>
-                                        <th>Phone</th>
-                                        <th>Leads</th>
-                                        <th>Conversions</th>
-                                        <th>Conversion Rate</th>
-                                        <th>Actions</th>
+                                        <th>Supervisor</th>
+                                        <th class="text-center">Leads</th>
+                                        <th class="text-center">Conversions</th>
+                                        <th class="text-center">Actions</th>
                                     </tr>
                                 </thead>
                                 <tbody id="my-team-sm-tbody">
-                                    <tr><td colspan="7">Loading your sales team...</td></tr>
-                                </tbody>
-                            </table>
-                        </div>
-                    </div>
-                    
-                    <!-- Cleaners Grid/Table -->
-                    <div class="card" style="margin-bottom: 20px;">
-                        <h3>🧹 My Cleaners</h3>
-                        <div class="table-responsive">
-                            <table class="data-table" id="my-team-cleaners-table">
-                                <thead>
-                                    <tr>
-                                        <th>Name</th>
-                                        <th>Phone</th>
-                                        <th>Completed Visits</th>
-                                        <th>Status</th>
-                                        <th>Actions</th>
-                                    </tr>
-                                </thead>
-                                <tbody id="my-team-cleaners-tbody">
-                                    <tr><td colspan="5">Loading your cleaners...</td></tr>
+                                    <tr><td colspan="5" class="text-center">Loading...</td></tr>
                                 </tbody>
                             </table>
                         </div>
                     </div>
 
+                    <!-- Cleaners Table -->
+                    <div class="card" style="margin-bottom: 20px;">
+                        <h3>🧹 Cleaners</h3>
+                        <div class="table-responsive">
+                            <table class="data-table">
+                                <thead>
+                                    <tr>
+                                        <th>Name</th>
+                                        <th>Supervisor</th>
+                                        <th class="text-center">Performance</th>
+                                        <th class="text-center">Status</th>
+                                        <th class="text-center">Actions</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="my-team-cleaners-tbody">
+                                    <tr><td colspan="5" class="text-center">Loading...</td></tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- Team Member Detail Modal -->
+                <div id="team-member-modal" class="modal" style="display:none;">
+                    <div class="modal-content large-modal">
+                        <div class="modal-header">
+                            <h2 id="member-modal-name">Team Member Details</h2>
+                            <span class="close-modal" id="close-member-modal">&times;</span>
+                        </div>
+                        <div class="modal-body" id="member-detail-content">
+                            <p style="text-align: center; padding: 40px; color: #666;">Loading member details...</p>
+                        </div>
+                    </div>
+                </div>
+
                     <!-- SM Leads Detail Panel (hidden until SM is selected) -->
-                    <div id="sm-leads-detail-panel" class="card" style="display: none;">
+                    <!-- SM Leads Detail Panel - HIDDEN (Moved to Modal) -->
+                    <div id="sm-leads-detail-panel" class="card" style="display: none !important;">
                         <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
                             <h3 id="sm-leads-title">📋 Leads for: <span id="selected-sm-name"></span></h3>
                             <button type="button" class="btn btn-secondary" id="close-sm-leads-panel" style="padding: 8px 15px;">✕ Close</button>

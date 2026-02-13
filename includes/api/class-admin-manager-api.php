@@ -2028,78 +2028,88 @@ class KSC_Admin_Manager_API extends KSC_API_Base {
      * Get team data for Manager dashboard
      * Returns Area Managers, Sales Managers, and Cleaners in manager's assigned states
      */
-    public function get_manager_team_data() {
-        $user = wp_get_current_user();
+    public function get_team_analysis_data() {
+        // error_log('=== GET TEAM ANALYSIS DATA DEBUG ===');
+        check_ajax_referer('get_dashboard_stats_nonce', 'nonce');
         
-        // Verify manager or admin role
-        if (!in_array('manager', $user->roles) && !in_array('administrator', $user->roles)) {
-            wp_send_json_error(['message' => 'Access denied. Manager role required.']);
+        $user = wp_get_current_user();
+        // error_log('User ID: ' . $user->ID . ', Roles: ' . print_r($user->roles, true));
+        
+        // Capability Check: Manager, Admin, OR Area Manager
+        if (!in_array('manager', $user->roles) && !in_array('administrator', $user->roles) && !in_array('area_manager', $user->roles)) {
+            wp_send_json_error(['message' => 'Access denied']);
         }
         
         $assigned_states = get_user_meta($user->ID, '_assigned_states', true);
-        if (empty($assigned_states) || !is_array($assigned_states)) {
-            // Admin fallback - get all
-            if (in_array('administrator', $user->roles)) {
-                $assigned_states = []; // Will fetch all
-            } else {
-                wp_send_json_success([
-                    'area_managers' => [],
-                    'sales_managers' => [],
-                    'cleaners' => [],
-                    'total_projects' => 0
-                ]);
-            }
-        }
+        $state = isset($_POST['state']) ? sanitize_text_field($_POST['state']) : '';
         
-        // Get Area Managers in assigned states
-        $am_args = ['role' => 'area_manager', 'number' => -1];
-        $all_ams = get_users($am_args);
-        
-        $area_managers = [];
+        // --- 1. Identify Target Area Managers ---
         $am_ids = [];
-        
-        foreach ($all_ams as $am) {
+        $area_managers = [];
+
+        // Define AMs list based on role
+        if (in_array('area_manager', $user->roles) && !in_array('administrator', $user->roles)) {
+             // Area Manager: Only see self
+             $ams = [$user];
+        } else {
+             // Manager/Admin: See all relevant AMs
+             $ams = get_users(['role' => 'area_manager', 'number' => -1]);
+        }
+
+        // Date range for "this month"
+        $first_day_this_month = date('Y-m-01 00:00:00');
+
+        foreach ($ams as $am) {
             $am_state = get_user_meta($am->ID, 'state', true);
             $am_city = get_user_meta($am->ID, 'city', true);
             
-            // Filter by assigned states (or show all for admin without states)
-            if (!empty($assigned_states) && !in_array($am_state, $assigned_states)) {
+            // Filter by Manager's assigned states (skip if AM role as they only get themselves)
+            if (!in_array('area_manager', $user->roles) && !empty($assigned_states) && is_array($assigned_states) && !in_array($am_state, $assigned_states)) {
+                continue;
+            }
+            
+            // Filter by specific state requested in dropdown
+            if (!empty($state) && $am_state !== $state) {
                 continue;
             }
             
             $am_ids[] = $am->ID;
             
-            // Count projects for this AM
-            $project_count = count($this->get_am_visible_project_ids($am->ID));
+            // Count projects
+            $project_ids = $this->get_am_visible_project_ids($am->ID);
+            $project_count = count($project_ids);
             
-            // Count team size (sales managers + cleaners)
-            $team_size = 0;
-            $sms = get_users([
-                'role' => 'sales_manager',
-                'meta_key' => '_assigned_area_manager',
-                'meta_value' => $am->ID
-            ]);
-            $team_size += count($sms);
+            // Calculate projects this month
+            $projects_this_month = 0;
+            foreach ($project_ids as $pid) {
+                $post_date = get_the_date('Y-m-d H:i:s', $pid);
+                if ($post_date >= $first_day_this_month) {
+                    $projects_this_month++;
+                }
+            }
+
+            // Get SMs
+            $sms = get_users(['role' => 'sales_manager', 'meta_key' => '_assigned_area_manager', 'meta_value' => $am->ID]);
             
-            global $wpdb;
-            $cleaners_count = $wpdb->get_var($wpdb->prepare(
-                "SELECT COUNT(*) FROM {$wpdb->prefix}solar_cleaners WHERE created_by = %d",
-                $am->ID
-            ));
-            $team_size += intval($cleaners_count);
-            
+            // Get Cleaners
+            $cleaners_list = get_users(['role' => 'solar_cleaner', 'meta_key' => '_supervised_by_area_manager', 'meta_value' => $am->ID]);
+
+            $location = ($am_city && $am_state) ? "$am_city, $am_state" : 'Not Assigned';
+
             $area_managers[] = [
                 'ID' => $am->ID,
                 'display_name' => $am->display_name,
                 'email' => $am->user_email,
                 'state' => $am_state,
                 'city' => $am_city,
+                'location' => $location,
                 'project_count' => $project_count,
-                'team_size' => $team_size
+                'projects_this_month' => $projects_this_month,
+                'team_size' => count($sms) + count($cleaners_list)
             ];
         }
         
-        // Get Sales Managers under those AMs
+        // --- 2. Get Sales Managers ---
         $sales_managers = [];
         if (!empty($am_ids)) {
             $sm_args = [
@@ -2118,14 +2128,21 @@ class KSC_Admin_Manager_API extends KSC_API_Base {
                 $am_id = get_user_meta($sm->ID, '_assigned_area_manager', true);
                 $am_user = get_userdata($am_id);
                 
-                // Get lead counts
+                // Get lead counts (WP_Query/Posts)
                 global $wpdb;
                 $lead_count = $wpdb->get_var($wpdb->prepare(
-                    "SELECT COUNT(*) FROM {$wpdb->prefix}solar_leads WHERE created_by = %d",
+                    "SELECT COUNT(*) FROM {$wpdb->posts} WHERE post_type = 'solar_lead' AND post_author = %d AND post_status != 'trash'",
                     $sm->ID
                 ));
+                
+                $leads_this_month = $wpdb->get_var($wpdb->prepare(
+                    "SELECT COUNT(*) FROM {$wpdb->posts} WHERE post_type = 'solar_lead' AND post_author = %d AND post_status != 'trash' AND post_date >= %s",
+                    $sm->ID,
+                    $first_day_this_month
+                ));
+
                 $conversion_count = $wpdb->get_var($wpdb->prepare(
-                    "SELECT COUNT(*) FROM {$wpdb->prefix}solar_leads WHERE created_by = %d AND status = 'converted'",
+                    "SELECT COUNT(*) FROM {$wpdb->posts} WHERE post_type = 'solar_lead' AND post_author = %d AND post_status = 'publish' AND ID IN (SELECT post_id FROM {$wpdb->postmeta} WHERE meta_key = '_lead_status' AND meta_value = 'converted')",
                     $sm->ID
                 ));
                 
@@ -2135,39 +2152,88 @@ class KSC_Admin_Manager_API extends KSC_API_Base {
                     'email' => $sm->user_email,
                     'supervising_am' => $am_user ? $am_user->display_name : 'N/A',
                     'lead_count' => intval($lead_count),
+                    'leads_this_month' => intval($leads_this_month),
                     'conversion_count' => intval($conversion_count)
                 ];
             }
         }
         
-        // Get Cleaners under those AMs
+        // --- 3. Get Cleaners ---
         $cleaners = [];
         if (!empty($am_ids)) {
-            global $wpdb;
-            $placeholders = implode(',', array_fill(0, count($am_ids), '%d'));
-            $cleaner_query = $wpdb->prepare(
-                "SELECT c.*, u.display_name as am_name 
-                 FROM {$wpdb->prefix}solar_cleaners c
-                 LEFT JOIN {$wpdb->users} u ON c.created_by = u.ID
-                 WHERE c.created_by IN ($placeholders)",
-                ...$am_ids
-            );
-            $cleaner_rows = $wpdb->get_results($cleaner_query, ARRAY_A);
+            // Using get_users for cleaners
+            $cleaner_args = [
+                'role' => 'solar_cleaner',
+                'meta_query' => [
+                    [
+                        'key' => '_supervised_by_area_manager',
+                        'value' => $am_ids,
+                        'compare' => 'IN'
+                    ]
+                ]
+            ];
+            $cleaner_rows = get_users($cleaner_args);
             
-            foreach ($cleaner_rows as $row) {
+            foreach ($cleaner_rows as $c) {
+                $am_id = get_user_meta($c->ID, '_supervised_by_area_manager', true);
+                $am_user = get_userdata($am_id);
+
                 // Get completed visits count
-                $visits_count = $wpdb->get_var($wpdb->prepare(
-                    "SELECT COUNT(*) FROM {$wpdb->prefix}cleaning_visits WHERE cleaner_id = %d AND status = 'completed'",
-                    $row['id']
-                ));
+                $visits_query = new WP_Query([
+                    'post_type' => 'cleaning_visit',
+                    'post_status' => 'publish',
+                    'meta_query' => [
+                        'relation' => 'AND',
+                        ['key' => '_cleaner_id', 'value' => $c->ID],
+                        ['key' => '_status', 'value' => 'completed']
+                    ],
+                    'fields' => 'ids'
+                ]);
+                $visits_count = $visits_query->found_posts;
+
+                 // Check for active status
+                 $today = date('Y-m-d');
+                 $active_visit_query = new WP_Query([
+                     'post_type' => 'cleaning_visit',
+                     'post_status' => 'publish',
+                     'posts_per_page' => 1,
+                     'meta_query' => [
+                         'relation' => 'AND',
+                         ['key' => '_cleaner_id', 'value' => $c->ID],
+                         [
+                             'relation' => 'OR',
+                             ['key' => '_status', 'value' => 'in_progress'],
+                             [
+                                 'relation' => 'AND',
+                                 ['key' => '_status', 'value' => 'assigned'],
+                                 ['key' => '_scheduled_date', 'value' => $today]
+                             ]
+                         ]
+                     ],
+                     'fields' => 'ids'
+                 ]);
+
+                 $status = 'offline';
+                 $status_label = 'Offline';
+
+                 if ($active_visit_query->have_posts()) {
+                     $active_visit_id = $active_visit_query->posts[0];
+                     $visit_status = get_post_meta($active_visit_id, '_status', true);
+                     if ($visit_status === 'in_progress') {
+                         $status = 'on_job'; $status_label = 'On Job';
+                     } else {
+                         $status = 'active'; $status_label = 'Active Today';
+                     }
+                 }
                 
                 $cleaners[] = [
-                    'id' => $row['id'],
-                    'name' => $row['name'],
-                    'phone' => $row['phone'],
-                    'supervising_am' => $row['am_name'] ?: 'N/A',
+                    'id' => $c->ID,
+                    'name' => $c->display_name,
+                    'phone' => get_user_meta($c->ID, 'phone_number', true) ?: '-',
+                    'supervising_am' => $am_user ? $am_user->display_name : 'N/A',
                     'completed_visits' => intval($visits_count),
-                    'status' => $row['status'] ?? 'active'
+                    'status' => $status,
+                    'status_label' => $status_label
                 ];
             }
         }
@@ -2319,6 +2385,8 @@ class KSC_Admin_Manager_API extends KSC_API_Base {
      * Get team data for Area Manager (their assigned Sales Managers)
      */
     public function get_am_team_data() {
+        check_ajax_referer('get_projects_nonce', 'nonce');
+        
         $user = wp_get_current_user();
         
         // Verify area_manager, manager, or admin role
@@ -2351,6 +2419,22 @@ class KSC_Admin_Manager_API extends KSC_API_Base {
             ]);
             $lead_count = $lead_query->found_posts;
 
+            // Leads this month
+            $month_leads_query = new WP_Query([
+                'post_type' => 'solar_lead',
+                'post_status' => 'any',
+                'author' => $sm->ID,
+                'date_query' => [
+                    [
+                        'year' => date('Y'),
+                        'month' => date('m'),
+                    ],
+                ],
+                'fields' => 'ids'
+            ]);
+            $leads_this_month = $month_leads_query->found_posts;
+            
+            // Conversions
             $conversion_query = new WP_Query([
                 'post_type' => 'solar_lead',
                 'post_status' => 'any',
@@ -2365,10 +2449,13 @@ class KSC_Admin_Manager_API extends KSC_API_Base {
             
             $sales_managers[] = [
                 'ID' => $sm->ID,
+                'id' => $sm->ID, // for consistency
                 'display_name' => $sm->display_name,
                 'email' => $sm->user_email,
                 'phone' => $phone ?: '',
+                'supervising_am' => 'You',
                 'lead_count' => intval($lead_count),
+                'leads_this_month' => intval($leads_this_month),
                 'conversion_count' => intval($conversion_count)
             ];
         }
@@ -2457,15 +2544,40 @@ class KSC_Admin_Manager_API extends KSC_API_Base {
                 'name' => $cleaner->display_name,
                 'email' => $cleaner->user_email,
                 'phone' => get_user_meta($cleaner->ID, 'phone_number', true) ?: '',
+                'supervising_am' => 'You',
                 'completed_visits' => $completed_count,
                 'status' => $status,
                 'status_label' => $status_label
             ];
         }
         
+        // 3. Get Active Projects Count
+        $project_args = [
+             'post_type' => 'solar_project',
+             'post_status' => 'publish',
+             'meta_query' => [
+                 'relation' => 'AND',
+                 [
+                     'relation' => 'OR',
+                     ['key' => '_created_by_area_manager', 'value' => $am_id],
+                     ['key' => '_assigned_area_manager', 'value' => $am_id],
+                     ['key' => 'post_author', 'value' => $am_id]
+                 ],
+                 [
+                     'key' => 'project_status',
+                     'value' => ['assigned', 'in_progress'],
+                     'compare' => 'IN'
+                 ]
+             ],
+             'fields' => 'ids'
+        ];
+        $project_query = new WP_Query($project_args);
+        $active_project_count = $project_query->found_posts;
+
         wp_send_json_success([
             'sales_managers' => $sales_managers,
-            'cleaners' => $cleaners_data
+            'cleaners' => $cleaners_data,
+            'total_projects' => $active_project_count // Renamed to match KSC_TeamAnalysis
         ]);
     }
     
@@ -2705,228 +2817,7 @@ class KSC_Admin_Manager_API extends KSC_API_Base {
         $user = get_userdata($user_id);
         return $user ? $user->display_name : ucfirst($fallback_role);
     }
-    /**
-     * Get Team Analysis Data for Manager Dashboard
-     */
-    public function get_team_analysis_data() {
-        if (!is_user_logged_in()) {
-            wp_send_json_error(['message' => 'Unauthorized']);
-        }
-        
-        $user = wp_get_current_user();
-        $is_admin = in_array('administrator', (array)$user->roles);
-        $is_manager = in_array('manager', (array)$user->roles);
-        
-        if (!$is_admin && !$is_manager) {
-            wp_send_json_error(['message' => 'Access denied']);
-        }
 
-
-        // 1. Get Area Managers based on Manager's assigned states
-        // Admin sees ALL AMs, Manager sees AMs based on their assigned states
-        if ($is_admin) {
-            // Admin sees everyone
-            $ams = get_users([
-                'role' => 'area_manager',
-                'orderby' => 'display_name',
-                'number' => -1
-            ]);
-        } else {
-            // Manager: Check assigned states
-            $manager_states = get_user_meta($user->ID, '_assigned_states', true);
-            
-            if (empty($manager_states)) {
-                // No assigned states = Global access, see ALL AMs
-                $ams = get_users([
-                    'role' => 'area_manager',
-                    'orderby' => 'display_name',
-                    'number' => -1
-                ]);
-            } else {
-                // Manager has specific assigned states - filter AMs by state
-                $ams = get_users([
-                    'role' => 'area_manager',
-                    'orderby' => 'display_name',
-                    'number' => -1
-                ]);
-                
-                // Filter AMs to only those in Manager's assigned states
-                $ams = array_filter($ams, function($am) use ($manager_states) {
-                    $am_state = get_user_meta($am->ID, 'state', true);
-                    return !empty($am_state) && in_array($am_state, $manager_states);
-                });
-            }
-        }
-
-        $am_data = [];
-        $sm_data = [];
-        $cleaner_data = [];
-        $total_projects = 0;
-        
-        // Date range for "this month"
-        $first_day_this_month = date('Y-m-01 00:00:00');
-
-        foreach ($ams as $am) {
-            $project_ids = $this->get_am_visible_project_ids($am->ID);
-            $total_projects += count($project_ids);
-            
-            // Calculate projects this month
-            $projects_this_month = 0;
-            foreach ($project_ids as $pid) {
-                $post_date = get_the_date('Y-m-d H:i:s', $pid);
-                if ($post_date >= $first_day_this_month) {
-                    $projects_this_month++;
-                }
-            }
-            
-            // Get SMs for this AM
-            $sms = get_users([
-                'role' => 'sales_manager',
-                'meta_key' => '_assigned_area_manager',
-                'meta_value' => $am->ID
-            ]);
-            
-            // Get Cleaners for this AM
-            $cleaners = get_users([
-                'role' => 'solar_cleaner',
-                'meta_key' => '_supervised_by_area_manager',
-                'meta_value' => $am->ID
-            ]);
-
-            $city = get_user_meta($am->ID, 'city', true) ?: '-';
-            $state = get_user_meta($am->ID, 'state', true) ?: '-';
-
-            $am_data[] = [
-                'id' => $am->ID,
-                'display_name' => $am->display_name,
-                'email' => $am->user_email,
-                'city' => $city,
-                'state' => $state,
-                'location' => ($city !== '-' && $state !== '-') ? "$city, $state" : 'Not Assigned',
-                'project_count' => count($project_ids),
-                'projects_this_month' => $projects_this_month,
-                'team_size' => count($sms) + count($cleaners)
-            ];
-
-            foreach ($sms as $sm) {
-                // Get Lead stats for SM
-                global $wpdb;
-                $lead_count = $wpdb->get_var($wpdb->prepare(
-                    "SELECT COUNT(*) FROM {$wpdb->posts} WHERE post_type = 'solar_lead' AND post_author = %d",
-                    $sm->ID
-                ));
-                
-                $leads_this_month = $wpdb->get_var($wpdb->prepare(
-                    "SELECT COUNT(*) FROM {$wpdb->posts} WHERE post_type = 'solar_lead' AND post_author = %d AND post_date >= %s",
-                    $sm->ID,
-                    $first_day_this_month
-                ));
-                
-                $converted = $wpdb->get_var($wpdb->prepare(
-                    "SELECT COUNT(*) FROM {$wpdb->posts} WHERE post_type = 'solar_lead' AND post_author = %d AND post_status = 'publish' AND ID IN (SELECT post_id FROM {$wpdb->postmeta} WHERE meta_key = 'lead_status' AND meta_value = 'converted')",
-                    $sm->ID
-                ));
-
-                $sm_data[] = [
-                    'id' => $sm->ID,
-                    'display_name' => $sm->display_name,
-                    'email' => $sm->user_email,
-                    'supervising_am' => $am->display_name,
-                    'lead_count' => intval($lead_count),
-                    'leads_this_month' => intval($leads_this_month),
-                    'conversion_count' => intval($converted)
-                ];
-            }
-
-            foreach ($cleaners as $c) {
-                 // Get completed visits for this cleaner
-                 $completed_visits = new WP_Query([
-                     'post_type' => 'cleaning_visit',
-                     'post_status' => 'publish',
-                     'meta_query' => [
-                         'relation' => 'AND',
-                         [
-                             'key' => '_cleaner_id',
-                             'value' => $c->ID
-                         ],
-                         [
-                             'key' => '_status',
-                             'value' => 'completed'
-                         ]
-                     ],
-                     'fields' => 'ids' // Only get IDs for performance
-                 ]);
-                 $completed_count = $completed_visits->found_posts;
-                 
-                 // Check for active status (visit in progress or assigned today)
-                 $today = date('Y-m-d');
-                 $active_visit_query = new WP_Query([
-                     'post_type' => 'cleaning_visit',
-                     'post_status' => 'publish',
-                     'posts_per_page' => 1,
-                     'meta_query' => [
-                         'relation' => 'AND',
-                         [
-                             'key' => '_cleaner_id',
-                             'value' => $c->ID
-                         ],
-                         [
-                             'relation' => 'OR',
-                             [
-                                 'key' => '_status',
-                                 'value' => 'in_progress'
-                             ],
-                             [
-                                 'relation' => 'AND',
-                                 [
-                                     'key' => '_status',
-                                     'value' => 'assigned'
-                                 ],
-                                 [
-                                     'key' => '_scheduled_date',
-                                     'value' => $today
-                                 ]
-                             ]
-                         ]
-                     ],
-                     'fields' => 'ids'
-                 ]);
-                 
-                 $status = 'offline';
-                 $status_label = 'Offline';
-                 
-                 if ($active_visit_query->have_posts()) {
-                     $active_visit_id = $active_visit_query->posts[0];
-                     $visit_status = get_post_meta($active_visit_id, '_status', true);
-                     
-                     if ($visit_status === 'in_progress') {
-                         $status = 'on_job';
-                         $status_label = 'On Job';
-                     } else {
-                         $status = 'active';
-                         $status_label = 'Active Today';
-                     }
-                 }
-
-                $cleaner_data[] = [
-                    'id' => $c->ID,
-                    'name' => $c->display_name,
-                    'phone' => get_user_meta($c->ID, 'phone', true) ?: '-',
-                    'supervising_am' => $am->display_name,
-                    'completed_visits' => intval($completed_visits),
-                    'status' => $status,
-                    'status_label' => $status_label
-                ];
-            }
-        }
-
-        wp_send_json_success([
-            'area_managers' => $am_data,
-            'sales_managers' => $sm_data,
-            'cleaners' => $cleaner_data,
-            'total_projects' => $total_projects
-        ]);
-    }
 
 
     /**
@@ -3028,8 +2919,9 @@ class KSC_Admin_Manager_API extends KSC_API_Base {
         $current_user = wp_get_current_user();
         $is_admin = in_array('administrator', (array)$current_user->roles);
         $is_manager = in_array('manager', (array)$current_user->roles);
+        $is_am = in_array('area_manager', (array)$current_user->roles);
         
-        if (!$is_admin && !$is_manager) {
+        if (!$is_admin && !$is_manager && !$is_am) {
             wp_send_json_error(['message' => 'Access denied']);
         }
         
@@ -3038,6 +2930,25 @@ class KSC_Admin_Manager_API extends KSC_API_Base {
         
         if (!$user_id || !$role) {
             wp_send_json_error(['message' => 'Missing user ID or role']);
+        }
+        
+        // Ownership Check for Area Managers
+        if ($is_am) {
+            if ($role === 'sales_manager') {
+                $assigned_am = get_user_meta($user_id, '_assigned_area_manager', true);
+                if ($assigned_am != $current_user->ID) {
+                    wp_send_json_error(['message' => 'Access denied. You do not supervise this Sales Manager.']);
+                }
+            } elseif ($role === 'cleaner') {
+                $supervisor = get_user_meta($user_id, '_supervised_by_area_manager', true);
+                if ($supervisor != $current_user->ID) {
+                    wp_send_json_error(['message' => 'Access denied. You do not supervise this Cleaner.']);
+                }
+            } elseif ($role === 'area_manager') {
+                if ($user_id != $current_user->ID) {
+                    wp_send_json_error(['message' => 'Access denied. You can only view your own details.']);
+                }
+            }
         }
         
         $user = get_userdata($user_id);
