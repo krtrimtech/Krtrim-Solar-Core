@@ -2884,7 +2884,7 @@
 
     // Append Edit Modal to Body
     $('body').append(`
-            < div id = "edit-visit-modal" class="modal" style = "display: none; position: fixed; z-index: 1050; left: 0; top: 0; width: 100%; height: 100%; overflow: auto; background-color: rgba(0,0,0,0.4);" >
+            <div id="edit-visit-modal" class="modal" style="display: none; position: fixed; z-index: 1050; left: 0; top: 0; width: 100%; height: 100%; overflow: auto; background-color: rgba(0,0,0,0.4);">
                 <div class="modal-content" style="background-color: #fefefe; margin: 10% auto; padding: 20px; border: 1px solid #888; width: 90%; max-width: 500px; border-radius: 8px;">
                     <span class="close-modal" data-modal="edit-visit-modal" style="color: #aaa; float: right; font-size: 28px; font-weight: bold; cursor: pointer;">&times;</span>
                     <h3 style="margin-top: 0; color: #1f2937;">✏️ Edit Visit</h3>

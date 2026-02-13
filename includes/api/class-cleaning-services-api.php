@@ -681,14 +681,22 @@ class KSC_Cleaning_Services_API {
         update_post_meta($visit_id, '_completed_at', current_time('mysql'));
 
         // Handle photo upload
-        if (!empty($_FILES['completion_photo']['name'])) {
+        // Handle photo upload (support both 'after_photo' from frontend and 'completion_photo')
+        $photo_key = '';
+        if (!empty($_FILES['after_photo']['name'])) {
+            $photo_key = 'after_photo';
+        } elseif (!empty($_FILES['completion_photo']['name'])) {
+            $photo_key = 'completion_photo';
+        }
+
+        if ($photo_key) {
             require_once ABSPATH . 'wp-admin/includes/file.php';
             require_once ABSPATH . 'wp-admin/includes/media.php';
             require_once ABSPATH . 'wp-admin/includes/image.php';
 
-            $upload = wp_handle_upload($_FILES['completion_photo'], ['test_form' => false]);
-            if (isset($upload['url'])) {
-                update_post_meta($visit_id, '_completion_photo', $upload['url']);
+            $attachment_id = media_handle_upload($photo_key, 0);
+            if (!is_wp_error($attachment_id)) {
+                update_post_meta($visit_id, '_completion_photo', $attachment_id);
             }
         }
 
