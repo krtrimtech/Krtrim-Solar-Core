@@ -385,6 +385,8 @@ class KSC_Cleaner_API {
         if (!in_array('administrator', (array) $current_user->roles) && !in_array('manager', (array) $current_user->roles)) {
             if (in_array('sales_manager', (array) $current_user->roles)) {
                 $supervising_am = get_user_meta($current_user->ID, '_supervised_by_area_manager', true); 
+                error_log("🔍 [get_cleaners] SM ID: " . $current_user->ID . ", AM ID: " . var_export($supervising_am, true));
+                
                 if ($supervising_am) {
                     $meta_query[] = [
                         'key' => '_supervised_by_area_manager',
@@ -393,17 +395,23 @@ class KSC_Cleaner_API {
                 } else {
                     // Fallback: Location based matching if no AM assigned
                     $sm_city = get_user_meta($current_user->ID, 'city', true);
+                    $sm_state = get_user_meta($current_user->ID, 'state', true);
                     
                     if ($sm_city) {
                          $meta_query[] = [
                             'key' => 'city',
                             'value' => $sm_city,
+                            'compare' => 'LIKE' // Use LIKE for partial matches
+                         ];
+                    } elseif ($sm_state) {
+                         $meta_query[] = [
+                            'key' => 'state',
+                            'value' => $sm_state,
                             'compare' => 'LIKE'
                          ];
                     } else {
-                        // If no AM and no City, return empty (or could default to all if desired, but safer to return empty)
-                        wp_send_json_success([]);
-                        return;
+                        // If no AM and no City/State, allow seeing ALL cleaners (Permissive Fallback)
+                        // This helps if the SM hasn't completed their profile yet.
                     }
                 }
             } else {

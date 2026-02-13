@@ -743,13 +743,33 @@
         const cleanerSelect = $('#book_cleaner_id');
         cleanerSelect.empty().append('<option value="">Select Cleaner</option>');
 
+        // Always try to load if empty or just to be safe
         if (smCleanersList && smCleanersList.length > 0) {
             smCleanersList.forEach(c => {
                 cleanerSelect.append(`<option value="${c.id}">${escapeHtml(c.name)}</option>`);
             });
         } else {
-            cleanerSelect.append('<option value="" disabled>No cleaners loaded. Refreshing...</option>');
-            loadSMCleaners(); // Try to load again
+            cleanerSelect.append('<option value="" disabled>Loading cleaners...</option>');
+            // Fetch again
+            $.ajax({
+                url: sm_vars.ajax_url,
+                type: 'POST',
+                data: { action: 'get_cleaners' },
+                success: function (response) {
+                    cleanerSelect.empty().append('<option value="">Select Cleaner</option>');
+                    if (response.success && response.data.length > 0) {
+                        smCleanersList = response.data; // Update global list
+                        response.data.forEach(c => {
+                            cleanerSelect.append(`<option value="${c.id}">${escapeHtml(c.name)}</option>`);
+                        });
+                    } else {
+                        cleanerSelect.append('<option value="" disabled>No cleaners found in your area</option>');
+                    }
+                },
+                error: function () {
+                    cleanerSelect.empty().append('<option value="" disabled>Error loading cleaners</option>');
+                }
+            });
         }
 
         // Set default date
@@ -843,6 +863,9 @@
                 if (response.success) {
                     smCleanersList = response.data;
                 }
+            },
+            error: function (xhr, status, error) {
+                console.error('❌ [SM Dashboard] get_cleaners AJAX Error:', error);
             }
         });
     }
@@ -906,9 +929,34 @@
         // Populate cleaners dropdown
         const select = $('#schedule_cleaner_id');
         select.empty().append('<option value="">Select Cleaner</option>');
-        smCleanersList.forEach(cleaner => {
-            select.append(`<option value="${cleaner.id}">${cleaner.name} (📞 ${cleaner.phone})</option>`);
-        });
+
+        if (smCleanersList && smCleanersList.length > 0) {
+            smCleanersList.forEach(cleaner => {
+                select.append(`<option value="${cleaner.id}">${escapeHtml(cleaner.name)} (📞 ${cleaner.phone})</option>`);
+            });
+        } else {
+            select.append('<option value="" disabled>Loading cleaners...</option>');
+            // Fetch again
+            $.ajax({
+                url: sm_vars.ajax_url,
+                type: 'POST',
+                data: { action: 'get_cleaners' },
+                success: function (response) {
+                    select.empty().append('<option value="">Select Cleaner</option>');
+                    if (response.success && response.data.length > 0) {
+                        smCleanersList = response.data; // Update global list
+                        response.data.forEach(cleaner => {
+                            select.append(`<option value="${cleaner.id}">${escapeHtml(cleaner.name)} (📞 ${cleaner.phone})</option>`);
+                        });
+                    } else {
+                        select.append('<option value="" disabled>No cleaners found in your area</option>');
+                    }
+                },
+                error: function () {
+                    select.append('<option value="" disabled>Error loading cleaners</option>');
+                }
+            });
+        }
 
         $('#schedule-visit-feedback').html('');
         $('#schedule-visit-modal').css('display', 'flex');
