@@ -384,15 +384,27 @@ class KSC_Cleaner_API {
         $meta_query = [];
         if (!in_array('administrator', (array) $current_user->roles) && !in_array('manager', (array) $current_user->roles)) {
             if (in_array('sales_manager', (array) $current_user->roles)) {
-                $supervising_am = get_user_meta($current_user->ID, '_assigned_area_manager', true); // Fixed meta key
+                $supervising_am = get_user_meta($current_user->ID, '_supervised_by_area_manager', true); 
                 if ($supervising_am) {
                     $meta_query[] = [
                         'key' => '_supervised_by_area_manager',
                         'value' => $supervising_am,
                     ];
                 } else {
-                    wp_send_json_success([]);
-                    return;
+                    // Fallback: Location based matching if no AM assigned
+                    $sm_city = get_user_meta($current_user->ID, 'city', true);
+                    
+                    if ($sm_city) {
+                         $meta_query[] = [
+                            'key' => 'city',
+                            'value' => $sm_city,
+                            'compare' => 'LIKE'
+                         ];
+                    } else {
+                        // If no AM and no City, return empty (or could default to all if desired, but safer to return empty)
+                        wp_send_json_success([]);
+                        return;
+                    }
                 }
             } else {
                 $meta_query[] = [

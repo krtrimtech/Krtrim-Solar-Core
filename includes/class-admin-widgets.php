@@ -197,6 +197,27 @@ class SP_Admin_Widgets {
                         <span class="sp-stat-value"><?php echo number_format($stats['conversion_rate'], 1); ?>%</span>
                     </div>
                 </div>
+                <div class="sp-stat-box sp-cleaning">
+                    <div class="sp-stat-icon">🧹</div>
+                    <div class="sp-stat-info">
+                        <span class="sp-stat-label">Cleaning Services</span>
+                        <span class="sp-stat-value"><?php echo number_format($stats['cleaning_services']); ?></span>
+                    </div>
+                </div>
+                <div class="sp-stat-box sp-visit">
+                    <div class="sp-stat-icon">📅</div>
+                    <div class="sp-stat-info">
+                        <span class="sp-stat-label">Cleaning Visits</span>
+                        <span class="sp-stat-value"><?php echo number_format($stats['total_visits']); ?></span>
+                    </div>
+                </div>
+                <div class="sp-stat-box sp-progress">
+                    <div class="sp-stat-icon">⚡</div>
+                    <div class="sp-stat-info">
+                        <span class="sp-stat-label">Visits in Progress</span>
+                        <span class="sp-stat-value"><?php echo number_format($stats['visits_in_progress']); ?></span>
+                    </div>
+                </div>
             </div>
             <div class="sp-widget-footer">
                 <a href="<?php echo admin_url('edit.php?post_type=solar_project'); ?>" class="sp-view-all">View All Projects →</a>
@@ -343,16 +364,35 @@ class SP_Admin_Widgets {
         $completed = $this->count_projects_by_status('completed');
         $active = ($this->count_projects_by_status('in_progress') + $this->count_projects_by_status('assigned'));
         
-        $total_leads = wp_count_posts('solar_lead')->publish;
+        // Lead Count - Sum all statuses except trash and converted (converted are already clients)
+        $lead_counts = wp_count_posts('solar_lead');
+        $total_leads = 0;
+        foreach ($lead_counts as $status => $count) {
+            if ($status !== 'trash') {
+                $total_leads += $count;
+            }
+        }
+        
         $converted_leads = $this->count_leads_by_status('converted');
         $conversion_rate = $total_leads > 0 ? ($converted_leads / $total_leads) * 100 : 0;
+
+        // Cleaning Services stats
+        $cleaning_services = wp_count_posts('cleaning_service')->publish;
+        $total_visits = wp_count_posts('cleaning_visit')->publish;
+        
+        $visits_in_progress = $this->count_visits_by_status('in_progress');
+        $visits_completed = $this->count_visits_by_status('completed');
 
         return [
             'total_projects' => $total_projects,
             'completed_projects' => $completed,
             'active_projects' => $active,
             'total_leads' => $total_leads,
-            'conversion_rate' => $conversion_rate
+            'conversion_rate' => $conversion_rate,
+            'cleaning_services' => $cleaning_services,
+            'total_visits' => $total_visits,
+            'visits_in_progress' => $visits_in_progress,
+            'visits_completed' => $visits_completed
         ];
     }
 
@@ -524,12 +564,40 @@ class SP_Admin_Widgets {
             ];
         }
 
+        // ✅ RECENT CLEANING VISITS (last 7 days)
+        $recent_visits = get_posts([
+            'post_type' => 'cleaning_visit',
+            'posts_per_page' => 5,
+            'date_query' => [
+                ['after' => '7 days ago']
+            ],
+            'orderby' => 'modified',
+            'order' => 'DESC'
+        ]);
+
+        foreach ($recent_visits as $visit) {
+            $v_status = get_post_meta($visit->ID, '_status', true);
+            $icon = '📅';
+            $text = 'Cleaning visit updated: ' . $visit->post_title;
+            
+            if ($v_status === 'scheduled') { $icon = '📅'; $text = 'New cleaning visit scheduled: ' . $visit->post_title; }
+            if ($v_status === 'in_progress') { $icon = '⚡'; $text = 'Cleaning visit started: ' . $visit->post_title; }
+            if ($v_status === 'completed') { $icon = '✅'; $text = 'Cleaning visit completed: ' . $visit->post_title; }
+            if ($v_status === 'cancelled') { $icon = '❌'; $text = 'Cleaning visit cancelled: ' . $visit->post_title; }
+
+            $activities[] = [
+                'icon' => $icon,
+                'text' => $text,
+                'time' => strtotime($visit->post_modified)
+            ];
+        }
+
         // Sort by time
         usort($activities, function($a, $b) {
             return $b['time'] - $a['time'];
         });
 
-        return array_slice($activities, 0, 8); // Increased limit to show more variety
+        return array_slice($activities, 0, 10); // Increased limit to show more variety
     }
 
     private function get_quick_stats() {
@@ -593,7 +661,20 @@ class SP_Admin_Widgets {
             'meta_query' => [
                 ['key' => '_lead_status', 'value' => $status]
             ],
-            'fields' => 'ids'
+            'fields' => 'ids',
+            'numberposts' => -1
+        ]);
+        return count($count);
+    }
+
+    private function count_visits_by_status($status) {
+        $count = get_posts([
+            'post_type' => 'cleaning_visit',
+            'meta_query' => [
+                ['key' => '_status', 'value' => $status]
+            ],
+            'fields' => 'ids',
+            'numberposts' => -1
         ]);
         return count($count);
     }

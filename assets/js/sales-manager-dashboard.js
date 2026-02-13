@@ -43,6 +43,7 @@
         loadDashboardStats();
         loadTodayFollowups();
         loadSMCleaners(); // Pre-load cleaners for booking
+        initModals(); // Initialize global modal handlers
     });
 
     // --- Tab Data Loading Triggers ---
@@ -455,12 +456,12 @@
     // Modals
     function initModals() {
         // Close modal on X click
-        $(document).on('click', '.close-modal', function () {
-            $(this).closest('.modal').css('display', 'none');
+        $(document).on('click', '.close-modal, .close-lead-modal', function () {
+            $(this).closest('.modal, .lead-modal').css('display', 'none');
         });
 
         // Close modal on background click
-        $(document).on('click', '.modal', function (e) {
+        $(document).on('click', '.modal, .lead-modal', function (e) {
             if (e.target === this) {
                 $(this).css('display', 'none');
             }
@@ -744,7 +745,7 @@
 
         if (smCleanersList && smCleanersList.length > 0) {
             smCleanersList.forEach(c => {
-                cleanerSelect.append(`<option value="${c.id}">${escapeHtml(c.display_name)}</option>`);
+                cleanerSelect.append(`<option value="${c.id}">${escapeHtml(c.name)}</option>`);
             });
         } else {
             cleanerSelect.append('<option value="" disabled>No cleaners loaded. Refreshing...</option>');
@@ -910,17 +911,11 @@
         });
 
         $('#schedule-visit-feedback').html('');
-        $('#schedule-visit-modal').show();
+        $('#schedule-visit-modal').css('display', 'flex');
     });
 
     // Close modals
-    $(document).on('click', '#schedule-visit-modal .close-modal', function () {
-        $('#schedule-visit-modal').hide();
-    });
-
-    $(document).on('click', '#service-detail-modal .close-modal', function () {
-        $('#service-detail-modal').hide();
-    });
+    // Handled by global .close-modal click in initModals()
 
     // Submit schedule visit form
     $('#schedule-visit-form').on('submit', function (e) {
@@ -1125,7 +1120,7 @@
         if (smCleanersList && smCleanersList.length > 0) {
             smCleanersList.forEach(c => {
                 const selected = c.id == btn.data('cleaner') ? 'selected' : '';
-                select.append(`<option value="${c.id}" ${selected}>${escapeHtml(c.display_name)}</option>`);
+                select.append(`<option value="${c.id}" ${selected}>${escapeHtml(c.name)}</option>`);
             });
         }
 
@@ -1195,11 +1190,7 @@
     });
 
     // Close modals
-    $(document).on('click', '#edit-visit-modal .close-modal', function () {
-        $('#edit-visit-modal').hide();
-    });
-    $(document).on('click', '#cancel-visit-modal .close-modal', function () {
-        $('#cancel-visit-modal').hide();
-    });
+    // Generic close modal button
+    // Handled by global .close-modal click
 
 })(jQuery);

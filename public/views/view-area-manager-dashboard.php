@@ -671,6 +671,13 @@ function sp_area_manager_dashboard_shortcode() {
                                 <span>Sales Managers</span>
                             </div>
                         </div>
+                        <div class="stat-card">
+                            <div class="stat-icon">🧹</div>
+                            <div class="stat-details">
+                                <h3 id="my-team-cleaner-count">0</h3>
+                                <span>Cleaners</span>
+                            </div>
+                        </div>
                         <div class="stat-card stat-info">
                             <div class="stat-icon">🎯</div>
                             <div class="stat-details">
@@ -711,6 +718,27 @@ function sp_area_manager_dashboard_shortcode() {
                         </div>
                     </div>
                     
+                    <!-- Cleaners Grid/Table -->
+                    <div class="card" style="margin-bottom: 20px;">
+                        <h3>🧹 My Cleaners</h3>
+                        <div class="table-responsive">
+                            <table class="data-table" id="my-team-cleaners-table">
+                                <thead>
+                                    <tr>
+                                        <th>Name</th>
+                                        <th>Phone</th>
+                                        <th>Completed Visits</th>
+                                        <th>Status</th>
+                                        <th>Actions</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="my-team-cleaners-tbody">
+                                    <tr><td colspan="5">Loading your cleaners...</td></tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+
                     <!-- SM Leads Detail Panel (hidden until SM is selected) -->
                     <div id="sm-leads-detail-panel" class="card" style="display: none;">
                         <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">

@@ -1634,22 +1634,26 @@
                             : '<span style="color: #9ca3af;">—</span>';
 
                         html += `
-                            <tr class="cleaning-service-row" data-id="${s.id}" style="cursor:pointer;">
-                                <td><strong>${s.customer_name}</strong><br><small>${s.customer_phone}</small></td>
-                                <td>${planLabels[s.plan_type] || s.plan_type}</td>
-                                <td>${s.system_size_kw} kW</td>
+                            <tr class="cleaning-service-row" data-id="${s.id}">
+                                <td><strong>${s.customer_name}</strong></td>
+                                <td>${s.customer_phone}</td>
+                                <td>
+                                    ${planLabels[s.plan_type] || s.plan_type}
+                                    <div style="font-size:12px;color:#666;">${s.system_size_kw} kW</div>
+                                </td>
                                 <td>${s.visits_used || 0}/${s.visits_total || 1}</td>
-                                <td>${paymentBadge}</td>
-                                <td>₹${Number(s.total_amount || 0).toLocaleString()}</td>
-                                <td>${paymentOptionDisplay}</td>
                                 <td>
                                     ${s.next_visit_date
                                 ? `<span style="color:#4f46e5;">✓ ${s.next_visit_date}</span><br><small style="color:#666;">👤 ${s.next_visit_cleaner || 'Unassigned'}</small>`
                                 : s.preferred_date
-                                    ? `<span style="color:#b45309;">⏳ Requested: ${s.preferred_date}</span><br><button class="btn btn-sm schedule-visit-btn" data-id="${s.id}">+ Schedule</button>`
+                                    ? `<span style="color:#b45309;">⏳ Requested: ${s.preferred_date}</span><br><button class="btn btn-sm schedule-visit-btn" data-id="${s.id}" style="margin-top:4px;">+ Schedule</button>`
                                     : '<button class="btn btn-sm schedule-visit-btn" data-id="' + s.id + '">+ Schedule</button>'}
                                 </td>
-                                <td>${paymentOptionDisplay}</td>
+                                <td>${paymentBadge}</td>
+                                <td>
+                                    ${paymentOptionDisplay}
+                                    <div style="font-size:12px;">₹${Number(s.total_amount || 0).toLocaleString()}</div>
+                                </td>
                                 <td>
                                     <button class="btn btn-sm view-service-details-btn" 
                                             data-id="${s.id}" 
@@ -1931,6 +1935,7 @@
     function renderMyTeam(data) {
         // Update stats
         const smCount = data.sales_managers?.length || 0;
+        const cleanerCount = data.cleaners?.length || 0;
         let totalLeads = 0;
         let totalConversions = 0;
 
@@ -1942,6 +1947,7 @@
         }
 
         $('#my-team-sm-count').text(smCount);
+        $('#my-team-cleaner-count').text(cleanerCount);
         $('#my-team-leads-count').text(totalLeads);
         $('#my-team-conversions-count').text(totalConversions);
 
@@ -1978,6 +1984,33 @@
             smHtml = '<tr><td colspan="7">No Sales Managers assigned to you yet</td></tr>';
         }
         $('#my-team-sm-tbody').html(smHtml);
+
+        // Render Cleaners table
+        let cleanerHtml = '';
+        if (data.cleaners && data.cleaners.length > 0) {
+            data.cleaners.forEach(cleaner => {
+                const statusBadge = cleaner.status === 'on_job'
+                    ? '<span class="status-badge" style="background:#fff3cd;color:#856404;padding:4px 8px;border-radius:12px;">On Job</span>'
+                    : cleaner.status === 'active'
+                        ? '<span class="status-badge" style="background:#d4edda;color:#155724;padding:4px 8px;border-radius:12px;">Active Today</span>'
+                        : '<span class="status-badge" style="background:#f8f9fa;color:#6c757d;padding:4px 8px;border-radius:12px;">Offline</span>';
+
+                cleanerHtml += `
+                    <tr>
+                        <td><strong>${cleaner.name || 'N/A'}</strong></td>
+                        <td>${cleaner.phone || '-'}</td>
+                        <td>${cleaner.completed_visits || 0} visits</td>
+                        <td>${statusBadge}</td>
+                        <td>
+                            <button class="btn btn-sm btn-info" onclick="if(window.CleanerComponent) CleanerComponent.openProfileModal(${cleaner.id})">👤 Profile</button>
+                        </td>
+                    </tr>
+                `;
+            });
+        } else {
+            cleanerHtml = '<tr><td colspan="5">No cleaners assigned to you yet</td></tr>';
+        }
+        $('#my-team-cleaners-tbody').html(cleanerHtml);
     }
 
     // --- SM Leads Detail Functions ---

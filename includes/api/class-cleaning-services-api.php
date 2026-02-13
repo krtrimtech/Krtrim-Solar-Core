@@ -82,10 +82,52 @@ class KSC_Cleaning_Services_API {
                 ];
             } else {
                 // AM sees services in their area
-                $args['meta_query'][] = [
+                
+                // 1. Get assigned Sales Managers
+                $sm_args = [
+                    'role' => 'sales_manager',
+                    'meta_key' => '_supervised_by_area_manager',
+                    'meta_value' => $user->ID,
+                    'fields' => 'ID'
+                ];
+                $assigned_sm_ids = get_users($sm_args);
+                
+                // 2. Get AM's assigned city
+                $am_city = get_user_meta($user->ID, 'city', true);
+                
+                // Build meta query
+                $meta_query = ['relation' => 'OR'];
+                
+                // Case A: Assigned directly to AM
+                $meta_query[] = [
                     'key' => '_assigned_area_manager',
                     'value' => $user->ID,
                 ];
+                
+                // Case B: Created by assigned SM
+                if (!empty($assigned_sm_ids)) {
+                    $meta_query[] = [
+                        'key' => '_created_by_sales_manager',
+                        'value' => $assigned_sm_ids,
+                        'compare' => 'IN'
+                    ];
+                }
+                
+                // Case C: Service address contains AM's city
+                if (!empty($am_city)) {
+                    $meta_query[] = [
+                        'key' => '_customer_address',
+                        'value' => $am_city,
+                        'compare' => 'LIKE'
+                    ];
+                     $meta_query[] = [
+                        'key' => '_service_city', // Check explicit city field too if it exists
+                        'value' => $am_city,
+                        'compare' => 'LIKE'
+                    ];
+                }
+                
+                $args['meta_query'][] = $meta_query;
             }
         }
 

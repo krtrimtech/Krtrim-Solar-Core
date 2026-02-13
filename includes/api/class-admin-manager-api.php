@@ -2330,7 +2330,7 @@ class KSC_Admin_Manager_API extends KSC_API_Base {
         
         $am_id = $user->ID;
         
-        // Get Sales Managers assigned to this Area Manager
+        // 1. Get Sales Managers assigned to this Area Manager
         $sm_args = [
             'role' => 'sales_manager',
             'meta_key' => '_assigned_area_manager',
@@ -2342,15 +2342,24 @@ class KSC_Admin_Manager_API extends KSC_API_Base {
         global $wpdb;
         
         foreach ($sms as $sm) {
-            // Get lead counts
-            $lead_count = $wpdb->get_var($wpdb->prepare(
-                "SELECT COUNT(*) FROM {$wpdb->prefix}solar_leads WHERE created_by = %d",
-                $sm->ID
-            ));
-            $conversion_count = $wpdb->get_var($wpdb->prepare(
-                "SELECT COUNT(*) FROM {$wpdb->prefix}solar_leads WHERE created_by = %d AND status = 'converted'",
-                $sm->ID
-            ));
+            // Get lead counts using WP_Query on 'solar_lead' post type
+            $lead_query = new WP_Query([
+                'post_type' => 'solar_lead',
+                'post_status' => 'any',
+                'author' => $sm->ID,
+                'fields' => 'ids'
+            ]);
+            $lead_count = $lead_query->found_posts;
+
+            $conversion_query = new WP_Query([
+                'post_type' => 'solar_lead',
+                'post_status' => 'any',
+                'author' => $sm->ID,
+                'meta_key' => '_lead_status',
+                'meta_value' => 'converted',
+                'fields' => 'ids'
+            ]);
+            $conversion_count = $conversion_query->found_posts;
             
             $phone = get_user_meta($sm->ID, 'phone_number', true);
             
@@ -2363,9 +2372,100 @@ class KSC_Admin_Manager_API extends KSC_API_Base {
                 'conversion_count' => intval($conversion_count)
             ];
         }
+
+        // 2. Get Cleaners supervised by this Area Manager
+        $cleaner_args = [
+            'role' => 'solar_cleaner',
+            'meta_key' => '_supervised_by_area_manager',
+            'meta_value' => $am_id
+        ];
+        $cleaners = get_users($cleaner_args);
+        $cleaners_data = [];
+
+        foreach ($cleaners as $cleaner) {
+            // Calculate completed visits (All Time)
+            $completed_query = new WP_Query([
+                'post_type' => 'cleaning_visit',
+                'post_status' => 'publish',
+                'meta_query' => [
+                    'relation' => 'AND',
+                    [
+                        'key' => '_cleaner_id',
+                        'value' => $cleaner->ID
+                    ],
+                    [
+                        'key' => '_status',
+                        'value' => 'completed'
+                    ]
+                ],
+                'fields' => 'ids'
+            ]);
+            $completed_count = $completed_query->found_posts;
+
+            // Check for active status (Active Today / On Job)
+            $today = date('Y-m-d');
+            $active_visit_query = new WP_Query([
+                'post_type' => 'cleaning_visit',
+                'post_status' => 'publish',
+                'posts_per_page' => 1,
+                'meta_query' => [
+                    'relation' => 'AND',
+                    [
+                        'key' => '_cleaner_id',
+                        'value' => $cleaner->ID
+                    ],
+                    [
+                        'relation' => 'OR',
+                        [
+                            'key' => '_status',
+                            'value' => 'in_progress'
+                        ],
+                        [
+                            'relation' => 'AND',
+                            [
+                                'key' => '_status',
+                                'value' => 'assigned'
+                            ],
+                            [
+                                'key' => '_scheduled_date',
+                                'value' => $today
+                            ]
+                        ]
+                    ]
+                ],
+                'fields' => 'ids'
+            ]);
+
+            $status = 'offline';
+            $status_label = 'Offline';
+
+            if ($active_visit_query->have_posts()) {
+                $active_visit_id = $active_visit_query->posts[0];
+                $visit_status = get_post_meta($active_visit_id, '_status', true);
+                
+                if ($visit_status === 'in_progress') {
+                    $status = 'on_job';
+                    $status_label = 'On Job';
+                } else {
+                    $status = 'active';
+                    $status_label = 'Active Today';
+                }
+            }
+
+            $cleaners_data[] = [
+                'id' => $cleaner->ID,
+                'name' => $cleaner->display_name,
+                'email' => $cleaner->user_email,
+                'phone' => get_user_meta($cleaner->ID, 'phone_number', true) ?: '',
+                'completed_visits' => $completed_count,
+                'status' => $status,
+                'status_label' => $status_label
+            ];
+        }
         
         wp_send_json_success([
-            'sales_managers' => $sales_managers
+            'sales_managers' => $sales_managers,
+            'cleaners' => $cleaners_data
         ]);
     }
     
@@ -2397,32 +2497,43 @@ class KSC_Admin_Manager_API extends KSC_API_Base {
         }
         
         global $wpdb;
+
+        // Get leads created by this SM using WP_Query
+        $leads_query = new WP_Query([
+            'post_type' => 'solar_lead',
+            'post_status' => 'any',
+            'author' => $sm_id,
+            'posts_per_page' => -1,
+            'orderby' => 'date',
+            'order' => 'DESC'
+        ]);
         
-        // Get leads created by this SM with last followup date
-        $leads = $wpdb->get_results($wpdb->prepare(
-            "SELECT l.*, 
-                    (SELECT MAX(f.created_at) FROM {$wpdb->prefix}solar_lead_followups f WHERE f.lead_id = l.id) as last_followup
-             FROM {$wpdb->prefix}solar_leads l 
-             WHERE l.created_by = %d 
-             ORDER BY l.created_at DESC",
-            $sm_id
-        ), ARRAY_A);
-        
-        // Format leads data
         $formatted_leads = [];
-        foreach ($leads as $lead) {
-            $formatted_leads[] = [
-                'id' => $lead['id'],
-                'name' => $lead['name'],
-                'phone' => $lead['phone'],
-                'email' => $lead['email'],
-                'status' => $lead['status'],
-                'city' => $lead['city'],
-                'state' => $lead['state'],
-                'notes' => $lead['notes'] ?? '',
-                'created_date' => $lead['created_at'],
-                'last_followup' => $lead['last_followup']
-            ];
+        
+        if ($leads_query->have_posts()) {
+            foreach ($leads_query->posts as $lead) {
+                // Get last followup date dynamically from the custom table
+                $last_followup = $wpdb->get_var($wpdb->prepare(
+                    "SELECT created_at FROM {$wpdb->prefix}solar_lead_followups 
+                     WHERE lead_id = %d 
+                     ORDER BY created_at DESC 
+                     LIMIT 1",
+                    $lead->ID
+                ));
+                
+                $formatted_leads[] = [
+                    'id' => $lead->ID,
+                    'name' => $lead->post_title,
+                    'phone' => get_post_meta($lead->ID, '_lead_phone', true),
+                    'email' => get_post_meta($lead->ID, '_lead_email', true),
+                    'status' => get_post_meta($lead->ID, '_lead_status', true),
+                    'city' => get_post_meta($lead->ID, '_lead_city', true),
+                    'state' => get_post_meta($lead->ID, '_lead_state', true),
+                    'notes' => $lead->post_content, // Assuming content holds notes
+                    'created_date' => $lead->post_date,
+                    'last_followup' => $last_followup
+                ];
+            }
         }
         
         wp_send_json_success([
