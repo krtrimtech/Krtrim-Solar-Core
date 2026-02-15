@@ -378,9 +378,7 @@ Krtrim Solar Core/
 │   │       └── lead-component.css        # NEW
 │   │
 │   ├── js/
-│   │   ├── admin.js
-│   │   ├── area-manager-dashboard.js
-│   │   ├── sales-manager-dashboard.js    # NEW
+│   │   ├── unified-dashboard.js          # Unified AM/SM Dashboard JS
 │   │   ├── dashboard.js
 │   │   ├── marketplace.js
 │   │   ├── project-bid.js

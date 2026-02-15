@@ -277,7 +277,7 @@
                     <td class="lead-actions-cell">
                         <a href="https://wa.me/91${lead.phone.replace(/\D/g, '')}" target="_blank" class="lead-quick-action btn-icon" title="WhatsApp">💬</a>
                         <a href="tel:${lead.phone}" class="lead-quick-action btn-icon" title="Call">📞</a>
-                        ${dashboardType === 'sales_manager' ? `<button class="lead-quick-action btn-icon btn-book-cleaning" title="Book Cleaning" data-lead-id="${lead.id}" data-lead-name="${escapeHtml(lead.name)}">🧹</button>` : ''}
+                        ${dashboardType === 'sales_manager' ? `<button class="lead-quick-action btn-icon btn-book-cleaning" id="btn-book-cleaning-detail" title="Book Cleaning" data-lead-id="${lead.id}" data-lead-name="${escapeHtml(lead.name)}">🧹</button>` : ''}
                     </td>
                 </tr>
             `;

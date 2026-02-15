@@ -228,28 +228,28 @@
     const awardBidNonce = sp_area_dashboard_vars.award_bid_nonce;
 
     // --- Dashboard Charts & Stats ---
-    let projectStatusChart, monthlyTrendChart, financialChart, leadChart;
+    let projectStatusChart, monthlyTrendChart, financialChart, leadChart, smLeadStatusChart;
 
     function loadDashboardStats() {
-        // console.log('Loading dashboard stats...');
+        const action = sp_area_dashboard_vars.is_sales_manager ? 'get_sales_manager_stats' : 'get_area_manager_dashboard_stats';
+
         $.ajax({
             url: ajaxUrl,
             type: 'POST',
             data: {
-                action: 'get_area_manager_dashboard_stats',
+                action: action,
                 nonce: sp_area_dashboard_vars.get_dashboard_stats_nonce,
             },
             success: function (response) {
-                // console.log('Stats response:', response);
                 if (response.success) {
                     updateDashboardStats(response.data);
                     initializeCharts(response.data);
-                } else {
-                    // console.error('Stats error:', response);
+
+                    // Sales Manager specific initial loads
+                    if (sp_area_dashboard_vars.is_sales_manager) {
+                        loadTodayFollowups();
+                    }
                 }
-            },
-            error: function (xhr, status, error) {
-                // console.error('AJAX error loading stats:', error);
             }
         });
     }
@@ -265,8 +265,14 @@
         $('#total-profit-stat').text('₹' + (stats.total_profit || 0).toLocaleString('en-IN'));
         $('#profit-margin-stat').text((stats.profit_margin || 0).toFixed(1) + '%');
         $('#collection-rate-stat').text((stats.collection_rate || 0).toFixed(1) + '%');
+
+        // Sales Manager Specific
         $('#total-leads-stat').text(stats.total_leads || 0);
+        $('#pending-followups-stat').text(stats.pending_followups || 0);
+        $('#converted-leads-stat').text(stats.converted_leads || 0);
+        $('#conversion-rate-stat').text((stats.conversion_rate || 0) + '%');
     }
+
 
     function initializeCharts(stats) {
         if (typeof Chart === 'undefined') {
@@ -279,6 +285,7 @@
         if (monthlyTrendChart) monthlyTrendChart.destroy();
         if (financialChart) financialChart.destroy();
         if (leadChart) leadChart.destroy();
+        if (smLeadStatusChart) smLeadStatusChart.destroy();
 
         // 1. Project Status Pie Chart
         const statusCtx = document.getElementById('project-status-chart');
@@ -363,8 +370,7 @@
                             data: stats.financial_data?.costs || [0, 0, 0, 0, 0, 0],
                             borderColor: '#ef4444',
                             backgroundColor: 'rgba(239, 68, 68, 0.1)',
-                            tension: 0.4,
-                            fill: true
+                            tension: 0.1
                         }
                     ]
                 },
@@ -2444,13 +2450,13 @@
             url: ajaxUrl,
             type: 'POST',
             data: {
-                action: 'get_all_area_managers', // Updated to match manager-features.js
+                action: 'get_unassigned_area_managers', // Updated to match backend API
                 nonce: sp_area_dashboard_vars.get_projects_nonce
             },
             success: function (response) {
                 let html = '<option value="">Select Area Manager</option>';
-                if (response.success && response.data) {
-                    response.data.forEach(am => {
+                if (response.success && response.data && response.data.managers) {
+                    response.data.managers.forEach(am => {
                         html += `<option value="${am.ID}">${am.display_name} (${am.user_email || am.email})</option>`;
                     });
                 }
@@ -2464,21 +2470,21 @@
             url: ajaxUrl,
             type: 'POST',
             data: {
-                action: 'get_am_assignments', // Updated to match manager-features.js
+                action: 'get_am_location_assignments', // Updated to match backend API
                 nonce: sp_area_dashboard_vars.get_projects_nonce
             },
             success: function (response) {
                 let html = '';
-                if (response.success && response.data && response.data.length > 0) {
-                    response.data.forEach(assignment => {
+                if (response.success && response.data && response.data.assignments && response.data.assignments.length > 0) {
+                    response.data.assignments.forEach(assignment => {
                         html += `
                             <tr>
-                                <td>${assignment.display_name}</td>
+                                <td>${assignment.am_name}</td>
                                 <td>${assignment.state || 'N/A'}</td>
                                 <td>${assignment.city || 'N/A'}</td>
                                 <td>
                                     <button class="btn btn-danger btn-sm unassign-am-btn" 
-                                            data-user-id="${assignment.ID}">
+                                            data-user-id="${assignment.am_id}">
                                         🗑️ Unassign
                                     </button>
                                 </td>
@@ -2498,6 +2504,26 @@
     if ($('#assign_state').length) {
         $.getJSON(sp_area_dashboard_vars.states_cities_json_url, function (data) {
             allIndianStates = data.states;
+            const stateSelect = $('#assign_state');
+            stateSelect.empty().append('<option value="">Select State</option>');
+
+            const assignedStates = sp_area_dashboard_vars.assigned_states || [];
+            const isManager = sp_area_dashboard_vars.is_manager;
+
+            let validStates = 0;
+            allIndianStates.forEach(s => {
+                // Filter by assigned states if it's a manager
+                if (isManager && assignedStates.length > 0 && !assignedStates.includes(s.state)) {
+                    return;
+                }
+                stateSelect.append(`<option value="${s.state}">${s.state}</option>`);
+                validStates++;
+            });
+
+            // If only one state is available, select it automatically
+            if (validStates === 1) {
+                stateSelect.find('option').last().prop('selected', true).trigger('change');
+            }
         });
 
         $('#assign_state').on('change', function () {
@@ -2527,7 +2553,7 @@
             url: ajaxUrl,
             type: 'POST',
             data: {
-                action: 'assign_am_location',
+                action: 'assign_area_manager_location',
                 nonce: sp_area_dashboard_vars.assign_am_location_nonce,
                 manager_id: $('#assign_am_id').val(),
                 state: $('#assign_state').val(),
@@ -2569,7 +2595,7 @@
             url: ajaxUrl,
             type: 'POST',
             data: {
-                action: 'unassign_am_location',
+                action: 'remove_area_manager_location',
                 nonce: sp_area_dashboard_vars.unassign_am_location_nonce,
                 manager_id: userId,
             },
@@ -3276,6 +3302,442 @@
                 button.text(button.data('original-text'));
             }
         });
+    });
+
+    // ==========================================
+    // SALES MANAGER SPECIFIC LOGIC
+    // ==========================================
+
+    const activityIcons = {
+        'phone_call': '📞',
+        'whatsapp': '💬',
+        'email': '📧',
+        'meeting_offline': '🤝',
+        'meeting_online': '💻',
+        'site_visit': '🏠',
+        'other': '📝'
+    };
+
+    const activityLabels = {
+        'phone_call': 'Phone Call',
+        'whatsapp': 'WhatsApp',
+        'email': 'Email',
+        'meeting_offline': 'Offline Meeting',
+        'meeting_online': 'Online Meeting',
+        'site_visit': 'Site Visit',
+        'other': 'Other'
+    };
+
+    // Load today's follow-ups for SM dashboard
+    function loadTodayFollowups() {
+        $.ajax({
+            url: ajaxUrl,
+            type: 'POST',
+            data: {
+                action: 'get_today_followups'
+            },
+            success: function (response) {
+                if (response.success) {
+                    renderTodayFollowups(response.data.followups);
+                }
+            }
+        });
+    }
+
+    function renderTodayFollowups(followups) {
+        const container = $('#today-followups-container');
+        if (!container.length) return;
+
+        if (!followups || followups.length === 0) {
+            container.html(`
+                <div class="empty-state" style="padding: 20px; text-align: center;">
+                    <div class="icon" style="font-size: 30px; margin-bottom: 10px;">📅</div>
+                    <h3>No follow-ups today</h3>
+                    <p>Add follow-ups to your leads to track them here</p>
+                </div>
+            `);
+            return;
+        }
+
+        let html = '<div class="activity-timeline">';
+        followups.forEach(f => {
+            html += `
+                <div class="activity-item type-${f.activity_type}">
+                    <div class="activity-header" style="display: flex; justify-content: space-between; margin-bottom: 5px;">
+                        <span class="activity-type" style="font-weight: 600;">${activityIcons[f.activity_type] || '📝'} ${activityLabels[f.activity_type] || f.activity_type}</span>
+                        <span class="activity-time" style="font-size: 12px; color: #666;">${formatTime(f.activity_date)}</span>
+                    </div>
+                    <div class="activity-notes" style="font-size: 14px;"><strong>${f.lead_name}</strong>: ${escapeHtml(f.notes)}</div>
+                </div>
+            `;
+        });
+        html += '</div>';
+        container.html(html);
+    }
+
+    // Ported from SM Dashboard for conversions
+    function loadConversions() {
+        const container = $('#conversions-container');
+        if (!container.length) return;
+        container.html('<p>Loading conversions...</p>');
+
+        $.ajax({
+            url: ajaxUrl,
+            type: 'POST',
+            data: {
+                action: 'get_sales_manager_conversions'
+            },
+            success: function (response) {
+                if (response.success) {
+                    renderConversions(response.data.conversions);
+                } else {
+                    container.html('<p>Error loading conversions</p>');
+                }
+            }
+        });
+    }
+    window.loadConversions = loadConversions;
+
+    function renderConversions(conversions) {
+        const container = $('#conversions-container');
+
+        if (!conversions || conversions.length === 0) {
+            container.html(`
+                <div class="empty-state" style="padding: 40px; text-align: center;">
+                    <div class="icon" style="font-size: 40px; margin-bottom: 15px;">✅</div>
+                    <h3>No conversions yet</h3>
+                    <p>Keep following up with your leads to convert them!</p>
+                </div>
+            `);
+            return;
+        }
+
+        let html = '<div class="conversions-grid" style="display: grid; gap: 15px;">';
+        conversions.forEach(c => {
+            html += `
+                <div class="conversion-card" style="padding: 15px; background: white; border: 1px solid #e2e8f0; border-radius: 8px; display: flex; justify-content: space-between; align-items: center;">
+                    <div>
+                        <h4 style="margin: 0 0 5px 0;">✅ ${escapeHtml(c.name)}</h4>
+                        <div style="font-size: 13px; color: #64748b;">
+                            <span>📞 ${escapeHtml(c.phone)}</span>
+                        </div>
+                    </div>
+                    <div style="font-size: 12px; color: #94a3b8; text-align: right;">
+                        Converted: ${formatDate(c.conversion_date)}
+                    </div>
+                </div>
+            `;
+        });
+        html += '</div>';
+        container.html(html);
+    }
+
+    // ===============================
+    // CLEANING SERVICES (Ported SM Logic)
+    // ===============================
+
+    let smCleanersList = [];
+
+    function loadSMCleaningServices() {
+        const tbody = $('#sm-cleaning-services-tbody');
+        if (!tbody.length) return;
+        tbody.html('<tr><td colspan="6">Loading...</td></tr>');
+
+        $.ajax({
+            url: ajaxUrl,
+            type: 'POST',
+            data: { action: 'get_cleaning_services' },
+            success: function (response) {
+                if (response.success) {
+                    renderSMCleaningServices(response.data);
+                } else {
+                    tbody.html('<tr><td colspan="6">Error loading services</td></tr>');
+                }
+            },
+            error: function () {
+                tbody.html('<tr><td colspan="6">Error loading services</td></tr>');
+            }
+        });
+
+        // Load cleaners for scheduling
+        loadSMCleaners();
+    }
+    window.loadSMCleaningServices = loadSMCleaningServices;
+
+    function loadSMCleaners() {
+        $.ajax({
+            url: ajaxUrl,
+            type: 'POST',
+            data: { action: 'get_cleaners' },
+            success: function (response) {
+                if (response.success) {
+                    smCleanersList = response.data;
+                }
+            }
+        });
+    }
+
+    function renderSMCleaningServices(services) {
+        const tbody = $('#sm-cleaning-services-tbody');
+
+        if (!services || services.length === 0) {
+            tbody.html('<tr><td colspan="6" style="text-align: center; padding: 30px; color: #64748b;">No cleaning services from your leads yet.</td></tr>');
+            return;
+        }
+
+        const planLabels = {
+            'one_time': 'One-Time',
+            'monthly': 'Monthly',
+            '6_month': '6-Month',
+            'yearly': 'Yearly'
+        };
+
+        let html = '';
+        services.forEach(s => {
+            const paymentBadge = s.payment_status === 'paid'
+                ? '<span style="background:#d1fae5;color:#047857;padding:4px 8px;border-radius:4px;font-size:12px;">Paid</span>'
+                : '<span style="background:#fef3c7;color:#b45309;padding:4px 8px;border-radius:4px;font-size:12px;">Pending</span>';
+
+            html += `
+                <tr class="sm-cleaning-service-row" data-id="${s.id}" style="cursor:pointer;">
+                    <td><strong>${s.customer_name}</strong><br><small style="color: #64748b;">${s.customer_phone}</small></td>
+                    <td>${planLabels[s.plan_type] || s.plan_type}</td>
+                    <td>${s.system_size_kw} kW</td>
+                    <td>${s.visits_used || 0}/${s.visits_total || 1}</td>
+                    <td>${paymentBadge}</td>
+                    <td>
+                        ${s.next_visit_date
+                    ? `<span style="color:#4f46e5; font-size: 13px;">✓ ${s.next_visit_date}</span>`
+                    : s.preferred_date
+                        ? `<span style="color:#b45309; font-size: 13px;">⏳ ${s.preferred_date}</span><br><button class="btn btn-sm btn-primary sm-schedule-visit-btn" data-id="${s.id}" data-name="${s.customer_name}" style="padding: 4px 8px; font-size: 11px;">+ Schedule</button>`
+                        : `<button class="btn btn-sm btn-primary sm-schedule-visit-btn" data-id="${s.id}" data-name="${s.customer_name}" style="padding: 4px 8px; font-size: 11px;">+ Schedule</button>`}
+                    </td>
+                </tr>
+            `;
+        });
+        tbody.html(html);
+    }
+
+    // Schedule Visit Handlers
+    $(document).on('click', '.sm-schedule-visit-btn', function (e) {
+        e.preventDefault();
+        e.stopPropagation();
+
+        const serviceId = $(this).data('id');
+        const customerName = $(this).data('name');
+
+        $('#schedule_service_id').val(serviceId);
+        $('#schedule_customer_name').text(customerName);
+
+        // Set minimum date to today
+        const today = new Date().toISOString().split('T')[0];
+        $('#schedule_date').attr('min', today).val(today);
+
+        // Populate cleaners dropdown
+        const select = $('#schedule_cleaner_id');
+        select.empty().append('<option value="">Select Cleaner</option>');
+
+        if (smCleanersList && smCleanersList.length > 0) {
+            smCleanersList.forEach(cleaner => {
+                select.append(`<option value="${cleaner.id}">${escapeHtml(cleaner.name)} (📞 ${cleaner.phone})</option>`);
+            });
+        }
+        $('#schedule-visit-modal').css('display', 'flex');
+    });
+
+    $(document).on('submit', '#schedule-visit-form', function (e) {
+        e.preventDefault();
+        const form = $(this);
+        const feedback = $('#schedule-visit-feedback');
+        const submitBtn = form.find('button[type="submit"]');
+
+        const data = {
+            action: 'schedule_cleaning_visit',
+            service_id: $('#schedule_service_id').val(),
+            cleaner_id: $('#schedule_cleaner_id').val(),
+            scheduled_date: $('#schedule_date').val(),
+            scheduled_time: $('#schedule_time').val()
+        };
+
+        if (!data.cleaner_id) {
+            showToast('Please select a cleaner', 'error');
+            return;
+        }
+
+        submitBtn.prop('disabled', true).text('Scheduling...');
+
+        $.ajax({
+            url: ajaxUrl,
+            type: 'POST',
+            data: data,
+            success: function (response) {
+                if (response.success) {
+                    showToast('Visit scheduled successfully!', 'success');
+                    $('#schedule-visit-modal').hide();
+                    form[0].reset();
+                    loadSMCleaningServices();
+                } else {
+                    showToast(response.data.message || 'Error scheduling visit', 'error');
+                }
+            },
+            complete: function () {
+                submitBtn.prop('disabled', false).text('+ Schedule Visit');
+            }
+        });
+    });
+
+    // Cleaning Service Detail Logic
+    $(document).on('click', '.sm-cleaning-service-row', function (e) {
+        if ($(e.target).is('button') || $(e.target).closest('button').length) return;
+        const serviceId = $(this).data('id');
+        loadSMServiceDetails(serviceId);
+    });
+
+    function loadSMServiceDetails(serviceId) {
+        const content = $('#service-detail-content');
+        if (!content.length) return;
+        content.html('<p>Loading...</p>');
+        $('#service-detail-modal').show();
+
+        $.ajax({
+            url: ajaxUrl,
+            type: 'POST',
+            data: {
+                action: 'get_cleaning_service_details',
+                service_id: serviceId
+            },
+            success: function (response) {
+                if (response.success) {
+                    const s = response.data.service;
+                    const visits = response.data.visits || [];
+                    const planLabels = { 'one_time': 'One-Time', 'monthly': 'Monthly', '6_month': '6-Month', 'yearly': 'Yearly' };
+
+                    let html = `
+                        <div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 15px; margin-bottom: 20px;">
+                            <div style="background: #f8fafc; padding: 15px; border-radius: 8px;">
+                                <strong>👤 Customer</strong><br>${s.customer_name}<br><small style="color: #64748b;">📞 ${s.customer_phone}</small>
+                            </div>
+                            <div style="background: #f8fafc; padding: 15px; border-radius: 8px;">
+                                <strong>📋 Plan</strong><br>${planLabels[s.plan_type] || s.plan_type}<br><small style="color: #64748b;">${s.system_size_kw} kW System</small>
+                            </div>
+                            <div style="background: #f8fafc; padding: 15px; border-radius: 8px;">
+                                <strong>🧹 Visits</strong><br>${s.visits_used || 0} / ${s.visits_total || 1} Used
+                            </div>
+                            <div style="background: #f8fafc; padding: 15px; border-radius: 8px;">
+                                <strong>💰 Payment</strong><br>₹${Number(s.total_amount || 0).toLocaleString()}<br><small style="color: ${s.payment_status === 'paid' ? '#059669' : '#d97706'}">${s.payment_status === 'paid' ? '✅ Paid' : '⏳ Pending'}</small>
+                            </div>
+                        </div>
+                        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
+                            <h4 style="margin: 0;">🗓️ Visit History</h4>
+                        </div>
+                    `;
+
+                    if (visits && visits.length > 0) {
+                        html += '<div class="table-responsive"><table class="data-table" style="width: 100%;">';
+                        html += '<thead><tr style="background: #f1f5f9;"><th style="padding: 10px; text-align: left;">Date</th><th style="padding: 10px; text-align: left;">Time</th><th style="padding: 10px; text-align: left;">Cleaner</th><th style="padding: 10px; text-align: left;">Status</th></tr></thead>';
+                        html += '<tbody>';
+                        visits.forEach(visit => {
+                            html += `
+                                <tr style="border-bottom: 1px solid #e2e8f0;">
+                                    <td style="padding: 10px;">${visit.scheduled_date}</td>
+                                    <td style="padding: 10px;">${visit.scheduled_time || '09:00'}</td>
+                                    <td style="padding: 10px;">${visit.cleaner_name || 'Not assigned'}</td>
+                                    <td style="padding: 10px;"><span class="status-badge ${visit.status}" style="font-size: 11px;">${visit.status}</span></td>
+                                </tr>
+                            `;
+                        });
+                        html += '</tbody></table></div>';
+                    } else {
+                        html += '<p style="color: #64748b; text-align: center; padding: 20px;">No visits scheduled yet.</p>';
+                    }
+                    content.html(html);
+                }
+            }
+        });
+    }
+
+    // Book Cleaning from Lead Detail
+    $(document).on('click', '#btn-book-cleaning-detail', function (e) {
+        e.preventDefault();
+        const leadId = $(this).data('lead-id');
+        const leadName = $(this).data('lead-name');
+
+        $('#book_lead_id').val(leadId);
+        $('#book_customer_name').text(leadName);
+
+        // Populate cleaners
+        const select = $('#book_cleaner_id');
+        select.empty().append('<option value="">Select Cleaner</option>');
+        if (smCleanersList && smCleanersList.length > 0) {
+            smCleanersList.forEach(c => select.append(`<option value="${c.id}">${escapeHtml(c.name)}</option>`));
+        }
+
+        $('#book-cleaning-modal').css('display', 'flex');
+    });
+
+    $(document).on('submit', '#book-cleaning-form', function (e) {
+        e.preventDefault();
+        const form = $(this);
+        const submitBtn = form.find('button[type="submit"]');
+        const data = form.serialize() + '&action=book_cleaning_service';
+
+        submitBtn.prop('disabled', true).text('Booking...');
+
+        $.ajax({
+            url: ajaxUrl,
+            type: 'POST',
+            data: data,
+            success: function (response) {
+                if (response.success) {
+                    showToast('Cleaning service booked successfully! 🎉', 'success');
+                    $('#book-cleaning-modal').hide();
+                    form[0].reset();
+                    if (typeof window.loadLeads === 'function') window.loadLeads();
+                } else {
+                    showToast(response.data.message || 'Error booking service', 'error');
+                }
+            },
+            complete: function () {
+                submitBtn.prop('disabled', false).text('✅ Book Service');
+            }
+        });
+    });
+
+    // Handle generic close modal
+    $(document).on('click', '.close-modal', function () {
+        $(this).closest('.modal').hide();
+    });
+
+    // Helper: format time for timeline
+    function formatTime(dateStr) {
+        if (!dateStr) return '';
+        const date = new Date(dateStr);
+        return date.toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' });
+    }
+
+    function formatDate(dateStr) {
+        if (!dateStr) return '';
+        const date = new Date(dateStr);
+        return date.toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' });
+    }
+
+    function escapeHtml(text) {
+        if (!text) return '';
+        const div = document.createElement('div');
+        div.textContent = text;
+        return div.innerHTML;
+    }
+
+    // Unified helper for section loading used by DashboardUtils
+    // Some functions like loadLeads are defined globally by lead-component.js
+    // We just need to make sure they are available.
+
+    // Initial Load for SM Dashboard
+    $(document).ready(function () {
+        if (sp_area_dashboard_vars.is_sales_manager && $('#dashboard-section').is(':visible')) {
+            loadDashboardStats();
+            loadSMCleaners();
+        }
     });
 
 })(jQuery);

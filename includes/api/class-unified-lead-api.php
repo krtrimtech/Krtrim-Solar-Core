@@ -97,7 +97,7 @@ class KSC_Unified_Lead_API {
      */
     private function check_lead_access($user, $lead, $lead_id) {
         // Admin - always has access
-        if (current_user_can('administrator')) {
+        if (in_array('administrator', (array)$user->roles)) {
             return true;
         }
         
@@ -105,37 +105,31 @@ class KSC_Unified_Lead_API {
         if ($lead->post_author == $user->ID) {
             return true;
         }
+
+        $creator_id = $lead->post_author;
         
-        // Check if created by Sales Manager
-        $created_by_sm = get_post_meta($lead_id, '_created_by_sales_manager', true);
-        
-        // Fallback to post author if meta is missing (for older leads or direct creation)
-        if (!$created_by_sm) {
-            $created_by_sm = $lead->post_author;
+        // 1. Check if Area Manager supervising Sales Manager creator
+        $sm_assigned_am = get_user_meta($creator_id, '_assigned_area_manager', true);
+        if ($sm_assigned_am == $user->ID) {
+            return true;
         }
-        
-        if ($created_by_sm) {
-            // Creator SM has access
-            if ($created_by_sm == $user->ID) {
-                return true;
-            }
+
+        // 2. Check if Manager access
+        if (in_array('manager', (array)$user->roles)) {
+            // Manager supervising the AM who is either the creator or supervisor of the creator
+            $target_am_id = in_array('area_manager', (array)get_userdata($creator_id)->roles) ? $creator_id : $sm_assigned_am;
             
-            // Area Manager supervising this SM
-            $sm_supervisor = get_user_meta($created_by_sm, '_supervised_by_area_manager', true);
-            $sm_assigned_am = get_user_meta($created_by_sm, '_assigned_area_manager', true);
-            
-            if ($sm_supervisor == $user->ID || $sm_assigned_am == $user->ID) {
-                return true;
-            }
-            
-            // Manager supervising the AM who supervises the SM
-            if (in_array('manager', (array)$user->roles)) {
-                $supervised_ams = get_users([
-                    'meta_key' => '_supervised_by_manager',
-                    'meta_value' => $user->ID,
-                    'fields' => 'ID'
-                ]);
-                if ($sm_supervisor && in_array($sm_supervisor, $supervised_ams)) {
+            if ($target_am_id) {
+                // Direct supervision check
+                $am_supervisor = get_user_meta($target_am_id, '_supervised_by_manager', true);
+                if ($am_supervisor == $user->ID) {
+                    return true;
+                }
+
+                // State-based assignment check
+                $assigned_states = get_user_meta($user->ID, '_assigned_states', true) ?: [];
+                $am_state = get_user_meta($target_am_id, 'state', true);
+                if (!empty($assigned_states) && in_array($am_state, $assigned_states)) {
                     return true;
                 }
             }

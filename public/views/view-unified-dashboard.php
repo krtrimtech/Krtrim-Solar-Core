@@ -772,15 +772,7 @@ function sp_unified_dashboard_shortcode() {
                                 <div class="form-group" style="flex: 1; min-width: 200px;">
                                     <label for="assign_state">State *</label>
                                     <select id="assign_state" name="state" required style="width: 100%; padding: 10px; border: 1px solid #ddd; border-radius: 6px;">
-                                        <option value="">Select your assigned state</option>
-                                        <?php
-                                        $manager_states = get_user_meta($user->ID, '_assigned_states', true);
-                                        if (!empty($manager_states) && is_array($manager_states)) {
-                                            foreach ($manager_states as $state) {
-                                                echo '<option value="' . esc_attr($state) . '">' . esc_html($state) . '</option>';
-                                            }
-                                        }
-                                        ?>
+                                        <option value="">Loading states...</option>
                                     </select>
                                 </div>
                                 <div class="form-group" style="flex: 1; min-width: 200px;">

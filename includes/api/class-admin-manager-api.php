@@ -1690,9 +1690,58 @@ class KSC_Admin_Manager_API extends KSC_API_Base {
         $search = isset($_POST['search']) ? sanitize_text_field($_POST['search']) : '';
         $lead_type = isset($_POST['lead_type']) ? sanitize_text_field($_POST['lead_type']) : '';
         
+        // Identify supervised users
+        $supervised_ids = [$manager->ID]; // Self
+        
+        $assigned_states = get_user_meta($manager->ID, '_assigned_states', true) ?: [];
+        $is_manager = in_array('manager', (array)$manager->roles);
+
+        if ($is_manager) {
+            // Include all AMs in assigned states
+            $ams = get_users([
+                'role' => 'area_manager',
+                'number' => -1,
+                'fields' => 'ID'
+            ]);
+            
+            $filtered_ams = [];
+            foreach ($ams as $am_id) {
+                $am_state = get_user_meta($am_id, 'state', true);
+                if (empty($assigned_states) || in_array($am_state, $assigned_states)) {
+                    $filtered_ams[] = $am_id;
+                    $supervised_ids[] = $am_id;
+                }
+            }
+            
+            // Include all SMs supervised by these AMs
+            if (!empty($filtered_ams)) {
+                $sms = get_users([
+                    'role' => 'sales_manager',
+                    'meta_key' => '_assigned_area_manager',
+                    'meta_value' => $filtered_ams,
+                    'meta_compare' => 'IN',
+                    'fields' => 'ID'
+                ]);
+                foreach ($sms as $sm_id) {
+                    $supervised_ids[] = $sm_id;
+                }
+            }
+        } else {
+            // Area Manager: Include all SMs assigned to them
+            $sms = get_users([
+                'role' => 'sales_manager',
+                'meta_key' => '_assigned_area_manager',
+                'meta_value' => $manager->ID,
+                'fields' => 'ID'
+            ]);
+            foreach ($sms as $sm_id) {
+                $supervised_ids[] = $sm_id;
+            }
+        }
+
         // Prepare args for component
         $args = [
-            'author' => $manager->ID,
+            'author__in' => $supervised_ids,
             'search' => $search,
             'filter_meta' => []
         ];

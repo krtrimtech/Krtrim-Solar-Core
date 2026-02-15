@@ -89,6 +89,7 @@ final class Krtrim_Solar_Core {
 		require_once $this->dir_path . 'public/views/view-vendor-status.php';
 		require_once $this->dir_path . 'public/views/view-cleaner-dashboard.php';
 		require_once $this->dir_path . 'public/views/view-cleaning-booking.php';
+		require_once $this->dir_path . 'public/views/view-sales-manager-dashboard.php';
 	}
 
 	private function init_hooks() {
@@ -354,9 +355,11 @@ final class Krtrim_Solar_Core {
             has_shortcode( $post->post_content, 'area_manager_dashboard' ) || 
             has_shortcode( $post->post_content, 'manager_dashboard' ) || 
             has_shortcode( $post->post_content, 'unified_solar_dashboard' ) || 
+            has_shortcode( $post->post_content, 'sales_manager_dashboard' ) || 
             is_page( 'unified-admin-dashboard' ) || 
             is_page( 'area-manager-dashboard' ) || 
-            is_page( 'manager-dashboard' ) 
+            is_page( 'manager-dashboard' ) ||
+            is_page( 'sales-manager-dashboard' )
         ) ) {
 			$current_user = wp_get_current_user();
 			$is_manager = in_array('manager', $current_user->roles, true) || in_array('administrator', $current_user->roles, true);
@@ -381,10 +384,9 @@ final class Krtrim_Solar_Core {
 			wp_enqueue_script( 'unified-dashboard-js', $this->dir_url . 'assets/js/unified-dashboard.js', [ 'jquery', 'chart-js', 'lead-component-js', 'cleaner-component-js', 'ksc-dashboard-utils', 'ksc-project-modal-component', 'ksc-team-analysis-component' ], '1.0.0', true );
 			
 			// Conditionally enqueue manager-specific scripts and styles
-			if ($is_manager) {
-
-				//wp_enqueue_script( 'manager-features-js', $this->dir_url . 'assets/js/manager-features.js', [ 'unified-dashboard-js' ], '1.0.0', true );
-			}
+			
+			$is_sm = in_array('sales_manager', $current_user->roles, true);
+			$is_manager = $is_manager || $is_sm;
 
 			wp_localize_script('unified-dashboard-js', 'sp_area_dashboard_vars', [
 				'ajax_url' => admin_url('admin-ajax.php'),
@@ -406,9 +408,12 @@ final class Krtrim_Solar_Core {
                 'reset_password_nonce' => wp_create_nonce('reset_password_nonce'),
                 'cleaner_nonce' => wp_create_nonce('ksc_cleaner_nonce'),
 				'assign_am_location_nonce' => wp_create_nonce('assign_am_location_nonce'),
-                'unassign_am_location_nonce' => wp_create_nonce('unassign_am_location_nonce'),
+				'unassign_am_location_nonce' => wp_create_nonce('unassign_am_location_nonce'),
+				'sales_manager_nonce' => wp_create_nonce('sp_sales_manager_nonce'),
 				'states_cities_json_url' => $this->dir_url . 'assets/data/indian-states-cities.json',
+				'assigned_states' => get_user_meta($current_user->ID, '_assigned_states', true) ?: [],
 				'is_manager' => $is_manager,
+				'is_sales_manager' => $is_sm,
 			]);
 		}
 

@@ -443,7 +443,9 @@
 #schedule-visit-modal .modal-content,
 #am-service-details-modal .modal-content,
 #service-detail-modal .modal-content,
-#service-details-modal .modal-content {
+#service-details-modal .modal-content,
+#book-cleaning-modal .modal-content,
+#reset-password-modal .modal-content {
     padding: 15px !important;
 }
 
@@ -565,7 +567,9 @@
     padding: 15px;
     box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
     border: 1px solid #e2e8f0;
-}/* ===================================
+}
+
+/* ===================================
    CURSOR FIXES - Pointer on all clickable elements
    =================================== */
 
