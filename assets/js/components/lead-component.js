@@ -45,6 +45,7 @@
     let canCreateClient = false;
     let canDelete = false;
     let dashboardType = 'sales_manager';
+    let currentUserId = null;
     let eventsAlreadyBound = false; // Flag to prevent double-binding
 
     // Initialize component
@@ -55,6 +56,7 @@
         canCreateClient = $component.data('can-create-client') === true || $component.data('can-create-client') === 'true';
         canDelete = $component.data('can-delete') === true || $component.data('can-delete') === 'true';
         dashboardType = $component.data('dashboard') || 'sales_manager';
+        currentUserId = parseInt($component.data('current-user-id')) || null;
 
         // Store ajax config - PRESERVE existing values if called without parameters
         if (ajaxUrl && nonce) {
@@ -195,7 +197,7 @@
         $('#leads-table-body').html('<tr><td colspan="7" class="loading-cell">Loading leads...</td></tr>');
         $('#leads-cards-mobile').html('<p>Loading leads...</p>');
 
-        const action = dashboardType === 'area_manager' ? 'get_area_manager_leads' : 'get_sales_manager_leads';
+        const action = (dashboardType === 'area_manager' || dashboardType === 'manager' || dashboardType === 'administrator') ? 'get_area_manager_leads' : 'get_sales_manager_leads';
 
         $.ajax({
             url: window.leadAjax.url,
@@ -266,6 +268,9 @@
                         <span title="${leadTypeLabel}">${leadTypeIcon} ${leadTypeLabel}</span>
                     </td>
                     <td>
+                        <span class="lead-creator">${lead.creator_id === currentUserId ? 'Me' : escapeHtml(lead.creator_name)}</span>
+                    </td>
+                    <td>
                         <a href="tel:${lead.phone}" class="lead-quick-action">${escapeHtml(lead.phone)}</a>
                     </td>
                     <td>
@@ -292,6 +297,7 @@
                         </span>
                     </div>
                     <div class="lead-card-mobile-info">
+                        <span>👤 ${lead.creator_id === currentUserId ? 'Me' : escapeHtml(lead.creator_name)}</span>
                         <span>📞 ${escapeHtml(lead.phone)}</span>
                         <span>💬 ${followupCount} follow-ups</span>
                     </div>
@@ -411,7 +417,7 @@
 
     // Create new lead
     function createLead($form) {
-        const action = dashboardType === 'area_manager' ? 'create_solar_lead' : 'create_lead_by_sales_manager';
+        const action = (dashboardType === 'area_manager' || dashboardType === 'manager' || dashboardType === 'administrator') ? 'create_solar_lead' : 'create_lead_by_sales_manager';
         // Form serialization includes lead_nonce from the hidden field
         const formData = $form.serialize() + '&action=' + action;
 
@@ -496,7 +502,7 @@
     // Update lead status
     function updateLeadStatus(leadId, status) {
         // Use role-specific action
-        const action = dashboardType === 'area_manager' ? 'update_solar_lead_status' : 'update_lead_by_sales_manager';
+        const action = (dashboardType === 'area_manager' || dashboardType === 'manager' || dashboardType === 'administrator') ? 'update_solar_lead_status' : 'update_lead_by_sales_manager';
 
         $.ajax({
             url: window.leadAjax.url,
@@ -567,7 +573,7 @@
             const leadId = window.leadIdToConvert;
 
             // Determine the correct action based on dashboard type
-            const action = dashboardType === 'area_manager' ? 'update_solar_lead_status' : 'update_lead_by_sales_manager';
+            const action = (dashboardType === 'area_manager' || dashboardType === 'manager' || dashboardType === 'administrator') ? 'update_solar_lead_status' : 'update_lead_by_sales_manager';
 
             $.ajax({
                 url: window.leadAjax.url,

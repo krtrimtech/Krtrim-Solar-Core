@@ -3,7 +3,7 @@
  * Plugin Name:       Krtrim Solar Core
  * Plugin URI:        https://krtrim.tech/wordpress
  * Description:       A comprehensive project management and bidding platform for solar companies, developed by Krtrim.
- * Version:           1.3.3
+ * Version:           1.4.0
  * Author:            Krtrim
  * Author URI:        https://krtrim.tech
  * License:           GPL-2.0+
@@ -23,7 +23,7 @@ if ( ! defined( 'WPINC' ) ) {
 final class Krtrim_Solar_Core {
 
 	private static $instance = null;
-	public $version = '1.3.3';
+	public $version = '1.4.0';
 	public $file = __FILE__;
 	public $dir_path;
 	public $dir_url;
@@ -130,6 +130,9 @@ final class Krtrim_Solar_Core {
 		
 		// Cascade delete: Clean up related data when project is deleted
 		add_action('before_delete_post', [$this, 'cleanup_project_data'], 10, 2);
+
+        // Dynamic Browser Tab Titles
+        add_filter( 'document_title_parts', [ $this, 'customize_dashboard_browser_title' ] );
 	}
 
     /**
@@ -585,6 +588,23 @@ final class Krtrim_Solar_Core {
 		return ob_get_clean();
 	}
 	
+    /**
+     * Customize the browser tab title for the staff-dashboard based on user role
+     */
+    public function customize_dashboard_browser_title( $title_parts ) {
+        if ( is_page( 'staff-dashboard' ) || is_page( 'area-manager-dashboard' ) || is_page( 'manager-dashboard' ) || is_page('sales-manager-dashboard') ) {
+            $user = wp_get_current_user();
+            if ( in_array( 'manager', (array) $user->roles ) || in_array( 'administrator', (array) $user->roles ) ) {
+                $title_parts['title'] = 'Manager Dashboard';
+            } elseif ( in_array( 'area_manager', (array) $user->roles ) ) {
+                $title_parts['title'] = 'Area Manager Dashboard';
+            } elseif ( in_array( 'sales_manager', (array) $user->roles ) ) {
+                $title_parts['title'] = 'Sales Manager Dashboard';
+            }
+        }
+        return $title_parts;
+    }
+
 	public function template_include_single_project( $template ) {
 		if ( is_singular( 'solar_project' ) ) {
 			$new_template = $this->dir_path . 'public/views/single-solar_project.php';

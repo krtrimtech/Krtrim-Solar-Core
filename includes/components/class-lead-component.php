@@ -71,8 +71,13 @@ class KSC_Lead_Component {
         $can_delete = self::can_delete_lead($user_roles);
         $all_statuses = self::get_status_options(); // For display/filtering
         $manual_statuses = self::get_manual_status_options(); // For manual selection
+        $current_user_id = get_current_user_id();
         ?>
-        <div class="lead-component" data-dashboard="<?php echo esc_attr($dashboard_type); ?>" data-can-create-client="<?php echo $can_create_client ? 'true' : 'false'; ?>" data-can-delete="<?php echo $can_delete ? 'true' : 'false'; ?>">
+        <div class="lead-component" 
+             data-dashboard="<?php echo esc_attr($dashboard_type); ?>" 
+             data-can-create-client="<?php echo $can_create_client ? 'true' : 'false'; ?>" 
+             data-can-delete="<?php echo $can_delete ? 'true' : 'false'; ?>"
+             data-current-user-id="<?php echo esc_attr($current_user_id); ?>">
             
             <!-- Header with Add Lead Button -->
             <div class="lead-section-header">
@@ -105,6 +110,7 @@ class KSC_Lead_Component {
                         <tr>
                             <th>Name</th>
                             <th>Type</th>
+                            <th>Created By</th>
                             <th>Phone</th>
                             <th>Status</th>
                             <th>Follow-ups</th>

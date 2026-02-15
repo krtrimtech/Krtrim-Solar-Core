@@ -296,28 +296,61 @@ class KSC_Admin_Manager_API extends KSC_API_Base {
         if (in_array('manager', (array)$manager->roles)) {
              // Manager: Get leads from self AND team
              $team_ids = [$manager->ID];
+             $assigned_states = get_user_meta($manager->ID, '_assigned_states', true) ?: [];
              
-             // Get AMs
-             $ams = get_users([
+             // 1. Get AMs (Directly supervised OR State-based)
+             $all_ams = get_users([
+                'role' => 'area_manager',
+                'number' => -1,
+                'fields' => 'ID'
+             ]);
+
+             $filtered_ams = [];
+             if (empty($assigned_states)) {
+                 $filtered_ams = (array)$all_ams;
+             } else {
+                 foreach ($all_ams as $am_id) {
+                     $am_state = get_user_meta($am_id, 'state', true);
+                     if (in_array($am_state, (array)$assigned_states)) {
+                         $filtered_ams[] = (int)$am_id;
+                     }
+                 }
+             }
+
+             // Add directly supervised AMs
+             $direct_ams = get_users([
                 'role' => 'area_manager',
                 'meta_key' => '_supervised_by_manager',
                 'meta_value' => $manager->ID,
                 'fields' => 'ID'
              ]);
-             if (!empty($ams)) {
-                 $team_ids = array_merge($team_ids, $ams);
+             $filtered_ams = array_unique(array_merge((array)$filtered_ams, (array)$direct_ams));
+             
+             if (!empty($filtered_ams)) {
+                 $team_ids = array_unique(array_merge($team_ids, array_map('intval', $filtered_ams)));
                  
-                 // Get SMs
+                 // 2. Get SMs reporting to these AMs
                  $sms = get_users([
                     'role' => 'sales_manager',
                     'meta_query' => [
-                        ['key' => '_assigned_area_manager', 'value' => $ams, 'compare' => 'IN']
+                        ['key' => '_assigned_area_manager', 'value' => $filtered_ams, 'compare' => 'IN']
                     ],
                     'fields' => 'ID'
                  ]);
                  if (!empty($sms)) {
-                     $team_ids = array_merge($team_ids, $sms);
+                     $team_ids = array_unique(array_merge($team_ids, array_map('intval', $sms)));
                  }
+             }
+
+             // 3. Get SMs reporting directly to Manager
+             $direct_sms = get_users([
+                'role' => 'sales_manager',
+                'meta_key' => '_supervised_by_manager',
+                'meta_value' => $manager->ID,
+                'fields' => 'ID'
+             ]);
+             if (!empty($direct_sms)) {
+                 $team_ids = array_unique(array_merge($team_ids, array_map('intval', $direct_sms)));
              }
              
              $total_leads = $wpdb->get_var("SELECT COUNT(*) FROM {$wpdb->posts} WHERE post_type = 'solar_lead' AND post_author IN (" . implode(',', array_map('intval', $team_ids)) . ")");
@@ -683,24 +716,58 @@ class KSC_Admin_Manager_API extends KSC_API_Base {
             wp_send_json_error(['message' => 'Project not found.']);
         }
         
-        // Permission check: Admin, project author, OR Manager supervising the project's AM
+        // Permission check: Admin, project author, assigned AM, OR Manager supervising the project's AM
         $can_award = false;
+        $assigned_am_id = get_post_meta($project_id, '_assigned_area_manager', true);
         
         if ($is_admin) {
             $can_award = true;
-        } elseif ($project->post_author == $current_user->ID) {
-            // Project author (AM) can award their own project
+        } elseif ($project->post_author == $current_user->ID || $assigned_am_id == $current_user->ID) {
+            // Project author or assigned AM can award their own project
             $can_award = true;
         } else {
-            // Check if current user is a Manager supervising the AM who created this project
+            // Check if current user is a Manager supervising the AM who created or is assigned to this project
             $is_manager = in_array('manager', (array)$current_user->roles);
             if ($is_manager) {
-                // Check if project's author (AM) is supervised by this manager
+                // Check author first
                 $project_author_id = $project->post_author;
-                $project_author_supervisor = get_user_meta($project_author_id, '_supervised_by_manager', true);
+                $author_supervisor = get_user_meta($project_author_id, '_supervised_by_manager', true);
                 
-                if ($project_author_supervisor == $current_user->ID) {
+                if ($author_supervisor == $current_user->ID) {
                     $can_award = true;
+                } else {
+                    // Check assigned AM
+                    if ($assigned_am_id) {
+                        $assigned_am_supervisor = get_user_meta($assigned_am_id, '_supervised_by_manager', true);
+                        if ($assigned_am_supervisor == $current_user->ID) {
+                            $can_award = true;
+                        }
+                    }
+                }
+                
+                // If still not allowed, check State-based Supervision for Manager
+                if (!$can_award) {
+                    $manager_states = get_user_meta($current_user->ID, '_assigned_states', true) ?: [];
+                    
+                    // Check if author is an AM in manager's state
+                    $author_state = get_user_meta($project_author_id, 'state', true);
+                    if (!empty($author_state) && in_array($author_state, (array)$manager_states)) {
+                        $author_user = get_userdata($project_author_id);
+                        if ($author_user && in_array('area_manager', (array)$author_user->roles)) {
+                            $can_award = true;
+                        }
+                    }
+                    
+                    // Check if assigned AM is in manager's state
+                    if (!$can_award && $assigned_am_id) {
+                        $assigned_am_state = get_user_meta($assigned_am_id, 'state', true);
+                        if (!empty($assigned_am_state) && in_array($assigned_am_state, (array)$manager_states)) {
+                            $assigned_am_user = get_userdata($assigned_am_id);
+                            if ($assigned_am_user && in_array('area_manager', (array)$assigned_am_user->roles)) {
+                                $can_award = true;
+                            }
+                        }
+                    }
                 }
             }
         }
@@ -1690,30 +1757,54 @@ class KSC_Admin_Manager_API extends KSC_API_Base {
         $search = isset($_POST['search']) ? sanitize_text_field($_POST['search']) : '';
         $lead_type = isset($_POST['lead_type']) ? sanitize_text_field($_POST['lead_type']) : '';
         
-        // Identify supervised users
-        $supervised_ids = [$manager->ID]; // Self
-        
-        $assigned_states = get_user_meta($manager->ID, '_assigned_states', true) ?: [];
+        $is_admin = in_array('administrator', (array)$manager->roles);
         $is_manager = in_array('manager', (array)$manager->roles);
 
-        if ($is_manager) {
-            // Include all AMs in assigned states
-            $ams = get_users([
+        // Identify supervised users
+        $supervised_ids = [$manager->ID]; // Self
+        $assigned_states = get_user_meta($manager->ID, '_assigned_states', true) ?: [];
+
+        if ($is_admin) {
+            // Admins see everything - we'll leave supervised_ids as an empty check or just skip author__in
+            $supervised_ids = []; 
+        } elseif ($is_manager) {
+            // 1. Determine if Manager has Global Access (no states assigned) or State-Based Access
+            $all_ams = get_users([
                 'role' => 'area_manager',
                 'number' => -1,
                 'fields' => 'ID'
             ]);
-            
+
             $filtered_ams = [];
-            foreach ($ams as $am_id) {
-                $am_state = get_user_meta($am_id, 'state', true);
-                if (empty($assigned_states) || in_array($am_state, $assigned_states)) {
-                    $filtered_ams[] = $am_id;
-                    $supervised_ids[] = $am_id;
+
+            if (empty($assigned_states)) {
+                // GLOBAL ACCESS: Include ALL Area Managers
+                $filtered_ams = (array)$all_ams;
+            } else {
+                // STATE-BASED ACCESS: Filter by assigned states
+                foreach ($all_ams as $am_id) {
+                    $am_state = get_user_meta($am_id, 'state', true);
+                    if (in_array($am_state, (array)$assigned_states)) {
+                        $filtered_ams[] = (int)$am_id;
+                    }
                 }
             }
             
-            // Include all SMs supervised by these AMs
+            // 2. Add AMs supervised directly (via meta) - always include these
+            $directly_supervised_ams = get_users([
+                'role' => 'area_manager',
+                'meta_key' => '_supervised_by_manager',
+                'meta_value' => $manager->ID,
+                'fields' => 'ID'
+            ]);
+            
+            // Merge unique AM IDs
+            $filtered_ams = array_unique(array_merge((array)$filtered_ams, (array)$directly_supervised_ams));
+            foreach ($filtered_ams as $am_id) {
+                $supervised_ids[] = (int)$am_id;
+            }
+            
+            // 3. Include all SMs supervised by these AMs
             if (!empty($filtered_ams)) {
                 $sms = get_users([
                     'role' => 'sales_manager',
@@ -1723,10 +1814,22 @@ class KSC_Admin_Manager_API extends KSC_API_Base {
                     'fields' => 'ID'
                 ]);
                 foreach ($sms as $sm_id) {
-                    $supervised_ids[] = $sm_id;
+                    $supervised_ids[] = (int)$sm_id;
                 }
             }
-        } else {
+
+            // 4. Also include SMs directly supervised by the Manager (if any)
+            $direct_sms = get_users([
+                'role' => 'sales_manager',
+                'meta_key' => '_supervised_by_manager',
+                'meta_value' => $manager->ID,
+                'fields' => 'ID'
+            ]);
+            foreach ($direct_sms as $sm_id) {
+                $supervised_ids[] = (int)$sm_id;
+            }
+        }
+ else {
             // Area Manager: Include all SMs assigned to them
             $sms = get_users([
                 'role' => 'sales_manager',
@@ -1735,16 +1838,19 @@ class KSC_Admin_Manager_API extends KSC_API_Base {
                 'fields' => 'ID'
             ]);
             foreach ($sms as $sm_id) {
-                $supervised_ids[] = $sm_id;
+                $supervised_ids[] = (int)$sm_id;
             }
         }
 
         // Prepare args for component
         $args = [
-            'author__in' => $supervised_ids,
             'search' => $search,
             'filter_meta' => []
         ];
+
+        if (!empty($supervised_ids)) {
+            $args['author__in'] = array_unique($supervised_ids);
+        }
 
         if (!empty($status)) {
             $args['filter_meta']['status'] = $status;
@@ -2129,12 +2235,22 @@ class KSC_Admin_Manager_API extends KSC_API_Base {
             $am_state = get_user_meta($am->ID, 'state', true);
             $am_city = get_user_meta($am->ID, 'city', true);
             
-            // Filter by Manager's assigned states (skip if AM role as they only get themselves)
-            if (!in_array('area_manager', $user->roles) && !empty($assigned_states) && is_array($assigned_states) && !in_array($am_state, $assigned_states)) {
-                continue;
+            // Filter logic:
+            // 1. If Manager role: Include AM if in assigned state OR directly supervised
+            // 2. If filtering by specific state dropdown: Must match state
+            
+            $is_direct_supervised = (get_user_meta($am->ID, '_supervised_by_manager', true) == $user->ID);
+            $is_in_assigned_state = !empty($assigned_states) && is_array($assigned_states) && in_array($am_state, $assigned_states);
+            
+            // Capability filter (for Managers/Admins)
+            if (!in_array('administrator', $user->roles) && !in_array('area_manager', $user->roles)) {
+                // It's a Manager
+                if (!$is_direct_supervised && !$is_in_assigned_state) {
+                    continue;
+                }
             }
             
-            // Filter by specific state requested in dropdown
+            // Dropdown State filter (if applied)
             if (!empty($state) && $am_state !== $state) {
                 continue;
             }

@@ -878,14 +878,14 @@
                         '<span style="color: #047857;">✓ Awarded</span>' :
                         '<span style="color: #9ca3af;">—</span>'
                     ) :
-                    `<button class="btn btn-primary btn-sm award-bid-btn" 
-                                                         data-project-id="${project.id}" 
-                                                         data-bid-id="${bid.id}" 
-                                                         data-vendor-id="${bid.vendor_id}"
-                                                         data-vendor-name="${bid.vendor_name}"
-                                                         data-amount="${bid.bid_amount}">
-                                                    🏆 Award
-                                                </button>`
+                    `<button class="btn btn-primary btn-sm award-bid-btn"
+                        data-project-id="${project.id}"
+                        data-bid-id="${bid.id}"
+                        data-vendor-id="${bid.vendor_id}"
+                        data-vendor-name="${bid.vendor_name}"
+                        data-bid-amount="${bid.bid_amount}">
+                        🏆 Award
+                    </button>`
                 }
                                         </td>
                                     </tr>
@@ -901,48 +901,6 @@
         container.html(html);
     }
 
-    // Handle Award Bid click
-    $(document).on('click', '.award-bid-btn', function (e) {
-        e.preventDefault();
-        const btn = $(this);
-        const projectId = btn.data('project-id');
-        const bidId = btn.data('bid-id');
-        const vendorId = btn.data('vendor-id');
-        const vendorName = btn.data('vendor-name');
-        const amount = btn.data('amount');
-
-        if (!confirm(`Award this project to ${vendorName} for ₹${Number(amount).toLocaleString()}?`)) {
-            return;
-        }
-
-        const originalText = btn.html();
-        btn.prop('disabled', true).html('Processing...');
-
-        $.ajax({
-            url: ajaxUrl,
-            type: 'POST',
-            data: {
-                action: 'award_project_to_vendor',
-                nonce: $('#award_bid_nonce_field').val() || sp_area_dashboard_vars.get_projects_nonce,
-                project_id: projectId,
-                bid_id: bidId,
-                vendor_id: vendorId
-            },
-            success: function (response) {
-                if (response.success) {
-                    showToast('🏆 Project awarded successfully!', 'success');
-                    loadBids(); // Refresh the bids list
-                } else {
-                    showToast('Error: ' + (response.data.message || 'Could not award project'), 'error');
-                    btn.prop('disabled', false).html(originalText);
-                }
-            },
-            error: function () {
-                showToast('Network error. Please try again.', 'error');
-                btn.prop('disabled', false).html(originalText);
-            }
-        });
-    });
 
     // --- Load Vendor Approvals ---
     function loadVendorApprovals() {
@@ -1437,13 +1395,15 @@
     });
 
     // --- Award Bid ---
-    $('#project-bids-list').on('click', '.award-bid-btn', function () {
+    // Unified Award Bid Click Handler (handles both Bids Section and Project Details)
+    $(document).on('click', '.award-bid-btn', function () {
         const button = $(this);
         const projectId = button.data('project-id');
         const vendorId = button.data('vendor-id');
-        const bidAmount = button.data('bid-amount');
+        const bidAmount = button.data('bid-amount') || button.data('amount');
+        const vendorName = button.data('vendor-name') || 'this vendor';
 
-        if (!confirm('Are you sure you want to award this project to this vendor?')) {
+        if (!confirm(`Are you sure you want to award this project to ${vendorName} for ₹${Number(bidAmount).toLocaleString()}?`)) {
             return;
         }
 
@@ -1462,14 +1422,22 @@
             },
             success: function (response) {
                 if (response.success) {
-                    showToast(response.data.message, 'error');
-                    loadProjectDetails(projectId);
+                    showToast(response.data.message || '🏆 Project awarded successfully!', 'success');
+
+                    // Refresh current view
+                    if ($('#bid-management-container').is(':visible')) {
+                        loadBids();
+                    } else if ($('#project-detail-modal').is(':visible') || $('.project-detail-card').length) {
+                        loadProjectDetails(projectId);
+                    }
                 } else {
-                    showToast('Error: ' + response.data.message, 'error');
+                    showToast('Error: ' + (response.data.message || 'Could not award project'), 'error');
+                    button.prop('disabled', false).text('🏆 Award');
                 }
             },
-            complete: function () {
-                button.prop('disabled', false).text('Award Project');
+            error: function () {
+                showToast('Network error. Please try again.', 'error');
+                button.prop('disabled', false).text('🏆 Award');
             }
         });
     });
@@ -1570,19 +1538,23 @@
     // Profile view handled by CleanerComponent
 
     // Load cleaning services
-    function loadCleaningServices() {
+    function loadCleaningServices(status = '', search = '') {
         const tbody = $('#cleaning-services-tbody');
         tbody.html('<tr><td colspan="8">Loading cleaning services...</td></tr>');
 
         $.ajax({
             url: ajaxUrl,
             type: 'POST',
-            data: { action: 'get_cleaning_services' },
+            data: {
+                action: 'get_cleaning_services',
+                status: status,
+                search: search
+            },
             success: function (response) {
                 if (response.success) {
                     const services = response.data;
                     if (services.length === 0) {
-                        tbody.html('<tr><td colspan="8">No cleaning services yet. Bookings will appear here once customers book cleanings.</td></tr>');
+                        tbody.html('<tr><td colspan="8">No cleaning services found matching your filters.</td></tr>');
                         return;
                     }
 
@@ -1630,8 +1602,8 @@
                                 </td>
                                 <td>
                                     <button class="btn btn-sm view-service-details-btn" 
-                                            data-id="${s.id}" 
-                                            style="background: #6366f1; color: white;">📋 Details</button>
+                                             data-id="${s.id}" 
+                                             style="background: #6366f1; color: white;">📋 Details</button>
                                 </td>
                             </tr>
                         `;
@@ -1647,6 +1619,20 @@
         });
     }
     window.loadCleaningServices = loadCleaningServices;
+
+    // Filter events for cleaning services
+    $(document).on('change', '#filter-cleaning-status', function () {
+        loadCleaningServices($(this).val(), $('#cleaning-search').val());
+    });
+
+    let cleaningSearchTimer;
+    $(document).on('input', '#cleaning-search', function () {
+        clearTimeout(cleaningSearchTimer);
+        const search = $(this).val();
+        cleaningSearchTimer = setTimeout(() => {
+            loadCleaningServices($('#filter-cleaning-status').val(), search);
+        }, 500);
+    });
 
     // Create/Delete Cleaner handled by CleanerComponent
 
