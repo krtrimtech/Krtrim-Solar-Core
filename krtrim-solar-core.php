@@ -83,9 +83,7 @@ final class Krtrim_Solar_Core {
 		// Public view files (for shortcodes)
 		require_once $this->dir_path . 'public/views/view-client-dashboard.php';
 		require_once $this->dir_path . 'public/views/view-vendor-dashboard.php';
-		require_once $this->dir_path . 'public/views/view-area-manager-dashboard.php';
-		require_once $this->dir_path . 'public/views/view-manager-dashboard.php';
-		require_once $this->dir_path . 'public/views/view-sales-manager-dashboard.php';
+		require_once $this->dir_path . 'public/views/view-unified-dashboard.php'; // Unified dashboard for AM and Manager
 		require_once $this->dir_path . 'public/views/view-marketplace.php';
 		require_once $this->dir_path . 'public/views/view-vendor-registration.php';
 		require_once $this->dir_path . 'public/views/view-vendor-status.php';
@@ -108,8 +106,7 @@ final class Krtrim_Solar_Core {
 		add_action( 'admin_enqueue_scripts', [ $this, 'enqueue_admin_scripts' ] );
 
 		add_shortcode( 'unified_solar_dashboard', [ $this, 'shortcode_unified_dashboard' ] );
-		add_shortcode( 'area_manager_dashboard', 'sp_area_manager_dashboard_shortcode' );
-		add_shortcode( 'manager_dashboard', 'sp_manager_dashboard_shortcode' );
+		add_shortcode( 'unified_admin_dashboard', 'sp_unified_dashboard_shortcode' ); // New unified shortcode
 		add_shortcode( 'sales_manager_dashboard', 'sp_sales_manager_dashboard_shortcode' );
 		add_shortcode( 'vendor_registration_form', 'sp_vendor_registration_form_shortcode' );
 		add_shortcode( 'solar_project_marketplace', 'sp_project_marketplace_shortcode' );
@@ -139,13 +136,17 @@ final class Krtrim_Solar_Core {
      */
     public function custom_login_redirect( $redirect_to, $request, $user ) {
         if ( isset( $user->roles ) && is_array( $user->roles ) ) {
-            // Sales Manager
-            if ( in_array( 'sales_manager', $user->roles ) ) {
-                return home_url( '/sales-manager-dashboard/' );
+            // Manager (regional manager with multi-state access)
+            if ( in_array( 'manager', $user->roles ) ) {
+                return home_url( '/staff-dashboard/' );
             }
             // Area Manager
             if ( in_array( 'area_manager', $user->roles ) ) {
-                return home_url( '/area-manager-dashboard/' );
+                return home_url( '/staff-dashboard/' );
+            }
+            // Sales Manager
+            if ( in_array( 'sales_manager', $user->roles ) ) {
+                return home_url( '/sales-manager-dashboard/' );
             }
             // Solar Client
             if ( in_array( 'solar_client', $user->roles ) ) {
@@ -161,10 +162,6 @@ final class Krtrim_Solar_Core {
                     // Send to status page if not approved
                     return home_url( '/vendor-status/' );
                 }
-            }
-            // Manager (regional manager with multi-state access)
-            if ( in_array( 'manager', $user->roles ) ) {
-                return home_url( '/manager-dashboard/' );
             }
         }
         return $redirect_to; // Default for administrators
@@ -190,7 +187,7 @@ final class Krtrim_Solar_Core {
                 // Define redirect mapping for each role
                 $redirect_map = [
                     'sales_manager'  => '/sales-manager-dashboard/',
-                    'area_manager'   => '/area-manager-dashboard/',
+                    'area_manager'   => '/staff-dashboard/',
                     'solar_client'   => '/solar-dashboard/',
                     'solar_vendor'   => '/solar-dashboard/',
                 ];
@@ -307,7 +304,6 @@ final class Krtrim_Solar_Core {
 
 	public function enqueue_public_scripts() {
 		wp_enqueue_style( 'ksc-public-styles', $this->dir_url . 'assets/css/dashboard.css', [], $this->version );
-		wp_enqueue_style( 'ksc-public-styles', $this->dir_url . 'assets/css/dashboard.css', [], $this->version );
 		
         if ( is_page( 'solar-dashboard' ) ) {
             wp_enqueue_script( 'ksc-public-scripts', $this->dir_url . 'assets/js/dashboard.js', [ 'jquery' ], $this->version, true );
@@ -353,7 +349,18 @@ final class Krtrim_Solar_Core {
 		}
 
 		global $post;
-		if ( is_a( $post, 'WP_Post' ) && ( has_shortcode( $post->post_content, 'area_manager_dashboard' ) || is_page( 'area-manager-dashboard' ) ) ) {
+		if ( is_a( $post, 'WP_Post' ) && ( 
+            has_shortcode( $post->post_content, 'unified_admin_dashboard' ) || 
+            has_shortcode( $post->post_content, 'area_manager_dashboard' ) || 
+            has_shortcode( $post->post_content, 'manager_dashboard' ) || 
+            has_shortcode( $post->post_content, 'unified_solar_dashboard' ) || 
+            is_page( 'unified-admin-dashboard' ) || 
+            is_page( 'area-manager-dashboard' ) || 
+            is_page( 'manager-dashboard' ) 
+        ) ) {
+			$current_user = wp_get_current_user();
+			$is_manager = in_array('manager', $current_user->roles, true) || in_array('administrator', $current_user->roles, true);
+
             wp_enqueue_style('area-manager-modern', $this->dir_url . 'assets/css/area-manager-modern.css', [], '1.0.0');
             wp_enqueue_style('lead-component-css', $this->dir_url . 'assets/css/components/lead-component.css', [], '1.0.1');
             wp_enqueue_style('leads-clients-enhanced', $this->dir_url . 'assets/css/leads-clients-enhanced.css', [], '1.0.0');
@@ -369,8 +376,17 @@ final class Krtrim_Solar_Core {
             wp_enqueue_style('cleaner-component-css', $this->dir_url . 'assets/css/components/cleaner-component.css', [], '1.0.2');
             wp_enqueue_script('cleaner-component-js', $this->dir_url . 'assets/js/components/cleaner-component.js', ['jquery', 'ksc-dashboard-utils'], '1.0.1', true);
             wp_enqueue_script('ksc-team-analysis-component', $this->dir_url . 'assets/js/components/team-analysis-component.js', ['jquery'], $this->version, true);
-			wp_enqueue_script( 'area-manager-dashboard-js', $this->dir_url . 'assets/js/area-manager-dashboard.js', [ 'jquery', 'chart-js', 'lead-component-js', 'cleaner-component-js', 'ksc-dashboard-utils', 'ksc-project-modal-component', 'ksc-team-analysis-component' ], '1.0.9', true );
-			wp_localize_script('area-manager-dashboard-js', 'sp_area_dashboard_vars', [
+			
+			// Enqueue the unified dashboard script for both roles
+			wp_enqueue_script( 'unified-dashboard-js', $this->dir_url . 'assets/js/unified-dashboard.js', [ 'jquery', 'chart-js', 'lead-component-js', 'cleaner-component-js', 'ksc-dashboard-utils', 'ksc-project-modal-component', 'ksc-team-analysis-component' ], '1.0.0', true );
+			
+			// Conditionally enqueue manager-specific scripts and styles
+			if ($is_manager) {
+
+				//wp_enqueue_script( 'manager-features-js', $this->dir_url . 'assets/js/manager-features.js', [ 'unified-dashboard-js' ], '1.0.0', true );
+			}
+
+			wp_localize_script('unified-dashboard-js', 'sp_area_dashboard_vars', [
 				'ajax_url' => admin_url('admin-ajax.php'),
 				'create_project_nonce' => wp_create_nonce('sp_create_project_nonce_field'),
 				'update_project_nonce' => wp_create_nonce('sp_update_project_nonce'),
@@ -387,73 +403,12 @@ final class Krtrim_Solar_Core {
                 'delete_lead_nonce' => wp_create_nonce('delete_lead_nonce'),
                 'send_message_nonce' => wp_create_nonce('send_message_nonce'),
                 'get_clients_nonce' => wp_create_nonce('get_clients_nonce'),
-                'get_clients_nonce' => wp_create_nonce('get_clients_nonce'),
                 'reset_password_nonce' => wp_create_nonce('reset_password_nonce'),
                 'cleaner_nonce' => wp_create_nonce('ksc_cleaner_nonce'),
+				'assign_am_location_nonce' => wp_create_nonce('assign_am_location_nonce'),
+                'unassign_am_location_nonce' => wp_create_nonce('unassign_am_location_nonce'),
 				'states_cities_json_url' => $this->dir_url . 'assets/data/indian-states-cities.json',
-			]);
-		}
-
-		// ✅ MANAGER DASHBOARD (Regional Manager with multi-state access)
-		global $post;
-		$is_manager_dash = is_a( $post, 'WP_Post' ) && ( has_shortcode( $post->post_content, 'manager_dashboard' ) || is_page( 'manager-dashboard' ) );
-		
-        if ( $is_manager_dash ) {
-			wp_enqueue_style('area-manager-modern', $this->dir_url . 'assets/css/area-manager-modern.css', [], '1.0.0');
-            wp_enqueue_style('cleaner-component-css', $this->dir_url . 'assets/css/components/cleaner-component.css', [], '1.0.2');
-			wp_enqueue_style('lead-component-css', $this->dir_url . 'assets/css/components/lead-component.css', [], '1.0.1');
-            wp_enqueue_style('leads-clients-enhanced', $this->dir_url . 'assets/css/leads-clients-enhanced.css', [], '1.0.0');
-            wp_enqueue_style('project-modal', $this->dir_url . 'assets/css/project-modal.css', [], '1.0.0');
-            wp_enqueue_style('date-picker-enhanced', $this->dir_url . 'assets/css/date-picker-enhanced.css', [], '1.0.0');
-            wp_enqueue_style('toast-css', $this->dir_url . 'assets/css/toast.css', [], '1.0.0');
-            wp_enqueue_style('password-field-css', $this->dir_url . 'assets/css/password-field.css', [], '1.0.0');
-            wp_enqueue_style('manager-dashboard-overrides', $this->dir_url . 'assets/css/manager-dashboard-overrides.css', [], '1.0.0');
-            wp_enqueue_script( 'chart-js', 'https://cdn.jsdelivr.net/npm/chart.js', [], '3.7.0', true );
-            wp_enqueue_script('ksc-dashboard-utils', $this->dir_url . 'assets/js/components/dashboard-utils.js', ['jquery'], $this->version, true);
-            wp_enqueue_script('ksc-project-modal-component', $this->dir_url . 'assets/js/components/project-modal-component.js', ['jquery', 'ksc-dashboard-utils'], $this->version, true);
-            wp_enqueue_script('project-modal-js', $this->dir_url . 'assets/js/project-modal.js', ['jquery'], '1.0.0', true);
-            wp_enqueue_script('lead-component-js', $this->dir_url . 'assets/js/components/lead-component.js', ['jquery', 'ksc-dashboard-utils'], '1.0.6', true);
-            wp_enqueue_script('cleaner-component-js', $this->dir_url . 'assets/js/components/cleaner-component.js', ['jquery', 'ksc-dashboard-utils'], '1.0.0', true);
-            wp_enqueue_script('ksc-team-analysis-component', $this->dir_url . 'assets/js/components/team-analysis-component.js', ['jquery'], $this->version, true);
-			wp_enqueue_script( 'manager-dashboard-js', $this->dir_url . 'assets/js/manager-dashboard.js', [ 'jquery', 'chart-js', 'lead-component-js', 'cleaner-component-js', 'ksc-dashboard-utils', 'ksc-project-modal-component', 'ksc-team-analysis-component' ], '1.0.4', true );
-			wp_localize_script('manager-dashboard-js', 'sp_area_dashboard_vars', [
-				'ajax_url' => admin_url('admin-ajax.php'),
-				'create_project_nonce' => wp_create_nonce('sp_create_project_nonce_field'),
-				'update_project_nonce' => wp_create_nonce('sp_update_project_nonce'),
-				'project_details_nonce' => wp_create_nonce('sp_project_details_nonce'),
-				'review_submission_nonce' => wp_create_nonce('sp_review_nonce'),
-				'award_bid_nonce' => wp_create_nonce('award_bid_nonce'),
-				'get_dashboard_stats_nonce' => wp_create_nonce('get_dashboard_stats_nonce'),
-				'get_projects_nonce' => wp_create_nonce('get_projects_nonce'),
-				'get_reviews_nonce' => wp_create_nonce('get_reviews_nonce'),
-				'get_vendor_approvals_nonce' => wp_create_nonce('get_vendor_approvals_nonce'),
-				'create_client_nonce' => wp_create_nonce('create_client_nonce'),
-                'get_leads_nonce' => wp_create_nonce('get_leads_nonce'),
-                'create_lead_nonce' => wp_create_nonce('create_lead_nonce'),
-                'delete_lead_nonce' => wp_create_nonce('delete_lead_nonce'),
-                'send_message_nonce' => wp_create_nonce('send_message_nonce'),
-                'get_clients_nonce' => wp_create_nonce('get_clients_nonce'),
-                'get_clients_nonce' => wp_create_nonce('get_clients_nonce'),
-                'reset_password_nonce' => wp_create_nonce('reset_password_nonce'),
-                'cleaner_nonce' => wp_create_nonce('ksc_cleaner_nonce'),
-				'states_cities_json_url' => $this->dir_url . 'assets/data/indian-states-cities.json',
-			]);
-		}
-
-		// ✅ SALES MANAGER DASHBOARD
-		global $post;
-		if ( is_a( $post, 'WP_Post' ) && ( has_shortcode( $post->post_content, 'sales_manager_dashboard' ) || is_page( 'sales-manager-dashboard' ) ) ) {
-			wp_enqueue_style('area-manager-modern', $this->dir_url . 'assets/css/area-manager-modern.css', [], '1.0.0');
-			wp_enqueue_style('lead-component-css', $this->dir_url . 'assets/css/components/lead-component.css', [], '1.0.1');
-			wp_enqueue_style('sales-manager-dashboard-css', $this->dir_url . 'assets/css/sales-manager-dashboard.css', ['area-manager-modern', 'lead-component-css'], '1.0.1');
-			wp_enqueue_style('toast-css', $this->dir_url . 'assets/css/toast.css', [], '1.0.0');
-			wp_enqueue_script('chart-js', 'https://cdn.jsdelivr.net/npm/chart.js', [], '3.7.0', true);
-            wp_enqueue_script('ksc-dashboard-utils', $this->dir_url . 'assets/js/components/dashboard-utils.js', ['jquery'], $this->version, true);
-			wp_enqueue_script('lead-component-js', $this->dir_url . 'assets/js/components/lead-component.js', ['jquery', 'ksc-dashboard-utils'], '1.0.6', true);
-			wp_enqueue_script('sales-manager-dashboard-js', $this->dir_url . 'assets/js/sales-manager-dashboard.js', ['jquery', 'chart-js', 'lead-component-js', 'ksc-dashboard-utils'], '1.0.2', true);
-			wp_localize_script('sales-manager-dashboard-js', 'sm_vars', [
-				'ajax_url' => admin_url('admin-ajax.php'),
-				'nonce' => wp_create_nonce('sp_sales_manager_nonce'),
+				'is_manager' => $is_manager,
 			]);
 		}
 
@@ -612,7 +567,10 @@ final class Krtrim_Solar_Core {
 		$user_roles   = $current_user->roles;
 
 		ob_start();
-		if ( in_array( 'solar_client', $user_roles, true ) || in_array( 'administrator', $user_roles, true ) ) {
+		if ( in_array( 'area_manager', $user_roles, true ) || in_array( 'manager', $user_roles, true ) ) {
+			// Reuse the unified dashboard shortcode logic
+			return sp_unified_dashboard_shortcode();
+		} elseif ( in_array( 'solar_client', $user_roles, true ) || in_array( 'administrator', $user_roles, true ) ) {
 			render_solar_client_dashboard();
 		} elseif ( in_array( 'solar_vendor', $user_roles, true ) || in_array( 'vendor', $user_roles, true ) ) {
 			render_solar_vendor_dashboard();
@@ -785,9 +743,8 @@ function sp_create_plugin_essentials() {
 
 	$pages_to_create = [
 		['title' => 'Dashboard', 'slug' => 'solar-dashboard', 'content' => '[unified_solar_dashboard]'],
-		['title' => 'Area Manager Dashboard', 'slug' => 'area-manager-dashboard', 'content' => '[area_manager_dashboard]'],
+		['title' => 'Unified Admin Dashboard', 'slug' => 'staff-dashboard', 'content' => '[unified_admin_dashboard]'],
 		['title' => 'Sales Manager Dashboard', 'slug' => 'sales-manager-dashboard', 'content' => '[sales_manager_dashboard]'],
-		['title' => 'Manager Dashboard', 'slug' => 'manager-dashboard', 'content' => '[manager_dashboard]'],
 		['title' => 'Cleaner Dashboard', 'slug' => 'cleaner-dashboard', 'content' => '[cleaner_dashboard]'],
 		['title' => 'Vendor Registration', 'slug' => 'vendor-registration', 'content' => '[vendor_registration_form]'],
 		['title' => 'Project Marketplace', 'slug' => 'project-marketplace', 'content' => '[solar_project_marketplace]'],

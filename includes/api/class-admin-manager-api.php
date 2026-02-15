@@ -1031,6 +1031,14 @@ class KSC_Admin_Manager_API extends KSC_API_Base {
     }
     
     /**
+     * Get team data for Manager (Alias for get_team_analysis_data)
+     */
+    public function get_manager_team_data() {
+        $this->get_team_analysis_data();
+    }
+
+    
+    /**
      * Get area manager data (wrapper for dashboard stats)
      */
     public function get_area_manager_data() {

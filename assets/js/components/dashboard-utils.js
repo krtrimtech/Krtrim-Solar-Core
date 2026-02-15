@@ -59,9 +59,24 @@
                     break;
                 case 'leads':
                     if (typeof window.initLeadComponent === 'function') window.initLeadComponent();
+                    if (typeof window.loadLeads === 'function') window.loadLeads();
                     break;
                 case 'projects':
                     if (typeof window.loadProjects === 'function') window.loadProjects();
+                    break;
+                case 'my-clients':
+                    if (typeof window.loadMyClients === 'function') window.loadMyClients();
+                    break;
+                case 'bid-management':
+                    if (typeof window.loadBids === 'function') window.loadBids();
+                    break;
+                case 'manage-cleaners':
+                    if (typeof window.initCleanerComponent === 'function') window.initCleanerComponent();
+                    if (typeof window.loadCleaners === 'function') window.loadCleaners();
+                    break;
+                case 'cleaning-services':
+                    if (typeof window.loadCleaningServices === 'function') window.loadCleaningServices();
+                    if (typeof window.loadSMCleaningServices === 'function') window.loadSMCleaningServices();
                     break;
                 case 'team-analysis':
                 case 'my-team':
@@ -74,16 +89,13 @@
                 case 'am-assignment':
                     if (typeof window.loadAMAssignments === 'function') window.loadAMAssignments();
                     break;
-                // Sales Manager Specific
+                // Sales Manager / Legacy
                 case 'my-leads':
                     if (typeof window.initLeadComponent === 'function') window.initLeadComponent();
                     if (typeof window.loadMyLeads === 'function') window.loadMyLeads();
                     break;
                 case 'conversions':
                     if (typeof window.loadConversions === 'function') window.loadConversions();
-                    break;
-                case 'cleaning-services':
-                    if (typeof window.loadSMCleaningServices === 'function') window.loadSMCleaningServices();
                     break;
             }
         },

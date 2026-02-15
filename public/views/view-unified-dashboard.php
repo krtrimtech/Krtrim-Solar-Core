@@ -1,6 +1,6 @@
 <?php
 /**
- * Shortcode and logic for the Area Manager frontend dashboard.
+ * Shortcode and logic for the unified frontend dashboard for Area Managers and Managers.
  */
 
 // Exit if accessed directly.
@@ -8,7 +8,7 @@ if ( ! defined( 'ABSPATH' ) ) {
     exit;
 }
 
-function sp_area_manager_dashboard_shortcode() {
+function sp_unified_dashboard_shortcode() {
     // Security check
     require_once plugin_dir_path(__FILE__) . '../../includes/components/class-cleaner-component.php';
 
@@ -20,58 +20,28 @@ function sp_area_manager_dashboard_shortcode() {
     $current_user = wp_get_current_user();
     $user_roles   = $current_user->roles;
 
-    if ( ! in_array( 'area_manager', $user_roles, true ) && ! in_array( 'administrator', $user_roles, true ) && ! in_array( 'manager', $user_roles, true ) ) {
-        if ( in_array( 'solar_client', $user_roles, true ) || in_array( 'solar_vendor', $user_roles, true ) ) {
-            $dashboard_url = get_permalink( get_page_by_path( 'solar-dashboard' ) );
-            wp_safe_redirect( $dashboard_url );
-            exit;
-        } else {
-            wp_safe_redirect( admin_url() );
-            exit;
+    // Enhanced security check for appropriate roles
+    if ( !in_array( 'area_manager', $user_roles, true ) && !in_array( 'manager', $user_roles, true ) && !current_user_can( 'manage_options' ) ) {
+        // Redirect other logged-in users to their respective dashboards or default WP admin
+        $redirect_url = home_url(); // Default redirect
+        if ( in_array('solar_client', $user_roles, true) ) {
+            $redirect_url = get_permalink( get_page_by_path( 'solar-dashboard' ) );
+        } elseif ( in_array('solar_vendor', $user_roles, true) ) {
+            $redirect_url = get_permalink( get_page_by_path( 'vendor-dashboard' ) );
         }
+        wp_safe_redirect( $redirect_url );
+        exit;
     }
 
     $user = wp_get_current_user();
-
-    // Handle Award Bid Action (Frontend)
-    if (isset($_POST['action']) && $_POST['action'] === 'am_award_bid' && isset($_POST['bid_nonce']) && wp_verify_nonce($_POST['bid_nonce'], 'am_award_bid_action')) {
-        $project_id = intval($_POST['project_id']);
-        $vendor_id = intval($_POST['vendor_id']);
-        $bid_amount = floatval($_POST['bid_amount']);
-        
-        // Verify Project Ownership (Security)
-        $project_owner = get_post_meta($project_id, '_created_by_area_manager', true);
-        // Fallback to post_author if meta not set
-        if (!$project_owner) {
-            $project = get_post($project_id);
-            $project_owner = $project->post_author;
-        }
-
-        if ($project_owner == $user->ID || current_user_can('administrator')) {
-             update_post_meta($project_id, 'winning_vendor_id', $vendor_id);
-            update_post_meta($project_id, 'winning_bid_amount', $bid_amount);
-            update_post_meta($project_id, '_assigned_vendor_id', $vendor_id);
-            update_post_meta($project_id, '_total_project_cost', $bid_amount);
-            update_post_meta($project_id, 'project_status', 'assigned');
-            
-            // Notify Vendor
-            $winning_vendor = get_userdata($vendor_id);
-            $project_title = get_the_title($project_id);
-            if ($winning_vendor) {
-                $subject = 'Congratulations! You Won the Bid for Project: ' . $project_title;
-                $message = "Congratulations! Your bid of ₹" . number_format($bid_amount, 2) . " for project '" . $project_title . "' has been accepted.";
-                wp_mail($winning_vendor->user_email, $subject, $message);
-            }
-            
-            echo '<div class="alert alert-success" style="margin: 20px;">Project awarded successfully!</div>';
-        } else {
-             echo '<div class="alert alert-danger" style="margin: 20px;">Permission denied. You do not own this project.</div>';
-        }
-    }
+    $is_manager = in_array('manager', $user_roles, true) || in_array('administrator', $user_roles, true);
+    $active_role = $is_manager ? 'manager' : 'area_manager';
+    $dashboard_class = $is_manager ? 'manager-dashboard' : 'area-manager-dashboard';
+    $dashboard_id = $is_manager ? 'managerDashboard' : 'areaManagerDashboard';
 
     ob_start();
     ?>
-    <div id="areaManagerDashboard" class="modern-solar-dashboard area-manager-dashboard">
+    <div id="<?php echo esc_attr($dashboard_id); ?>" class="modern-solar-dashboard <?php echo esc_attr($dashboard_class); ?>">
         <!-- Sidebar -->
         <div class="dashboard-sidebar">
             <div class="sidebar-brand">
@@ -89,7 +59,7 @@ function sp_area_manager_dashboard_shortcode() {
                 <a href="javascript:void(0)" class="nav-item" data-section="projects"><span>🏗️</span> Projects</a>
                 <a href="javascript:void(0)" class="nav-item" data-section="create-project"><span>➕</span> Create Project</a>
                 <a href="javascript:void(0)" class="nav-item" data-section="project-reviews"><span>📝</span> Project Reviews</a>
-                <a href="javascript:void(0)" class="nav-item" data-section="marketplace"><span>🏪</span> Marketplace</a>
+
                 <a href="javascript:void(0)" class="nav-item" data-section="bid-management"><span>🔨</span> Bid Management</a>
 
                 <a href="javascript:void(0)" class="nav-item" data-section="leads"><span>🎯</span> Leads</a>
@@ -97,23 +67,22 @@ function sp_area_manager_dashboard_shortcode() {
                 
                 <a href="javascript:void(0)" class="nav-item" data-section="manage-cleaners"><span>🧹</span> Manage Cleaners</a>
                 <a href="javascript:void(0)" class="nav-item" data-section="cleaning-services"><span>🧼</span> Cleaning Services</a>
-                <a href="javascript:void(0)" class="nav-item" data-section="my-team"><span>👥</span> My Team</a>
                 
-                <?php if (in_array('manager', $user_roles, true) || in_array('administrator', $user_roles, true)) : ?>
-                <!-- Manager-Only Sections -->
-                <div style="margin-top: 15px; border-top: 1px solid #e2e8f0; padding-top: 15px;">
-                    <p style="font-size: 11px; text-transform: uppercase; color: #94a3b8; margin-bottom: 10px; padding: 0 20px; font-weight: 600;">Manager Tools</p>
-                </div>
-                <a href="javascript:void(0)" class="nav-item" data-section="team-analysis"><span>📊</span> Team Analysis</a>
-                <a href="javascript:void(0)" class="nav-item" data-section="am-assignment"><span>🗺️</span> AM Assignment</a>
+                <a href="javascript:void(0)" class="nav-item" data-section="team-analysis"><span>📊</span> Team Overview</a>
+                <?php if ($is_manager) : ?>
+                    <!-- Manager-Only Sections -->
+                    <div style="margin-top: 15px; border-top: 1px solid #e2e8f0; padding-top: 15px;">
+                        <p style="font-size: 11px; text-transform: uppercase; color: #94a3b8; margin-bottom: 10px; padding: 0 20px; font-weight: 600;">Manager Tools</p>
+                    </div>
+                    <a href="javascript:void(0)" class="nav-item" data-section="am-assignment"><span>🗺️</span> AM Assignment</a>
                 <?php endif; ?>
             </nav>
             <div class="sidebar-profile">
                 <div class="profile-info">
                     <h4><?php echo esc_html($user->display_name); ?></h4>
-                    <p><?php echo in_array('manager', $user_roles, true) ? 'Manager' : 'Area Manager'; ?></p>
+                    <p><?php echo $is_manager ? 'Manager' : 'Area Manager'; ?></p>
                 </div>
-                <?php if (in_array('manager', $user_roles, true)) : ?>
+                <?php if ($is_manager) : ?>
                 <!-- Assigned States for Manager -->
                 <div class="supervisor-info" style="margin-top: 15px; border-top: 1px solid rgba(255,255,255,0.1); padding-top: 15px;">
                     <p style="font-size: 11px; text-transform: uppercase; color: rgba(255,255,255,0.6); margin-bottom: 5px;">Assigned States</p>
@@ -541,7 +510,7 @@ function sp_area_manager_dashboard_shortcode() {
                     <?php 
                     // Include and render shared lead component
                     require_once plugin_dir_path(dirname(dirname(__FILE__))) . 'includes/components/class-lead-component.php';
-                    KSC_Lead_Component::render_lead_section($user_roles, 'area_manager');
+                    KSC_Lead_Component::render_lead_section($user_roles, $active_role);
                     ?>
                 </section>
 
@@ -607,7 +576,7 @@ function sp_area_manager_dashboard_shortcode() {
                     <?php 
                     // Use Shared Cleaner Component
                     if (class_exists('KSC_Cleaner_Component')) {
-                        KSC_Cleaner_Component::render_cleaner_section($user_roles, 'area_manager'); 
+                        KSC_Cleaner_Component::render_cleaner_section($user_roles, $active_role); 
                     } else {
                         echo '<p>Error: Cleaner component not loaded.</p>';
                     }
@@ -656,82 +625,7 @@ function sp_area_manager_dashboard_shortcode() {
                     </div>
                 </section>
 
-                    <!-- My Team Section (for all AMs - shows assigned Sales Managers) -->
-                <!-- My Team Section (Restricted Team Analysis) -->
-                <!-- My Team Section (Restricted Team Analysis) -->
-                <section id="my-team-section" class="section-content" style="display:none;">
-                    <div class="section-header">
-                        <h2 class="section-title">👥 My Team Overview</h2>
-                        <p style="color: #666; margin-top: 8px;">Performance overview of your assigned team</p>
-                    </div>
 
-                    <!-- Stats Row -->
-                    <div class="stats-grid" style="margin-bottom: 30px;">
-                        <div class="stat-card">
-                            <div class="stat-icon">👥</div>
-                            <div class="stat-details">
-                                <h3 id="my-team-sm-count">0</h3>
-                                <span>Sales Managers</span>
-                            </div>
-                        </div>
-                        <div class="stat-card">
-                            <div class="stat-icon">🧹</div>
-                            <div class="stat-details">
-                                <h3 id="my-team-cleaner-count">0</h3>
-                                <span>Cleaners</span>
-                            </div>
-                        </div>
-                        <div class="stat-card">
-                            <div class="stat-icon">🏗️</div>
-                            <div class="stat-details">
-                                <h3 id="my-team-project-count">0</h3>
-                                <span>Active Projects</span>
-                            </div>
-                        </div>
-                    </div>
-
-                    <!-- Sales Managers Table -->
-                    <div class="card" style="margin-bottom: 20px;">
-                        <h3>👥 Sales Managers</h3>
-                        <div class="table-responsive">
-                            <table class="data-table">
-                                <thead>
-                                    <tr>
-                                        <th>Name</th>
-                                        <th>Supervisor</th>
-                                        <th class="text-center">Leads</th>
-                                        <th class="text-center">Conversions</th>
-                                        <th class="text-center">Actions</th>
-                                    </tr>
-                                </thead>
-                                <tbody id="my-team-sm-tbody">
-                                    <tr><td colspan="5" class="text-center">Loading...</td></tr>
-                                </tbody>
-                            </table>
-                        </div>
-                    </div>
-
-                    <!-- Cleaners Table -->
-                    <div class="card" style="margin-bottom: 20px;">
-                        <h3>🧹 Cleaners</h3>
-                        <div class="table-responsive">
-                            <table class="data-table">
-                                <thead>
-                                    <tr>
-                                        <th>Name</th>
-                                        <th>Supervisor</th>
-                                        <th class="text-center">Performance</th>
-                                        <th class="text-center">Status</th>
-                                        <th class="text-center">Actions</th>
-                                    </tr>
-                                </thead>
-                                <tbody id="my-team-cleaners-tbody">
-                                    <tr><td colspan="5" class="text-center">Loading...</td></tr>
-                                </tbody>
-                            </table>
-                        </div>
-                    </div>
-                </section>
 
                 <!-- Team Member Detail Modal -->
                 <div id="team-member-modal" class="modal" style="display:none;">
@@ -745,84 +639,19 @@ function sp_area_manager_dashboard_shortcode() {
                         </div>
                     </div>
                 </div>
-
-                    <!-- SM Leads Detail Panel (hidden until SM is selected) -->
-                    <!-- SM Leads Detail Panel - HIDDEN (Moved to Modal) -->
-                    <div id="sm-leads-detail-panel" class="card" style="display: none !important;">
-                        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
-                            <h3 id="sm-leads-title">📋 Leads for: <span id="selected-sm-name"></span></h3>
-                            <button type="button" class="btn btn-secondary" id="close-sm-leads-panel" style="padding: 8px 15px;">✕ Close</button>
-                        </div>
-                        
-                        <!-- Leads Filter -->
-                        <div class="filter-row" style="display: flex; gap: 15px; flex-wrap: wrap; margin-bottom: 20px;">
-                            <select id="sm-leads-status-filter" style="padding: 10px; border: 1px solid #ddd; border-radius: 6px; min-width: 150px;">
-                                <option value="">All Statuses</option>
-                                <option value="new">New</option>
-                                <option value="contacted">Contacted</option>
-                                <option value="qualified">Qualified</option>
-                                <option value="proposal">Proposal Sent</option>
-                                <option value="negotiation">Negotiation</option>
-                                <option value="converted">Converted</option>
-                                <option value="lost">Lost</option>
-                            </select>
-                            <input type="text" id="sm-leads-search" placeholder="Search leads..." 
-                                   style="padding: 10px; border: 1px solid #ddd; border-radius: 6px; flex: 1; min-width: 200px;">
-                        </div>
-                        
-                        <!-- Leads Table -->
-                        <div class="table-responsive">
-                            <table class="data-table" id="sm-leads-table">
-                                <thead>
-                                    <tr>
-                                        <th>Lead Name</th>
-                                        <th>Phone</th>
-                                        <th>Status</th>
-                                        <th>Location</th>
-                                        <th>Created</th>
-                                        <th>Last Followup</th>
-                                        <th>Actions</th>
-                                    </tr>
-                                </thead>
-                                <tbody id="sm-leads-tbody">
-                                    <tr><td colspan="7">Select a Sales Manager to view leads...</td></tr>
-                                </tbody>
-                            </table>
-                        </div>
-                    </div>
-                    
-                    <!-- Lead Followup History Modal -->
-                    <div id="lead-followup-modal" class="modal" style="display: none;">
-                        <div class="modal-content" style="max-width: 700px;">
-                            <div class="modal-header">
-                                <h3>📞 Lead Followup History</h3>
-                                <span class="close-modal" data-modal="lead-followup-modal">&times;</span>
-                            </div>
-                            <div class="modal-body">
-                                <div id="lead-info-header" style="background: #f8f9fa; padding: 15px; border-radius: 8px; margin-bottom: 20px;">
-                                    <h4 id="followup-lead-name" style="margin-bottom: 8px;"></h4>
-                                    <p id="followup-lead-contact" style="color: #666; font-size: 14px;"></p>
-                                </div>
-                                <h4 style="margin-bottom: 15px;">📝 Activity Timeline</h4>
-                                <div id="followup-timeline" style="max-height: 400px; overflow-y: auto;">
-                                    <p>Loading followup history...</p>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                </section>
-
-
-                <?php if (in_array('manager', $user_roles, true) || in_array('administrator', $user_roles, true)) : ?>
-                <!-- Team Analysis Section (Manager Only) -->
+              
+                <!-- Team Analysis Section (Unified for Manager and Area Manager) -->
                 <section id="team-analysis-section" class="section-content" style="display:none;">
                     <div class="section-header">
-                        <h2 class="section-title">📊 Team Analysis</h2>
-                        <p style="color: #666; margin-top: 8px;">Overview of all Area Managers, Sales Managers, and Cleaners in your assigned states</p>
+                        <h2 class="section-title">📊 Team Overview</h2>
+                        <p style="color: #666; margin-top: 8px;">
+                            <?php echo $is_manager ? 'Overview of all Area Managers, Sales Managers, and Cleaners in your assigned states' : 'Performance overview of your assigned team'; ?>
+                        </p>
                     </div>
                     
                     <!-- Team Stats -->
                     <div class="stats-grid" style="margin-bottom: 30px;">
+                        <?php if ($is_manager) : ?>
                         <div class="stat-card">
                             <div class="stat-icon">👔</div>
                             <div class="stat-details">
@@ -830,6 +659,7 @@ function sp_area_manager_dashboard_shortcode() {
                                 <span>Area Managers</span>
                             </div>
                         </div>
+                        <?php endif; ?>
                         <div class="stat-card">
                             <div class="stat-icon">👥</div>
                             <div class="stat-details">
@@ -853,7 +683,8 @@ function sp_area_manager_dashboard_shortcode() {
                         </div>
                     </div>
                     
-                    <!-- Area Managers Table -->
+                    <?php if ($is_manager) : ?>
+                    <!-- Area Managers Table (Manager Only) -->
                     <div class="card" style="margin-bottom: 20px;">
                         <h3>👔 Area Managers</h3>
                         <div class="table-responsive">
@@ -874,6 +705,7 @@ function sp_area_manager_dashboard_shortcode() {
                             </table>
                         </div>
                     </div>
+                    <?php endif; ?>
                     
                     <!-- Sales Managers Table -->
                     <div class="card" style="margin-bottom: 20px;">
@@ -884,7 +716,7 @@ function sp_area_manager_dashboard_shortcode() {
                                     <tr>
                                         <th>Name</th>
                                         <th>Email</th>
-                                        <th>Supervising AM</th>
+                                        <th><?php echo $is_manager ? 'Supervising AM' : 'Supervisor'; ?></th>
                                         <th>Leads</th>
                                         <th>Conversions</th>
                                     </tr>
@@ -905,7 +737,7 @@ function sp_area_manager_dashboard_shortcode() {
                                     <tr>
                                         <th>Name</th>
                                         <th>Phone</th>
-                                        <th>Supervising AM</th>
+                                        <th><?php echo $is_manager ? 'Supervising AM' : 'Supervisor'; ?></th>
                                         <th>Completed Visits</th>
                                         <th>Status</th>
                                     </tr>
@@ -918,6 +750,7 @@ function sp_area_manager_dashboard_shortcode() {
                     </div>
                 </section>
 
+                <?php if ($is_manager) : ?>
                 <!-- AM Assignment Section (Manager Only) -->
                 <section id="am-assignment-section" class="section-content" style="display:none;">
                     <div class="section-header">
