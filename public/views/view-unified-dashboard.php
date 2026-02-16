@@ -691,16 +691,15 @@ function sp_unified_dashboard_shortcode() {
                             <table class="data-table" id="team-am-table">
                                 <thead>
                                     <tr>
-                                        <th>Name</th>
-                                        <th>Email</th>
-                                        <th>City</th>
-                                        <th>State</th>
-                                        <th>Projects</th>
-                                        <th>Team Size</th>
+                                        <th>Name & Contact</th>
+                                        <th>Location</th>
+                                        <th class="text-center">Projects</th>
+                                        <th class="text-center">Team Size</th>
+                                        <th class="text-center">Actions</th>
                                     </tr>
                                 </thead>
                                 <tbody id="team-am-tbody">
-                                    <tr><td colspan="6">Loading area managers...</td></tr>
+                                    <tr><td colspan="5">Loading area managers...</td></tr>
                                 </tbody>
                             </table>
                         </div>
@@ -714,11 +713,11 @@ function sp_unified_dashboard_shortcode() {
                             <table class="data-table" id="team-sm-table">
                                 <thead>
                                     <tr>
-                                        <th>Name</th>
-                                        <th>Email</th>
-                                        <th><?php echo $is_manager ? 'Supervising AM' : 'Supervisor'; ?></th>
-                                        <th>Leads</th>
-                                        <th>Conversions</th>
+                                        <th>Name & Contact</th>
+                                        <th>Supervisor</th>
+                                        <th class="text-center">Leads</th>
+                                        <th class="text-center">Conversions</th>
+                                        <th class="text-center">Actions</th>
                                     </tr>
                                 </thead>
                                 <tbody id="team-sm-tbody">
@@ -735,11 +734,11 @@ function sp_unified_dashboard_shortcode() {
                             <table class="data-table" id="team-cleaners-table">
                                 <thead>
                                     <tr>
-                                        <th>Name</th>
-                                        <th>Phone</th>
-                                        <th><?php echo $is_manager ? 'Supervising AM' : 'Supervisor'; ?></th>
-                                        <th>Completed Visits</th>
-                                        <th>Status</th>
+                                        <th>Name & Contact</th>
+                                        <th>Supervisor</th>
+                                        <th class="text-center">Performance</th>
+                                        <th class="text-center">Status</th>
+                                        <th class="text-center">Actions</th>
                                     </tr>
                                 </thead>
                                 <tbody id="team-cleaners-tbody">
@@ -818,10 +817,10 @@ function sp_unified_dashboard_shortcode() {
                             <input type="hidden" id="reset_password_client_id">
                             <div class="form-group">
                                 <label for="new_password">New Password</label>
-                                <div style="position: relative;">
-                                    <input type="password" id="new_password" name="new_password" required style="width: 100%; padding-right: 80px;">
-                                    <span class="toggle-password" data-target="new_password" style="position: absolute; right: 40px; top: 50%; transform: translateY(-50%); cursor: pointer; z-index: 2;">👁️</span>
-                                    <button type="button" class="generate-password-btn" data-target="new_password" style="position: absolute; right: 5px; top: 50%; transform: translateY(-50%); border: none; background: none; cursor: pointer; z-index: 2;" title="Generate Password">🎲</button>
+                                <div style="display: flex; gap: 5px; align-items: stretch;">
+                                    <input type="password" id="new_password" name="new_password" required style="flex: 1; padding: 10px; border: 1px solid #ddd; border-radius: 6px;">
+                                    <button type="button" class="toggle-password" data-target="new_password" style="padding: 10px 15px; border: 1px solid #ddd; background: #f8f9fa; cursor: pointer; border-radius: 6px; font-size: 18px;" title="Toggle Password">👁️</button>
+                                    <button type="button" class="generate-password-btn" data-target="new_password" style="padding: 10px 15px; border: 1px solid #ddd; background: #f8f9fa; cursor: pointer; border-radius: 6px; font-size: 18px;" title="Generate Password">🎲</button>
                                 </div>
                             </div>
                             <button type="submit" class="btn btn-primary">Reset Password</button>

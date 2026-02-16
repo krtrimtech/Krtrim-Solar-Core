@@ -116,20 +116,31 @@ class KSC_Unified_Lead_API {
 
         // 2. Check if Manager access
         if (in_array('manager', (array)$user->roles)) {
+            // Manager with Global Access (no assigned states) see everything
+            $assigned_states = get_user_meta($user->ID, '_assigned_states', true) ?: [];
+            if (empty($assigned_states)) {
+                return true;
+            }
+
+            // Direct supervision of the creator
+            $creator_supervisor = get_user_meta($creator_id, '_supervised_by_manager', true);
+            if ($creator_supervisor == $user->ID) {
+                return true;
+            }
+
             // Manager supervising the AM who is either the creator or supervisor of the creator
             $target_am_id = in_array('area_manager', (array)get_userdata($creator_id)->roles) ? $creator_id : $sm_assigned_am;
             
             if ($target_am_id) {
-                // Direct supervision check
+                // Direct supervision of the AM
                 $am_supervisor = get_user_meta($target_am_id, '_supervised_by_manager', true);
                 if ($am_supervisor == $user->ID) {
                     return true;
                 }
 
-                // State-based assignment check
-                $assigned_states = get_user_meta($user->ID, '_assigned_states', true) ?: [];
+                // State-based assignment
                 $am_state = get_user_meta($target_am_id, 'state', true);
-                if (!empty($assigned_states) && in_array($am_state, $assigned_states)) {
+                if (in_array($am_state, (array)$assigned_states)) {
                     return true;
                 }
             }
