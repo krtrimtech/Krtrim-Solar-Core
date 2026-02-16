@@ -260,7 +260,7 @@ function sp_sales_manager_dashboard_shortcode() {
                 <input type="hidden" id="schedule_service_id">
                 <div class="form-group">
                     <label>Customer</label>
-                    <p id="schedule_customer_name" style="font-weight: 600; margin: 5px 0;"></p>
+                    <p id="schedule_customer_name" class="customer-name-display"></p>
                 </div>
                 <div class="form-group">
                     <label for="schedule_cleaner_id">Select Cleaner *</label>
@@ -305,7 +305,7 @@ function sp_sales_manager_dashboard_shortcode() {
                 
                 <div class="form-group">
                     <label>Customer</label>
-                    <p id="book_customer_name" style="font-weight: 600; margin: 5px 0;"></p>
+                    <p id="book_customer_name" class="customer-name-display"></p>
                 </div>
 
                 <div class="form-row" style="display: flex; gap: 15px;">
@@ -363,7 +363,7 @@ function sp_sales_manager_dashboard_shortcode() {
                 
                 <div class="form-group">
                     <label>Customer</label>
-                    <p id="edit_customer_name" style="font-weight: 600; margin: 5px 0;"></p>
+                    <p id="edit_customer_name" class="customer-name-display"></p>
                 </div>
 
                 <div class="form-row" style="display: flex; gap: 15px;">

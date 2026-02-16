@@ -96,15 +96,7 @@ class SP_Admin_Menus {
             [ $this, 'render_process_step_template_page' ]
         );
         
-        // Debug Panel (Admin Only)
-        add_submenu_page(
-            'tools.php',
-            'Debug Panel',
-            'Debug Panel',
-            'manage_options',
-            'ksc-debug-panel',
-            [ $this, 'render_debug_panel' ]
-        );
+
     }
 
     public function render_vendor_approval_page() {
@@ -137,12 +129,7 @@ class SP_Admin_Menus {
         sp_render_process_step_template_page();
     }
     
-    /**
-     * Render debug panel page
-     */
-    public function render_debug_panel() {
-        require_once plugin_dir_path(dirname(__FILE__)) . '../admin/views/view-debug-panel.php';
-    }
+
     
     /**
      * AJAX: Generate manager performance report

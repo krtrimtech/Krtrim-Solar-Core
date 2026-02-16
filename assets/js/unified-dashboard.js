@@ -87,7 +87,8 @@
         }
 
         if (typeof DashboardUtils !== 'undefined') {
-            DashboardUtils.setupTabNavigation('.area-manager-dashboard');
+            // Setup navigation for both possible dashboard classes
+            DashboardUtils.setupTabNavigation('.modern-solar-dashboard');
         }
     });
 
@@ -113,7 +114,7 @@
     const ajaxUrl = (typeof sp_area_dashboard_vars !== 'undefined') ? sp_area_dashboard_vars.ajax_url : '';
 
     if (!ajaxUrl) {
-        // console.error('Area Manager Dashboard: sp_area_dashboard_vars is undefined or missing ajax_url.');
+        // console.error('Unified Dashboard: sp_area_dashboard_vars is undefined or missing ajax_url.');
         return;
     }
 
@@ -204,6 +205,7 @@
             }
         });
     }
+    window.loadNotifications = loadNotifications;
 
     // Toggle notification panel
     $(document).on('click', '#notification-toggle', function () {
@@ -226,31 +228,32 @@
     const awardBidNonce = sp_area_dashboard_vars.award_bid_nonce;
 
     // --- Dashboard Charts & Stats ---
-    let projectStatusChart, monthlyTrendChart, financialChart, leadChart;
+    let projectStatusChart, monthlyTrendChart, financialChart, leadChart, smLeadStatusChart;
 
     function loadDashboardStats() {
-        // console.log('Loading dashboard stats...');
+        const action = sp_area_dashboard_vars.is_sales_manager ? 'get_sales_manager_stats' : 'get_area_manager_dashboard_stats';
+
         $.ajax({
             url: ajaxUrl,
             type: 'POST',
             data: {
-                action: 'get_area_manager_dashboard_stats',
+                action: action,
                 nonce: sp_area_dashboard_vars.get_dashboard_stats_nonce,
             },
             success: function (response) {
-                // console.log('Stats response:', response);
                 if (response.success) {
                     updateDashboardStats(response.data);
                     initializeCharts(response.data);
-                } else {
-                    // console.error('Stats error:', response);
+
+                    // Sales Manager specific initial loads
+                    if (sp_area_dashboard_vars.is_sales_manager) {
+                        loadTodayFollowups();
+                    }
                 }
-            },
-            error: function (xhr, status, error) {
-                // console.error('AJAX error loading stats:', error);
             }
         });
     }
+    window.loadDashboardStats = loadDashboardStats;
 
     function updateDashboardStats(stats) {
         // console.log('Updating stats:', stats);
@@ -262,8 +265,14 @@
         $('#total-profit-stat').text('₹' + (stats.total_profit || 0).toLocaleString('en-IN'));
         $('#profit-margin-stat').text((stats.profit_margin || 0).toFixed(1) + '%');
         $('#collection-rate-stat').text((stats.collection_rate || 0).toFixed(1) + '%');
+
+        // Sales Manager Specific
         $('#total-leads-stat').text(stats.total_leads || 0);
+        $('#pending-followups-stat').text(stats.pending_followups || 0);
+        $('#converted-leads-stat').text(stats.converted_leads || 0);
+        $('#conversion-rate-stat').text((stats.conversion_rate || 0) + '%');
     }
+
 
     function initializeCharts(stats) {
         if (typeof Chart === 'undefined') {
@@ -276,6 +285,7 @@
         if (monthlyTrendChart) monthlyTrendChart.destroy();
         if (financialChart) financialChart.destroy();
         if (leadChart) leadChart.destroy();
+        if (smLeadStatusChart) smLeadStatusChart.destroy();
 
         // 1. Project Status Pie Chart
         const statusCtx = document.getElementById('project-status-chart');
@@ -360,8 +370,7 @@
                             data: stats.financial_data?.costs || [0, 0, 0, 0, 0, 0],
                             borderColor: '#ef4444',
                             backgroundColor: 'rgba(239, 68, 68, 0.1)',
-                            tension: 0.4,
-                            fill: true
+                            tension: 0.1
                         }
                     ]
                 },
@@ -419,87 +428,8 @@
     }
 
     // Global section data loader
-    window.loadSectionData = function (section) {
-        // console.log('Loading section data for:', section);
-        if (section === 'dashboard') {
-            loadDashboardStats();
-        } else if (section === 'projects') {
-            loadProjects();
-        } else if (section === 'project-reviews') {
-            loadReviews();
-        } else if (section === 'bid-management') {
-            loadBids();
-        } else if (section === 'vendor-approvals') {
-            loadVendorApprovals();
-        } else if (section === 'leads') {
-            // console.log('Triggering shared lead component...');
-            initLeadComponent();
-        } else if (section === 'my-clients') {
-            loadMyClients();
-        } else if (section === 'manage-cleaners') {
-            if (window.loadCleaners) window.loadCleaners();
-        } else if (section === 'cleaning-services') {
-            loadCleaningServices();
-        } else if (section === 'my-team') {
-            loadMyTeam();
-        } else if (section === 'my-team') {
-            loadMyTeam();
-        } else if (section === 'team-analysis') {
-            loadTeamAnalysis();
-        } else if (section === 'am-assignment') {
-            loadAMAssignments();
-        }
-    };
-
-    function loadTeamAnalysis() {
-        // console.log('Loading team analysis...');
-        $('#team-sm-tbody').html('<tr><td colspan="5" class="text-center">Loading...</td></tr>');
-        $('#team-cleaners-tbody').html('<tr><td colspan="5" class="text-center">Loading...</td></tr>');
-
-        // Ensure shared component is loaded
-        if (typeof KSC_TeamAnalysis === 'undefined') {
-            // console.error('KSC_TeamAnalysis component not loaded. Retrying in 500ms...');
-            setTimeout(loadTeamAnalysis, 500);
-            return;
-        }
-
-        $.ajax({
-            url: ajaxUrl,
-            type: 'POST',
-            data: {
-                action: 'get_team_analysis_data',
-                nonce: sp_area_dashboard_vars.get_dashboard_stats_nonce
-            },
-            success: function (response) {
-                if (response.success) {
-                    KSC_TeamAnalysis.render(response.data);
-                } else {
-                    $('#team-sm-tbody').html('<tr><td colspan="5" class="text-center">Error loading data. ' + (response.data?.message || '') + '</td></tr>');
-                    $('#team-cleaners-tbody').html('<tr><td colspan="5" class="text-center">Error loading data.</td></tr>');
-                }
-            },
-            error: function (xhr, status, error) {
-                // console.error('AJAX error loading team analysis:', error);
-                $('#team-sm-tbody').html('<tr><td colspan="5" class="text-center">Error loading data.</td></tr>');
-                $('#team-cleaners-tbody').html('<tr><td colspan="5" class="text-center">Error loading data.</td></tr>');
-            }
-        });
-    }
-
-    // Load data when section becomes visible
-    $(document).on('click', '.nav-item', function () {
-        const section = $(this).data('section');
-        // console.log('Nav clicked, section:', section);
-
-        // Reset create form when navigating to it (unless we're in edit mode)
-        if (section === 'create-project' && !$('#edit_project_id').val()) {
-            resetCreateForm();
-        }
-
-        setTimeout(function () {
-            loadSectionData(section);
-        }, 100);
-    });
+    // This function is now handled by DashboardUtils.triggerSectionLoad
+    // window.loadSectionData = function (section) { /* ... */ }; // This was a previous attempt to fix, now removed.
 
     // Initial load - check if dashboard is visible and load it
     $(document).ready(function () {
@@ -518,7 +448,10 @@
 
     // Handle event from global handler
     $(document).on('area-manager-nav-click', function (e, section) {
-        window.loadSectionData(section);
+        // This event is now handled by DashboardUtils.triggerSectionLoad
+        // and calls the appropriate global functions.
+        // The local loadSectionData is no longer needed.
+        // loadSectionData(section);
     });
 
     // Initial load if dashboard is visible
@@ -552,6 +485,7 @@
             }
         });
     }
+    window.loadProjects = loadProjects;
 
     function renderProjects(projects) {
         if (!projects || projects.length === 0) {
@@ -872,6 +806,7 @@
             }
         });
     };
+    window.loadBids = loadBids;
 
     function renderBids(projects) {
         const container = $('#bid-management-container');
@@ -943,14 +878,14 @@
                         '<span style="color: #047857;">✓ Awarded</span>' :
                         '<span style="color: #9ca3af;">—</span>'
                     ) :
-                    `<button class="btn btn-primary btn-sm award-bid-btn" 
-                                                         data-project-id="${project.id}" 
-                                                         data-bid-id="${bid.id}" 
-                                                         data-vendor-id="${bid.vendor_id}"
-                                                         data-vendor-name="${bid.vendor_name}"
-                                                         data-amount="${bid.bid_amount}">
-                                                    🏆 Award
-                                                </button>`
+                    `<button class="btn btn-primary btn-sm award-bid-btn"
+                        data-project-id="${project.id}"
+                        data-bid-id="${bid.id}"
+                        data-vendor-id="${bid.vendor_id}"
+                        data-vendor-name="${bid.vendor_name}"
+                        data-bid-amount="${bid.bid_amount}">
+                        🏆 Award
+                    </button>`
                 }
                                         </td>
                                     </tr>
@@ -966,48 +901,6 @@
         container.html(html);
     }
 
-    // Handle Award Bid click
-    $(document).on('click', '.award-bid-btn', function (e) {
-        e.preventDefault();
-        const btn = $(this);
-        const projectId = btn.data('project-id');
-        const bidId = btn.data('bid-id');
-        const vendorId = btn.data('vendor-id');
-        const vendorName = btn.data('vendor-name');
-        const amount = btn.data('amount');
-
-        if (!confirm(`Award this project to ${vendorName} for ₹${Number(amount).toLocaleString()}?`)) {
-            return;
-        }
-
-        const originalText = btn.html();
-        btn.prop('disabled', true).html('Processing...');
-
-        $.ajax({
-            url: ajaxUrl,
-            type: 'POST',
-            data: {
-                action: 'award_project_to_vendor',
-                nonce: $('#award_bid_nonce_field').val() || sp_area_dashboard_vars.get_projects_nonce,
-                project_id: projectId,
-                bid_id: bidId,
-                vendor_id: vendorId
-            },
-            success: function (response) {
-                if (response.success) {
-                    showToast('🏆 Project awarded successfully!', 'success');
-                    loadBids(); // Refresh the bids list
-                } else {
-                    showToast('Error: ' + (response.data.message || 'Could not award project'), 'error');
-                    btn.prop('disabled', false).html(originalText);
-                }
-            },
-            error: function () {
-                showToast('Network error. Please try again.', 'error');
-                btn.prop('disabled', false).html(originalText);
-            }
-        });
-    });
 
     // --- Load Vendor Approvals ---
     function loadVendorApprovals() {
@@ -1213,6 +1106,7 @@
             }
         });
     }
+    window.loadLeads = loadLeads;
 
     // NOTE: Lead form submission is handled by lead-component.js via form serialization
     // which correctly includes the nonce from the form's hidden field
@@ -1501,13 +1395,15 @@
     });
 
     // --- Award Bid ---
-    $('#project-bids-list').on('click', '.award-bid-btn', function () {
+    // Unified Award Bid Click Handler (handles both Bids Section and Project Details)
+    $(document).on('click', '.award-bid-btn', function () {
         const button = $(this);
         const projectId = button.data('project-id');
         const vendorId = button.data('vendor-id');
-        const bidAmount = button.data('bid-amount');
+        const bidAmount = button.data('bid-amount') || button.data('amount');
+        const vendorName = button.data('vendor-name') || 'this vendor';
 
-        if (!confirm('Are you sure you want to award this project to this vendor?')) {
+        if (!confirm(`Are you sure you want to award this project to ${vendorName} for ₹${Number(bidAmount).toLocaleString()}?`)) {
             return;
         }
 
@@ -1526,14 +1422,22 @@
             },
             success: function (response) {
                 if (response.success) {
-                    showToast(response.data.message, 'error');
-                    loadProjectDetails(projectId);
+                    showToast(response.data.message || '🏆 Project awarded successfully!', 'success');
+
+                    // Refresh current view
+                    if ($('#bid-management-container').is(':visible')) {
+                        loadBids();
+                    } else if ($('#project-detail-modal').is(':visible') || $('.project-detail-card').length) {
+                        loadProjectDetails(projectId);
+                    }
                 } else {
-                    showToast('Error: ' + response.data.message, 'error');
+                    showToast('Error: ' + (response.data.message || 'Could not award project'), 'error');
+                    button.prop('disabled', false).text('🏆 Award');
                 }
             },
-            complete: function () {
-                button.prop('disabled', false).text('Award Project');
+            error: function () {
+                showToast('Network error. Please try again.', 'error');
+                button.prop('disabled', false).text('🏆 Award');
             }
         });
     });
@@ -1580,6 +1484,7 @@
             }
         });
     }
+    window.loadMyClients = loadMyClients;
 
     $(document).on('click', '.open-reset-password-modal', function (e) {
         e.preventDefault();
@@ -1633,19 +1538,23 @@
     // Profile view handled by CleanerComponent
 
     // Load cleaning services
-    function loadCleaningServices() {
+    function loadCleaningServices(status = '', search = '') {
         const tbody = $('#cleaning-services-tbody');
         tbody.html('<tr><td colspan="8">Loading cleaning services...</td></tr>');
 
         $.ajax({
             url: ajaxUrl,
             type: 'POST',
-            data: { action: 'get_cleaning_services' },
+            data: {
+                action: 'get_cleaning_services',
+                status: status,
+                search: search
+            },
             success: function (response) {
                 if (response.success) {
                     const services = response.data;
                     if (services.length === 0) {
-                        tbody.html('<tr><td colspan="8">No cleaning services yet. Bookings will appear here once customers book cleanings.</td></tr>');
+                        tbody.html('<tr><td colspan="8">No cleaning services found matching your filters.</td></tr>');
                         return;
                     }
 
@@ -1693,8 +1602,8 @@
                                 </td>
                                 <td>
                                     <button class="btn btn-sm view-service-details-btn" 
-                                            data-id="${s.id}" 
-                                            style="background: #6366f1; color: white;">📋 Details</button>
+                                             data-id="${s.id}" 
+                                             style="background: #6366f1; color: white;">📋 Details</button>
                                 </td>
                             </tr>
                         `;
@@ -1709,6 +1618,21 @@
             }
         });
     }
+    window.loadCleaningServices = loadCleaningServices;
+
+    // Filter events for cleaning services
+    $(document).on('change', '#filter-cleaning-status', function () {
+        loadCleaningServices($(this).val(), $('#cleaning-search').val());
+    });
+
+    let cleaningSearchTimer;
+    $(document).on('input', '#cleaning-search', function () {
+        clearTimeout(cleaningSearchTimer);
+        const search = $(this).val();
+        cleaningSearchTimer = setTimeout(() => {
+            loadCleaningServices($('#filter-cleaning-status').val(), search);
+        }, 500);
+    });
 
     // Create/Delete Cleaner handled by CleanerComponent
 
@@ -1946,46 +1870,56 @@
 
     // --- Team Analysis & Details (Unified Design) ---
 
-    // Load My Team Data using Shared Component
-    function loadMyTeam() {
-        // console.log('Loading my team data...');
+    /**
+     * Load Team Analysis data
+     * Handles both Manager (multi-AM) and Area Manager (direct reports) roles
+     */
+    function loadTeamAnalysis() {
+        const isManager = sp_area_dashboard_vars.is_manager;
+        const action = isManager ? 'get_manager_team_data' : 'get_am_team_data';
+        const nonce = isManager ? sp_area_dashboard_vars.get_dashboard_stats_nonce : sp_area_dashboard_vars.get_projects_nonce;
 
         // Initial Loading State
-        $('#my-team-sm-tbody').html('<tr><td colspan="5" class="text-center">Loading...</td></tr>');
-        $('#my-team-cleaners-tbody').html('<tr><td colspan="5" class="text-center">Loading...</td></tr>');
+        $('#team-am-tbody').html('<tr><td colspan="6" class="text-center">Loading...</td></tr>');
+        $('#team-sm-tbody').html('<tr><td colspan="5" class="text-center">Loading...</td></tr>');
+        $('#team-cleaners-tbody').html('<tr><td colspan="5" class="text-center">Loading...</td></tr>');
 
         $.ajax({
             url: ajaxUrl,
             type: 'POST',
             data: {
-                action: 'get_am_team_data',
-                nonce: sp_area_dashboard_vars.get_projects_nonce
+                action: action,
+                nonce: nonce
             },
             success: function (response) {
                 if (response.success) {
-                    // Use Shared Component to Render
                     if (typeof KSC_TeamAnalysis !== 'undefined') {
                         KSC_TeamAnalysis.render(response.data, {
-                            smTable: '#my-team-sm-tbody',
-                            cleanerTable: '#my-team-cleaners-tbody',
-                            smCount: '#my-team-sm-count',
-                            cleanerCount: '#my-team-cleaner-count',
-                            projectCount: '#my-team-project-count'
+                            amTable: '#team-am-tbody',
+                            smTable: '#team-sm-tbody',
+                            cleanerTable: '#team-cleaners-tbody',
+                            amCount: '#team-am-count',
+                            smCount: '#team-sm-count',
+                            cleanerCount: '#team-cleaner-count',
+                            projectCount: '#team-project-count'
                         });
-                    } else {
-                        console.error('KSC_TeamAnalysis component not found');
                     }
                 } else {
-                    $('#my-team-sm-tbody').html('<tr><td colspan="5" class="text-center">Error loading team. ' + (response.data?.message || '') + '</td></tr>');
-                    $('#my-team-cleaners-tbody').html('<tr><td colspan="5" class="text-center">Error loading team.</td></tr>');
+                    const errorMsg = '<tr><td colspan="6" class="text-center">Error loading data. ' + (response.data?.message || '') + '</td></tr>';
+                    $('#team-am-tbody').html(errorMsg);
+                    $('#team-sm-tbody').html(errorMsg);
+                    $('#team-cleaners-tbody').html(errorMsg);
                 }
             },
-            error: function (xhr, status, error) {
-                $('#my-team-sm-tbody').html('<tr><td colspan="5" class="text-center">Error loading team.</td></tr>');
-                $('#my-team-cleaners-tbody').html('<tr><td colspan="5" class="text-center">Error loading team.</td></tr>');
+            error: function () {
+                const errorMsg = '<tr><td colspan="6" class="text-center">AJAX Error loading data.</td></tr>';
+                $('#team-am-tbody').html(errorMsg);
+                $('#team-sm-tbody').html(errorMsg);
+                $('#team-cleaners-tbody').html(errorMsg);
             }
         });
     }
+    window.loadTeamAnalysis = loadTeamAnalysis;
 
     // --- Member Detail Modal Handlers ---
 
@@ -2038,6 +1972,7 @@
             }
         });
     }
+
 
     /**
      * Render member details based on role
@@ -2173,8 +2108,8 @@
         // Recent Activity - MATCH MANAGER DESIGN (Timeline)
         if (data.recent_activity && data.recent_activity.length > 0) {
             html += '<div class="detail-section">';
-            html += '<h3>⏱️ Recent Activity</h3>'; // Icon changed to match manager
-            html += '<div class="activity-timeline">'; // Class changed to match manager
+            html += '<h3>⏱️ Recent Activity</h3>';
+            html += '<div class="activity-timeline">';
             data.recent_activity.forEach(activity => {
                 html += `<div class="activity-item">
                     <div class="activity-time">${activity.time}</div>
@@ -2487,98 +2422,6 @@
     // MANAGER-SPECIFIC FUNCTIONS (shown for manager role only)
     // ========================================
 
-    // --- Team Analysis Functions ---
-    function loadTeamAnalysis() {
-        // console.log('Loading team analysis data...');
-
-        $.ajax({
-            url: ajaxUrl,
-            type: 'POST',
-            data: {
-                action: 'get_manager_team_data',
-                nonce: sp_area_dashboard_vars.get_projects_nonce
-            },
-            success: function (response) {
-                if (response.success) {
-                    renderTeamAnalysis(response.data);
-                } else {
-                    // console.error('Failed to load team data:', response);
-                    $('#team-am-tbody').html('<tr><td colspan="6">Error loading data. ' + (response.data?.message || '') + '</td></tr>');
-                }
-            },
-            error: function (xhr, status, error) {
-                // console.error('AJAX error loading team data:', error);
-                $('#team-am-tbody').html('<tr><td colspan="6">Error loading data. Please try again.</td></tr>');
-            }
-        });
-    }
-
-    function renderTeamAnalysis(data) {
-        // Update stats
-        $('#team-am-count').text(data.area_managers?.length || 0);
-        $('#team-sm-count').text(data.sales_managers?.length || 0);
-        $('#team-cleaner-count').text(data.cleaners?.length || 0);
-        $('#team-project-count').text(data.total_projects || 0);
-
-        // Render Area Managers table
-        let amHtml = '';
-        if (data.area_managers && data.area_managers.length > 0) {
-            data.area_managers.forEach(am => {
-                amHtml += `
-                    <tr>
-                        <td>${am.display_name || 'N/A'}</td>
-                        <td>${am.email || 'N/A'}</td>
-                        <td>${am.city || '-'}</td>
-                        <td>${am.state || '-'}</td>
-                        <td>${am.project_count || 0}</td>
-                        <td>${am.team_size || 0}</td>
-                    </tr>
-                `;
-            });
-        } else {
-            amHtml = '<tr><td colspan="6">No area managers in your assigned states</td></tr>';
-        }
-        $('#team-am-tbody').html(amHtml);
-
-        // Render Sales Managers table
-        let smHtml = '';
-        if (data.sales_managers && data.sales_managers.length > 0) {
-            data.sales_managers.forEach(sm => {
-                smHtml += `
-                    <tr>
-                        <td>${sm.display_name || 'N/A'}</td>
-                        <td>${sm.email || 'N/A'}</td>
-                        <td>${sm.supervising_am || '-'}</td>
-                        <td>${sm.lead_count || 0}</td>
-                        <td>${sm.conversion_count || 0}</td>
-                    </tr>
-                `;
-            });
-        } else {
-            smHtml = '<tr><td colspan="5">No sales managers found</td></tr>';
-        }
-        $('#team-sm-tbody').html(smHtml);
-
-        // Render Cleaners table
-        let cleanerHtml = '';
-        if (data.cleaners && data.cleaners.length > 0) {
-            data.cleaners.forEach(cleaner => {
-                const statusClass = cleaner.status === 'active' ? 'status-success' : 'status-warning';
-                cleanerHtml += `
-                    <tr>
-                        <td>${cleaner.name || 'N/A'}</td>
-                        <td>${cleaner.phone || '-'}</td>
-                        <td>${cleaner.supervising_am || '-'}</td>
-                        <td>${cleaner.completed_visits || 0}</td>
-                        <td><span class="badge ${statusClass}">${cleaner.status || 'active'}</span></td>
-                    </tr>
-                `;
-            });
-        } else {
-            cleanerHtml = '<tr><td colspan="5">No cleaners found</td></tr>';
-        }
-        $('#team-cleaners-tbody').html(cleanerHtml);
-    }
 
     // --- AM Assignment Functions ---
     function loadAMAssignments() {
@@ -2586,20 +2429,21 @@
         loadAMDropdown();
         loadAssignmentsTable();
     }
+    window.loadAMAssignments = loadAMAssignments;
 
     function loadAMDropdown() {
         $.ajax({
             url: ajaxUrl,
             type: 'POST',
             data: {
-                action: 'get_unassigned_area_managers',
+                action: 'get_unassigned_area_managers', // Updated to match backend API
                 nonce: sp_area_dashboard_vars.get_projects_nonce
             },
             success: function (response) {
                 let html = '<option value="">Select Area Manager</option>';
-                if (response.success && response.data.managers) {
+                if (response.success && response.data && response.data.managers) {
                     response.data.managers.forEach(am => {
-                        html += `<option value="${am.ID}">${am.display_name} (${am.email})</option>`;
+                        html += `<option value="${am.ID}">${am.display_name} (${am.user_email || am.email})</option>`;
                     });
                 }
                 $('#assign_am_id').html(html);
@@ -2612,22 +2456,22 @@
             url: ajaxUrl,
             type: 'POST',
             data: {
-                action: 'get_am_location_assignments',
+                action: 'get_am_location_assignments', // Updated to match backend API
                 nonce: sp_area_dashboard_vars.get_projects_nonce
             },
             success: function (response) {
                 let html = '';
-                if (response.success && response.data.assignments && response.data.assignments.length > 0) {
+                if (response.success && response.data && response.data.assignments && response.data.assignments.length > 0) {
                     response.data.assignments.forEach(assignment => {
                         html += `
                             <tr>
                                 <td>${assignment.am_name}</td>
-                                <td>${assignment.state}</td>
-                                <td>${assignment.city}</td>
+                                <td>${assignment.state || 'N/A'}</td>
+                                <td>${assignment.city || 'N/A'}</td>
                                 <td>
-                                    <button class="action-btn action-btn-danger remove-am-assignment" 
-                                            data-am-id="${assignment.am_id}">
-                                        🗑️ Remove
+                                    <button class="btn btn-danger btn-sm unassign-am-btn" 
+                                            data-user-id="${assignment.am_id}">
+                                        🗑️ Unassign
                                     </button>
                                 </td>
                             </tr>
@@ -2642,103 +2486,125 @@
     }
 
     // State change handler for city dropdown
-    $(document).on('change', '#assign_state', function () {
-        const state = $(this).val();
-        if (!state) {
-            $('#assign_city').html('<option value="">Select state first</option>');
-            return;
-        }
+    let allIndianStates = [];
+    if ($('#assign_state').length) {
+        $.getJSON(sp_area_dashboard_vars.states_cities_json_url, function (data) {
+            allIndianStates = data.states;
+            const stateSelect = $('#assign_state');
+            stateSelect.empty().append('<option value="">Select State</option>');
 
-        $.ajax({
-            url: ajaxUrl,
-            type: 'POST',
-            data: {
-                action: 'get_cities_for_state',
-                state: state
-            },
-            success: function (response) {
-                let html = '<option value="">Select City</option>';
-                if (response.success && response.data.cities) {
-                    response.data.cities.forEach(city => {
-                        html += `<option value="${city}">${city}</option>`;
-                    });
+            const assignedStates = sp_area_dashboard_vars.assigned_states || [];
+            const isManager = sp_area_dashboard_vars.is_manager;
+
+            let validStates = 0;
+            allIndianStates.forEach(s => {
+                // Filter by assigned states if it's a manager
+                if (isManager && assignedStates.length > 0 && !assignedStates.includes(s.state)) {
+                    return;
                 }
-                $('#assign_city').html(html);
+                stateSelect.append(`<option value="${s.state}">${s.state}</option>`);
+                validStates++;
+            });
+
+            // If only one state is available, select it automatically
+            if (validStates === 1) {
+                stateSelect.find('option').last().prop('selected', true).trigger('change');
             }
         });
-    });
+
+        $('#assign_state').on('change', function () {
+            const selectedState = $(this).val();
+            const citySelect = $('#assign_city');
+            citySelect.empty().append('<option value="">Select City</option>');
+
+            if (selectedState && allIndianStates) {
+                const stateData = allIndianStates.find(s => s.state === selectedState);
+                if (stateData) {
+                    stateData.districts.forEach(city => {
+                        citySelect.append(`<option value="${city}">${city}</option>`);
+                    });
+                }
+            }
+        });
+    }
 
     // AM Assignment form submission
     $(document).on('submit', '#assign-am-location-form', function (e) {
         e.preventDefault();
-
-        const $form = $(this);
-        const $btn = $form.find('button[type="submit"]');
-        const $feedback = $('#assign-am-feedback');
-
-        $btn.prop('disabled', true).text('Assigning...');
-        $feedback.html('');
+        const form = $(this);
+        const feedback = $('#assign-am-feedback');
+        const btn = form.find('button[type="submit"]');
 
         $.ajax({
             url: ajaxUrl,
             type: 'POST',
             data: {
                 action: 'assign_area_manager_location',
+                nonce: sp_area_dashboard_vars.assign_am_location_nonce,
                 manager_id: $('#assign_am_id').val(),
                 state: $('#assign_state').val(),
-                city: $('#assign_city').val()
+                city: $('#assign_city').val(),
+            },
+            beforeSend: function () {
+                btn.prop('disabled', true).text('Assigning...');
+                feedback.text('').removeClass('text-success text-danger');
             },
             success: function (response) {
                 if (response.success) {
-                    $feedback.html('<p class="text-success">✅ ' + response.data.message + '</p>');
-                    $form[0].reset();
-                    loadAssignmentsTable();
-                    loadAMDropdown();
+                    feedback.text(response.data.message).addClass('text-success');
+                    showToast(response.data.message, 'success');
+                    loadAMAssignments(); // Refresh the list
+                    form[0].reset();
                 } else {
-                    $feedback.html('<p class="text-danger">❌ ' + (response.data?.message || 'Error assigning area') + '</p>');
+                    feedback.text(response.data.message).addClass('text-danger');
+                    showToast(response.data.message, 'error');
                 }
             },
             error: function () {
-                $feedback.html('<p class="text-danger">❌ Error assigning area. Please try again.</p>');
+                feedback.text('AJAX error. Please try again.').addClass('text-danger');
+                showToast('Network error.', 'error');
             },
             complete: function () {
-                $btn.prop('disabled', false).text('Assign Area');
+                btn.prop('disabled', false).text('Assign Area');
             }
         });
     });
 
-    // Remove AM assignment
-    $(document).on('click', '.remove-am-assignment', function () {
-        if (!confirm('Are you sure you want to remove this area assignment?')) return;
+    // Handle Unassign AM
+    $(document).on('click', '.unassign-am-btn', function () {
+        if (!confirm('Are you sure you want to unassign this Area Manager?')) return;
 
-        const amId = $(this).data('am-id');
-        const $btn = $(this);
-
-        $btn.prop('disabled', true).text('Removing...');
+        const btn = $(this);
+        const userId = btn.data('user-id');
 
         $.ajax({
             url: ajaxUrl,
             type: 'POST',
             data: {
                 action: 'remove_area_manager_location',
-                manager_id: amId
+                nonce: sp_area_dashboard_vars.unassign_am_location_nonce,
+                manager_id: userId,
+            },
+            beforeSend: function () {
+                btn.prop('disabled', true).text('...');
             },
             success: function (response) {
                 if (response.success) {
-                    showToast('Area assignment removed successfully', 'success');
-                    loadAssignmentsTable();
-                    loadAMDropdown();
+                    showToast(response.data.message, 'success');
+                    loadAMAssignments();
                 } else {
-                    showToast(response.data?.message || 'Error removing assignment', 'error');
-                    $btn.prop('disabled', false).text('🗑️ Remove');
+                    showToast(response.data.message, 'error');
+                    btn.prop('disabled', false).text('Unassign');
                 }
             },
             error: function () {
-                showToast('Error removing assignment. Please try again.', 'error');
-                $btn.prop('disabled', false).text('🗑️ Remove');
+                showToast('Network error.', 'error');
+                btn.prop('disabled', false).text('Unassign');
             }
         });
     });
+
+
 
     // Area Manager View Service Details Button Handler
     $(document).on('click', '.view-service-details-btn', function (e) {
@@ -3109,10 +2975,6 @@
 
     // --- Project Reviews Logic ---
 
-    // Nav Handler for Project Reviews
-    $(document).on('click', '.nav-item[data-section="project-reviews"]', function () {
-        loadProjectReviews();
-    });
 
     // Review Filter Handler
     $(document).on('click', '.review-filter-btn', function () {
@@ -3373,6 +3235,7 @@
             }
         });
     }
+    window.loadProjectReviews = loadProjectReviews;
 
     // Toggle function for expanding/collapsing project reviews (Global scope)
     window.toggleProjectReviews = function (projectId) {
@@ -3425,6 +3288,442 @@
                 button.text(button.data('original-text'));
             }
         });
+    });
+
+    // ==========================================
+    // SALES MANAGER SPECIFIC LOGIC
+    // ==========================================
+
+    const activityIcons = {
+        'phone_call': '📞',
+        'whatsapp': '💬',
+        'email': '📧',
+        'meeting_offline': '🤝',
+        'meeting_online': '💻',
+        'site_visit': '🏠',
+        'other': '📝'
+    };
+
+    const activityLabels = {
+        'phone_call': 'Phone Call',
+        'whatsapp': 'WhatsApp',
+        'email': 'Email',
+        'meeting_offline': 'Offline Meeting',
+        'meeting_online': 'Online Meeting',
+        'site_visit': 'Site Visit',
+        'other': 'Other'
+    };
+
+    // Load today's follow-ups for SM dashboard
+    function loadTodayFollowups() {
+        $.ajax({
+            url: ajaxUrl,
+            type: 'POST',
+            data: {
+                action: 'get_today_followups'
+            },
+            success: function (response) {
+                if (response.success) {
+                    renderTodayFollowups(response.data.followups);
+                }
+            }
+        });
+    }
+
+    function renderTodayFollowups(followups) {
+        const container = $('#today-followups-container');
+        if (!container.length) return;
+
+        if (!followups || followups.length === 0) {
+            container.html(`
+                <div class="empty-state" style="padding: 20px; text-align: center;">
+                    <div class="icon" style="font-size: 30px; margin-bottom: 10px;">📅</div>
+                    <h3>No follow-ups today</h3>
+                    <p>Add follow-ups to your leads to track them here</p>
+                </div>
+            `);
+            return;
+        }
+
+        let html = '<div class="activity-timeline">';
+        followups.forEach(f => {
+            html += `
+                <div class="activity-item type-${f.activity_type}">
+                    <div class="activity-header" style="display: flex; justify-content: space-between; margin-bottom: 5px;">
+                        <span class="activity-type" style="font-weight: 600;">${activityIcons[f.activity_type] || '📝'} ${activityLabels[f.activity_type] || f.activity_type}</span>
+                        <span class="activity-time" style="font-size: 12px; color: #666;">${formatTime(f.activity_date)}</span>
+                    </div>
+                    <div class="activity-notes" style="font-size: 14px;"><strong>${f.lead_name}</strong>: ${escapeHtml(f.notes)}</div>
+                </div>
+            `;
+        });
+        html += '</div>';
+        container.html(html);
+    }
+
+    // Ported from SM Dashboard for conversions
+    function loadConversions() {
+        const container = $('#conversions-container');
+        if (!container.length) return;
+        container.html('<p>Loading conversions...</p>');
+
+        $.ajax({
+            url: ajaxUrl,
+            type: 'POST',
+            data: {
+                action: 'get_sales_manager_conversions'
+            },
+            success: function (response) {
+                if (response.success) {
+                    renderConversions(response.data.conversions);
+                } else {
+                    container.html('<p>Error loading conversions</p>');
+                }
+            }
+        });
+    }
+    window.loadConversions = loadConversions;
+
+    function renderConversions(conversions) {
+        const container = $('#conversions-container');
+
+        if (!conversions || conversions.length === 0) {
+            container.html(`
+                <div class="empty-state" style="padding: 40px; text-align: center;">
+                    <div class="icon" style="font-size: 40px; margin-bottom: 15px;">✅</div>
+                    <h3>No conversions yet</h3>
+                    <p>Keep following up with your leads to convert them!</p>
+                </div>
+            `);
+            return;
+        }
+
+        let html = '<div class="conversions-grid" style="display: grid; gap: 15px;">';
+        conversions.forEach(c => {
+            html += `
+                <div class="conversion-card" style="padding: 15px; background: white; border: 1px solid #e2e8f0; border-radius: 8px; display: flex; justify-content: space-between; align-items: center;">
+                    <div>
+                        <h4 style="margin: 0 0 5px 0;">✅ ${escapeHtml(c.name)}</h4>
+                        <div style="font-size: 13px; color: #64748b;">
+                            <span>📞 ${escapeHtml(c.phone)}</span>
+                        </div>
+                    </div>
+                    <div style="font-size: 12px; color: #94a3b8; text-align: right;">
+                        Converted: ${formatDate(c.conversion_date)}
+                    </div>
+                </div>
+            `;
+        });
+        html += '</div>';
+        container.html(html);
+    }
+
+    // ===============================
+    // CLEANING SERVICES (Ported SM Logic)
+    // ===============================
+
+    let smCleanersList = [];
+
+    function loadSMCleaningServices() {
+        const tbody = $('#sm-cleaning-services-tbody');
+        if (!tbody.length) return;
+        tbody.html('<tr><td colspan="6">Loading...</td></tr>');
+
+        $.ajax({
+            url: ajaxUrl,
+            type: 'POST',
+            data: { action: 'get_cleaning_services' },
+            success: function (response) {
+                if (response.success) {
+                    renderSMCleaningServices(response.data);
+                } else {
+                    tbody.html('<tr><td colspan="6">Error loading services</td></tr>');
+                }
+            },
+            error: function () {
+                tbody.html('<tr><td colspan="6">Error loading services</td></tr>');
+            }
+        });
+
+        // Load cleaners for scheduling
+        loadSMCleaners();
+    }
+    window.loadSMCleaningServices = loadSMCleaningServices;
+
+    function loadSMCleaners() {
+        $.ajax({
+            url: ajaxUrl,
+            type: 'POST',
+            data: { action: 'get_cleaners' },
+            success: function (response) {
+                if (response.success) {
+                    smCleanersList = response.data;
+                }
+            }
+        });
+    }
+
+    function renderSMCleaningServices(services) {
+        const tbody = $('#sm-cleaning-services-tbody');
+
+        if (!services || services.length === 0) {
+            tbody.html('<tr><td colspan="6" style="text-align: center; padding: 30px; color: #64748b;">No cleaning services from your leads yet.</td></tr>');
+            return;
+        }
+
+        const planLabels = {
+            'one_time': 'One-Time',
+            'monthly': 'Monthly',
+            '6_month': '6-Month',
+            'yearly': 'Yearly'
+        };
+
+        let html = '';
+        services.forEach(s => {
+            const paymentBadge = s.payment_status === 'paid'
+                ? '<span style="background:#d1fae5;color:#047857;padding:4px 8px;border-radius:4px;font-size:12px;">Paid</span>'
+                : '<span style="background:#fef3c7;color:#b45309;padding:4px 8px;border-radius:4px;font-size:12px;">Pending</span>';
+
+            html += `
+                <tr class="sm-cleaning-service-row" data-id="${s.id}" style="cursor:pointer;">
+                    <td><strong>${s.customer_name}</strong><br><small style="color: #64748b;">${s.customer_phone}</small></td>
+                    <td>${planLabels[s.plan_type] || s.plan_type}</td>
+                    <td>${s.system_size_kw} kW</td>
+                    <td>${s.visits_used || 0}/${s.visits_total || 1}</td>
+                    <td>${paymentBadge}</td>
+                    <td>
+                        ${s.next_visit_date
+                    ? `<span style="color:#4f46e5; font-size: 13px;">✓ ${s.next_visit_date}</span>`
+                    : s.preferred_date
+                        ? `<span style="color:#b45309; font-size: 13px;">⏳ ${s.preferred_date}</span><br><button class="btn btn-sm btn-primary sm-schedule-visit-btn" data-id="${s.id}" data-name="${s.customer_name}" style="padding: 4px 8px; font-size: 11px;">+ Schedule</button>`
+                        : `<button class="btn btn-sm btn-primary sm-schedule-visit-btn" data-id="${s.id}" data-name="${s.customer_name}" style="padding: 4px 8px; font-size: 11px;">+ Schedule</button>`}
+                    </td>
+                </tr>
+            `;
+        });
+        tbody.html(html);
+    }
+
+    // Schedule Visit Handlers
+    $(document).on('click', '.sm-schedule-visit-btn', function (e) {
+        e.preventDefault();
+        e.stopPropagation();
+
+        const serviceId = $(this).data('id');
+        const customerName = $(this).data('name');
+
+        $('#schedule_service_id').val(serviceId);
+        $('#schedule_customer_name').text(customerName);
+
+        // Set minimum date to today
+        const today = new Date().toISOString().split('T')[0];
+        $('#schedule_date').attr('min', today).val(today);
+
+        // Populate cleaners dropdown
+        const select = $('#schedule_cleaner_id');
+        select.empty().append('<option value="">Select Cleaner</option>');
+
+        if (smCleanersList && smCleanersList.length > 0) {
+            smCleanersList.forEach(cleaner => {
+                select.append(`<option value="${cleaner.id}">${escapeHtml(cleaner.name)} (📞 ${cleaner.phone})</option>`);
+            });
+        }
+        $('#schedule-visit-modal').css('display', 'flex');
+    });
+
+    $(document).on('submit', '#schedule-visit-form', function (e) {
+        e.preventDefault();
+        const form = $(this);
+        const feedback = $('#schedule-visit-feedback');
+        const submitBtn = form.find('button[type="submit"]');
+
+        const data = {
+            action: 'schedule_cleaning_visit',
+            service_id: $('#schedule_service_id').val(),
+            cleaner_id: $('#schedule_cleaner_id').val(),
+            scheduled_date: $('#schedule_date').val(),
+            scheduled_time: $('#schedule_time').val()
+        };
+
+        if (!data.cleaner_id) {
+            showToast('Please select a cleaner', 'error');
+            return;
+        }
+
+        submitBtn.prop('disabled', true).text('Scheduling...');
+
+        $.ajax({
+            url: ajaxUrl,
+            type: 'POST',
+            data: data,
+            success: function (response) {
+                if (response.success) {
+                    showToast('Visit scheduled successfully!', 'success');
+                    $('#schedule-visit-modal').hide();
+                    form[0].reset();
+                    loadSMCleaningServices();
+                } else {
+                    showToast(response.data.message || 'Error scheduling visit', 'error');
+                }
+            },
+            complete: function () {
+                submitBtn.prop('disabled', false).text('+ Schedule Visit');
+            }
+        });
+    });
+
+    // Cleaning Service Detail Logic
+    $(document).on('click', '.sm-cleaning-service-row', function (e) {
+        if ($(e.target).is('button') || $(e.target).closest('button').length) return;
+        const serviceId = $(this).data('id');
+        loadSMServiceDetails(serviceId);
+    });
+
+    function loadSMServiceDetails(serviceId) {
+        const content = $('#service-detail-content');
+        if (!content.length) return;
+        content.html('<p>Loading...</p>');
+        $('#service-detail-modal').show();
+
+        $.ajax({
+            url: ajaxUrl,
+            type: 'POST',
+            data: {
+                action: 'get_cleaning_service_details',
+                service_id: serviceId
+            },
+            success: function (response) {
+                if (response.success) {
+                    const s = response.data.service;
+                    const visits = response.data.visits || [];
+                    const planLabels = { 'one_time': 'One-Time', 'monthly': 'Monthly', '6_month': '6-Month', 'yearly': 'Yearly' };
+
+                    let html = `
+                        <div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 15px; margin-bottom: 20px;">
+                            <div style="background: #f8fafc; padding: 15px; border-radius: 8px;">
+                                <strong>👤 Customer</strong><br>${s.customer_name}<br><small style="color: #64748b;">📞 ${s.customer_phone}</small>
+                            </div>
+                            <div style="background: #f8fafc; padding: 15px; border-radius: 8px;">
+                                <strong>📋 Plan</strong><br>${planLabels[s.plan_type] || s.plan_type}<br><small style="color: #64748b;">${s.system_size_kw} kW System</small>
+                            </div>
+                            <div style="background: #f8fafc; padding: 15px; border-radius: 8px;">
+                                <strong>🧹 Visits</strong><br>${s.visits_used || 0} / ${s.visits_total || 1} Used
+                            </div>
+                            <div style="background: #f8fafc; padding: 15px; border-radius: 8px;">
+                                <strong>💰 Payment</strong><br>₹${Number(s.total_amount || 0).toLocaleString()}<br><small style="color: ${s.payment_status === 'paid' ? '#059669' : '#d97706'}">${s.payment_status === 'paid' ? '✅ Paid' : '⏳ Pending'}</small>
+                            </div>
+                        </div>
+                        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
+                            <h4 style="margin: 0;">🗓️ Visit History</h4>
+                        </div>
+                    `;
+
+                    if (visits && visits.length > 0) {
+                        html += '<div class="table-responsive"><table class="data-table" style="width: 100%;">';
+                        html += '<thead><tr style="background: #f1f5f9;"><th style="padding: 10px; text-align: left;">Date</th><th style="padding: 10px; text-align: left;">Time</th><th style="padding: 10px; text-align: left;">Cleaner</th><th style="padding: 10px; text-align: left;">Status</th></tr></thead>';
+                        html += '<tbody>';
+                        visits.forEach(visit => {
+                            html += `
+                                <tr style="border-bottom: 1px solid #e2e8f0;">
+                                    <td style="padding: 10px;">${visit.scheduled_date}</td>
+                                    <td style="padding: 10px;">${visit.scheduled_time || '09:00'}</td>
+                                    <td style="padding: 10px;">${visit.cleaner_name || 'Not assigned'}</td>
+                                    <td style="padding: 10px;"><span class="status-badge ${visit.status}" style="font-size: 11px;">${visit.status}</span></td>
+                                </tr>
+                            `;
+                        });
+                        html += '</tbody></table></div>';
+                    } else {
+                        html += '<p style="color: #64748b; text-align: center; padding: 20px;">No visits scheduled yet.</p>';
+                    }
+                    content.html(html);
+                }
+            }
+        });
+    }
+
+    // Book Cleaning from Lead Detail
+    $(document).on('click', '#btn-book-cleaning-detail', function (e) {
+        e.preventDefault();
+        const leadId = $(this).data('lead-id');
+        const leadName = $(this).data('lead-name');
+
+        $('#book_lead_id').val(leadId);
+        $('#book_customer_name').text(leadName);
+
+        // Populate cleaners
+        const select = $('#book_cleaner_id');
+        select.empty().append('<option value="">Select Cleaner</option>');
+        if (smCleanersList && smCleanersList.length > 0) {
+            smCleanersList.forEach(c => select.append(`<option value="${c.id}">${escapeHtml(c.name)}</option>`));
+        }
+
+        $('#book-cleaning-modal').css('display', 'flex');
+    });
+
+    $(document).on('submit', '#book-cleaning-form', function (e) {
+        e.preventDefault();
+        const form = $(this);
+        const submitBtn = form.find('button[type="submit"]');
+        const data = form.serialize() + '&action=book_cleaning_service';
+
+        submitBtn.prop('disabled', true).text('Booking...');
+
+        $.ajax({
+            url: ajaxUrl,
+            type: 'POST',
+            data: data,
+            success: function (response) {
+                if (response.success) {
+                    showToast('Cleaning service booked successfully! 🎉', 'success');
+                    $('#book-cleaning-modal').hide();
+                    form[0].reset();
+                    if (typeof window.loadLeads === 'function') window.loadLeads();
+                } else {
+                    showToast(response.data.message || 'Error booking service', 'error');
+                }
+            },
+            complete: function () {
+                submitBtn.prop('disabled', false).text('✅ Book Service');
+            }
+        });
+    });
+
+    // Handle generic close modal
+    $(document).on('click', '.close-modal', function () {
+        $(this).closest('.modal').hide();
+    });
+
+    // Helper: format time for timeline
+    function formatTime(dateStr) {
+        if (!dateStr) return '';
+        const date = new Date(dateStr);
+        return date.toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' });
+    }
+
+    function formatDate(dateStr) {
+        if (!dateStr) return '';
+        const date = new Date(dateStr);
+        return date.toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' });
+    }
+
+    function escapeHtml(text) {
+        if (!text) return '';
+        const div = document.createElement('div');
+        div.textContent = text;
+        return div.innerHTML;
+    }
+
+    // Unified helper for section loading used by DashboardUtils
+    // Some functions like loadLeads are defined globally by lead-component.js
+    // We just need to make sure they are available.
+
+    // Initial Load for SM Dashboard
+    $(document).ready(function () {
+        if (sp_area_dashboard_vars.is_sales_manager && $('#dashboard-section').is(':visible')) {
+            loadDashboardStats();
+            loadSMCleaners();
+        }
     });
 
 })(jQuery);

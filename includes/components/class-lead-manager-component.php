@@ -130,6 +130,8 @@ class LeadManagerComponent {
             'address' => get_post_meta($lead_id, '_lead_address', true),
             'notes' => get_post_meta($lead_id, '_lead_notes', true) ?: get_post_field('post_content', $lead_id),
             'content_notes' => get_post_field('post_content', $lead_id),
+            'creator_id' => (int) get_post_field('post_author', $lead_id),
+            'creator_name' => get_the_author_meta('display_name', get_post_field('post_author', $lead_id)),
             'created_date' => get_the_date('Y-m-d', $lead_id),
             'followup_count' => intval($followup_count),
             'followups' => $recent_followups // Include recent history

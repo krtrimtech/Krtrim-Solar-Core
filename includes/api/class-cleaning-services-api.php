@@ -131,17 +131,53 @@ class KSC_Cleaning_Services_API {
             }
         }
 
-        // Filter by payment status
+        // Filter by status (Payment or Visit Status)
         if (!empty($status)) {
-            $args['meta_query'][] = [
-                'key' => '_payment_status',
-                'value' => $status,
-            ];
+            if (in_array($status, ['pending', 'paid'])) {
+                $args['meta_query'][] = [
+                    'key' => '_payment_status',
+                    'value' => $status,
+                ];
+            } elseif (in_array($status, ['scheduled', 'completed'])) {
+                // Find services that have at least one visit with this status
+                $visit_args = [
+                    'post_type' => 'cleaning_visit',
+                    'posts_per_page' => -1,
+                    'fields' => 'ids',
+                    'meta_query' => [
+                        [
+                            'key' => '_status',
+                            'value' => $status
+                        ]
+                    ]
+                ];
+                $visit_query = new WP_Query($visit_args);
+                $service_ids = [];
+                if ($visit_query->have_posts()) {
+                    foreach ($visit_query->posts as $visit_id) {
+                        $sid = get_post_meta($visit_id, '_service_id', true);
+                        if ($sid) {
+                            $service_ids[] = (int)$sid;
+                        }
+                    }
+                }
+                
+                if (!empty($service_ids)) {
+                    $args['post__in'] = array_unique($service_ids);
+                } else {
+                    // No services matching this visit status
+                    $args['post__in'] = [0]; 
+                }
+            }
         }
 
-        // Search by customer name
+        // Search by customer name (meta search)
         if (!empty($search)) {
-            $args['s'] = $search;
+            $args['meta_query'][] = [
+                'key' => '_customer_name',
+                'value' => $search,
+                'compare' => 'LIKE'
+            ];
         }
 
         $query = new WP_Query($args);
