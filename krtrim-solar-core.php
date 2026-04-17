@@ -61,6 +61,7 @@ final class Krtrim_Solar_Core {
         
         // Components
         require_once $this->dir_path . 'includes/components/class-lead-manager-component.php';
+        require_once $this->dir_path . 'includes/components/class-email-templates.php';
 
 		require_once $this->dir_path . 'includes/post-types/class-cleaning-cpts.php';
         require_once $this->dir_path . 'includes/post-types/class-coupon-cpt.php';
@@ -71,6 +72,7 @@ final class Krtrim_Solar_Core {
 		require_once $this->dir_path . 'includes/integrations/class-official-whatsapp.php';
 		require_once $this->dir_path . 'includes/integrations/class-cf7-cleaning-integration.php';
 		require_once $this->dir_path . 'includes/class-project-notifications.php';
+        require_once $this->dir_path . 'includes/api/class-ksc-payment-gateway.php';
 		
 		// Admin view files (required by SP_Admin_Menus class)
 		require_once $this->dir_path . 'admin/views/view-vendor-approval.php';
@@ -311,7 +313,7 @@ final class Krtrim_Solar_Core {
 		
         if ( is_page( 'solar-dashboard' ) ) {
             wp_enqueue_script( 'ksc-public-scripts', $this->dir_url . 'assets/js/dashboard.js', [ 'jquery' ], $this->version, true );
-            wp_localize_script( 'ksc-public-scripts', 'ksc_dashboard_vars', [
+            wp_localize_script( 'ksc-public-scripts', 'ksc_dashboard_vars', [  
                 'rest_api_nonce' => wp_create_nonce( 'wp_rest' ),
                 'client_api_url' => rest_url( 'solar/v1/client-notifications' ),
                 'vendor_api_url' => rest_url( 'solar/v1/vendor-notifications' ),
@@ -448,6 +450,19 @@ final class Krtrim_Solar_Core {
 				$razorpay_key = isset($options['razorpay_test_key_id']) ? $options['razorpay_test_key_id'] : '';
 			}
 
+            // Handle step 2 resume data
+            $resume_step = isset($_GET['vreg_resume']) ? intval($_GET['vreg_resume']) : 0;
+            $user_data = null;
+            if ($resume_step === 2 && is_user_logged_in()) {
+                $current_user = wp_get_current_user();
+                $user_data = [
+                    'name' => get_user_meta($current_user->ID, 'first_name', true) ?: $current_user->display_name,
+                    'company' => get_user_meta($current_user->ID, 'company_name', true),
+                    'email' => $current_user->user_email,
+                    'phone' => get_user_meta($current_user->ID, 'phone', true)
+                ];
+            }
+
 			// Localize script with config
 			wp_localize_script('vendor-registration-js', 'vendor_reg_vars', [
 				'ajax_url' => admin_url('admin-ajax.php'),
@@ -455,6 +470,8 @@ final class Krtrim_Solar_Core {
 				'per_state_fee' => isset($options['per_state_fee']) ? $options['per_state_fee'] : 500,
 				'per_city_fee' => isset($options['per_city_fee']) ? $options['per_city_fee'] : 100,
 				'nonce' => wp_create_nonce('vendor_registration_nonce'),
+                'resume_step' => $resume_step,
+                'user_data' => $user_data
 			]);
 		}
 

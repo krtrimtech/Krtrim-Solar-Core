@@ -294,7 +294,8 @@ function ksc_render_cleaning_booking_form() {
 
     function verifyPayment(response) {
         const formData = new FormData();
-        formData.append('action', 'verify_cleaning_payment');
+        formData.append('action', 'verify_ksc_payment');
+        formData.append('context', 'cleaning_booking');
         formData.append('razorpay_order_id', response.razorpay_order_id);
         formData.append('razorpay_payment_id', response.razorpay_payment_id);
         formData.append('razorpay_signature', response.razorpay_signature);

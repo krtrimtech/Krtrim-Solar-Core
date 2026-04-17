@@ -65,11 +65,11 @@
      * Step Navigation Initialization
      */
     function initializeStepNavigation() {
-        // Step 1: Basic Info → Coverage
+        // Step 1: Basic Info → Registration & Halt
         $('#vreg-step1-next').on('click', async function () {
             if (await validateStep1()) {
                 saveStep1Data();
-                showStep(2);
+                await submitInitialRegistration();
             }
         });
 
@@ -395,34 +395,94 @@
     }
 
     /**
-     * Initiate Razorpay Payment
+     * Submit Initial Registration (Step 1)
      */
-    function initiatePayment() {
-        // First create Razorpay order
-        $.ajax({
-            url: config.ajax_url,
-            type: 'POST',
-            data: {
-                action: 'create_razorpay_order',
-                amount: registrationData.total_amount,
-                nonce: config.nonce
-            },
-            beforeSend: function () {
-                $('#vreg-pay-btn').prop('disabled', true).text('Creating order...');
-            },
-            success: function (response) {
-                if (response.success && response.data.order_id) {
-                    openRazorpayCheckout(response.data.order_id, response.data.amount);
-                } else {
-                    showFeedback(response.data.message || 'Failed to create payment order', 'error');
+    function submitInitialRegistration() {
+        return new Promise((resolve, reject) => {
+            $.ajax({
+                url: config.ajax_url,
+                type: 'POST',
+                data: {
+                    action: 'complete_vendor_registration',
+                    registration_data: JSON.stringify(registrationData),
+                    nonce: config.nonce
+                },
+                beforeSend: function () {
+                    $('#vreg-step1-next').prop('disabled', true).text('Registering...');
+                },
+                success: function (response) {
+                    if (response.success) {
+                        showFeedback('Registration successful! Please check your email and click the verification link to continue.', 'success');
+                        
+                        // Hide Step 1 UI and show a success message block
+                        $('#vreg-step-1').html(`
+                            <div class="registration-success-message" style="text-align: center; padding: 40px 20px;">
+                                <svg width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="#10b981" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="margin-bottom: 20px;">
+                                    <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path>
+                                    <polyline points="22 4 12 14.01 9 11.01"></polyline>
+                                </svg>
+                                <h2>Account Created!</h2>
+                                <p style="font-size: 16px; color: #4b5563; margin-top: 10px;">We've sent a verification link to <strong>${registrationData.basic_info.email}</strong>.</p>
+                                <p style="font-size: 16px; color: #4b5563;">Please click the link in that email to proceed to coverage selection and payment.</p>
+                            </div>
+                        `);
+                        resolve(response.data.user_id);
+                    } else {
+                        showFeedback(response.data.message || 'Registration failed', 'error');
+                        $('#vreg-step1-next').prop('disabled', false).text('Next');
+                        reject(response.data.message);
+                    }
+                },
+                error: function () {
+                    showFeedback('Error submitting registration.', 'error');
+                    $('#vreg-step1-next').prop('disabled', false).text('Next');
+                    reject('Error submitting registration.');
+                }
+            });
+        });
+    }
+
+    /**
+     * Initiate Razorpay Payment (Now runs AFTER user is fully verified and logged in)
+     */
+    async function initiatePayment() {
+        try {
+            $('#vreg-pay-btn').prop('disabled', true).text('Initializing Gateway...');
+            
+            // Note: The user account is now completely created and verified before this point.
+            // All we need to do is generate the order.
+
+            // 2. Create Razorpay order
+            $.ajax({
+                url: config.ajax_url,
+                type: 'POST',
+                data: {
+                    action: 'create_razorpay_order',
+                    amount: registrationData.total_amount,
+                    nonce: config.nonce
+                },
+                beforeSend: function () {
+                    $('#vreg-pay-btn').text('Creating order...');
+                },
+                success: function (response) {
+                    if (response.success && response.data.order_id) {
+                        openRazorpayCheckout(response.data.order_id, response.data.amount);
+                        $('#vreg-pay-btn').prop('disabled', false).text('Proceed to Payment');
+                    } else {
+                        showFeedback(response.data.message || 'Failed to create payment order', 'error');
+                        $('#vreg-pay-btn').prop('disabled', false).text('Proceed to Payment');
+                    }
+                },
+                error: function () {
+                    showFeedback('Error creating payment order', 'error');
                     $('#vreg-pay-btn').prop('disabled', false).text('Proceed to Payment');
                 }
-            },
-            error: function () {
-                showFeedback('Error creating payment order', 'error');
-                $('#vreg-pay-btn').prop('disabled', false).text('Proceed to Payment');
-            }
-        });
+            });
+            
+        } catch (error) {
+            showFeedback(error, 'error');
+            $('#vreg-pay-btn').prop('disabled', false).text('Proceed to Payment');
+        }
     }
 
     /**
@@ -437,8 +497,8 @@
             description: 'Coverage Area Purchase',
             order_id: orderId,
             handler: function (response) {
-                // Payment successful
-                completeRegistration(response);
+                // Payment successful - verify it with the central gateway
+                verifyCentralPayment(response, orderId, amount);
             },
             prefill: {
                 name: registrationData.basic_info.full_name,
@@ -450,7 +510,7 @@
             },
             modal: {
                 ondismiss: function () {
-                    $('#vreg-pay-btn').prop('disabled', false).text('Proceed to Payment');
+                    // Nothing to revert
                 }
             }
         };
@@ -462,31 +522,49 @@
     /**
      * Complete Registration after payment
      */
-    function completeRegistration(paymentResponse) {
+    function verifyCentralPayment(paymentResponse, orderId, amount) {
         $.ajax({
             url: config.ajax_url,
             type: 'POST',
             data: {
-                action: 'complete_vendor_registration',
-                registration_data: JSON.stringify(registrationData),
-                payment_response: JSON.stringify(paymentResponse),
+                action: 'verify_ksc_payment',
+                context: 'vendor_registration',
+                razorpay_payment_id: paymentResponse.razorpay_payment_id,
+                razorpay_order_id: paymentResponse.razorpay_order_id,
+                razorpay_signature: paymentResponse.razorpay_signature,
+                extra_data: JSON.stringify({
+                    states: registrationData.coverage.states,
+                    cities: registrationData.coverage.cities.map(c => c.city),
+                    amount: registrationData.total_amount
+                    // vendor_id is NOT needed here anymore since the user is fully logged in now.
+                }),
                 nonce: config.nonce
             },
             beforeSend: function () {
-                showFeedback('Processing registration...', 'info');
+                showFeedback('Processing payment...', 'info');
             },
             success: function (response) {
                 if (response.success) {
-                    showFeedback('Registration successful! Redirecting...', 'success');
+                    $('#vreg-step-3').html(`
+                        <div class="registration-success-message" style="text-align: center; padding: 40px 20px;">
+                            <svg width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="#10b981" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="margin-bottom: 20px;">
+                                <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path>
+                                <polyline points="22 4 12 14.01 9 11.01"></polyline>
+                            </svg>
+                            <h2>Payment Successful!</h2>
+                            <p style="font-size: 16px; color: #4b5563; margin-top: 10px;">Your coverage areas have been locked in and your account is now Fully Approved.</p>
+                            <p style="font-size: 16px; color: #4b5563;">Redirecting you to your dashboard...</p>
+                        </div>
+                    `);
                     setTimeout(function () {
                         window.location.href = response.data.redirect_url || '/vendor-status/';
-                    }, 2000);
+                    }, 3000);
                 } else {
-                    showFeedback(response.data.message || 'Registration failed', 'error');
+                    showFeedback(response.data.message || 'Payment processing failed', 'error');
                 }
             },
             error: function () {
-                showFeedback('Error completing registration', 'error');
+                showFeedback('Error processing payment confirmation on the server.', 'error');
             }
         });
     }
@@ -506,6 +584,23 @@
                 $feedback.fadeOut();
             }, 5000);
         }
+    }
+
+    // Check if the page loaded with a pending payment status state
+    if (config.resume_step && config.resume_step === 2) {
+        $(document).ready(function() {
+            // Pre-fill the basic info so the summary doesn't look empty when they reach Step 3
+            if (config.user_data) {
+                registrationData.basic_info = {
+                    full_name: config.user_data.name || 'Vendor',
+                    company_name: config.user_data.company || '',
+                    email: config.user_data.email || '',
+                    phone: config.user_data.phone || ''
+                };
+            }
+            showStep(2);
+            showFeedback('Email verified successfully! Please select your coverage areas.', 'success');
+        });
     }
 
 })(jQuery);

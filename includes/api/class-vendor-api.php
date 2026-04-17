@@ -194,58 +194,13 @@ class KSC_Vendor_API extends KSC_API_Base {
     }
     
     /**
-     * Add vendor coverage area (after payment)
+     * (Deprecated) Verify Coverage Payment
+     * Logic moved to KSC_Payment_Gateway.
+     * This endpoint should no longer be hit by updated JS.
      */
     public function add_vendor_coverage() {
-        $vendor_id = $this->verify_vendor_role();
-        
-        $payment_response = json_decode(stripslashes($_POST['payment_response']), true);
-        $states = isset($_POST['states']) && is_array($_POST['states']) ? $_POST['states'] : [];
-        $cities = isset($_POST['cities']) && is_array($_POST['cities']) ? $_POST['cities'] : [];
-        
-        if (empty($payment_response) || !isset($payment_response['razorpay_payment_id'])) {
-            wp_send_json_error(['message' => 'Invalid payment data']);
-        }
-        
-        // Store payment record
-        global $wpdb;
-        $table = $wpdb->prefix . 'solar_vendor_payments';
-        $wpdb->insert($table, [
-            'vendor_id' => $vendor_id,
-            'razorpay_payment_id' => $payment_response['razorpay_payment_id'],
-            'razorpay_order_id' => $payment_response['razorpay_order_id'],
-            'amount' => floatval($_POST['amount']),
-            'states_purchased' => json_encode($states),
-            'cities_purchased' => json_encode($cities),
-            'payment_status' => 'completed',
-            'payment_date' => current_time('mysql')
-        ]);
-        
-        // Update user meta - append new coverage
-        $current_states = get_user_meta($vendor_id, 'purchased_states', true) ?: [];
-        $current_cities = get_user_meta($vendor_id, 'purchased_cities', true) ?: [];
-        
-        // Normalize states to string array (handle both object and string formats)
-        $current_states_normalized = array_map(function($state) {
-            return is_array($state) && isset($state['state']) ? $state['state'] : $state;
-        }, $current_states);
-        
-        // Normalize cities to string array (handle both object and string formats)
-        $current_cities_normalized = array_map(function($city) {
-            if (is_array($city) && isset($city['city'])) {
-                return $city['city'];  // Extract city name from object
-            }
-            return $city;  // Already a string
-        }, $current_cities);
-        
-        // Merge and deduplicate (array_unique works properly with strings)
-        $new_states = array_values(array_unique(array_merge($current_states_normalized, $states)));
-        $new_cities = array_values(array_unique(array_merge($current_cities_normalized, $cities)));
-        
-        update_user_meta($vendor_id, 'purchased_states', $new_states);
-        update_user_meta($vendor_id, 'purchased_cities', $new_cities);
-        
-        wp_send_json_success(['message' => 'Coverage added successfully.']);
+        wp_send_json_error(['message' => 'Obsolete endpoint. Ensure frontend JS is updated.']);
+        exit;
     }
     
     /**

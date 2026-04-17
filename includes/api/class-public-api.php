@@ -64,19 +64,44 @@ class KSC_Public_API {
         
         $email = sanitize_email($basic_info['email'] ?? '');
         
-        // Generate username from email prefix
-        $email_parts = explode('@', $email);
-        $base_username = sanitize_user($email_parts[0]);
-        $username = $base_username;
-        $counter = 1;
+        $user_id = 0;
+        $is_new_user = true;
         
-        // Ensure username is unique
-        while (username_exists($username)) {
-            $username = $base_username . $counter;
-            $counter++;
+        if (email_exists($email)) {
+            $existing_user = get_user_by('email', $email);
+            // If the user exists but hasn't completed payment, allow updating their info
+            if (get_user_meta($existing_user->ID, 'vendor_payment_status', true) !== 'completed') {
+                $user_id = $existing_user->ID;
+                $is_new_user = false;
+            } else {
+                wp_send_json_error(['message' => 'Email already registered and active.']);
+            }
         }
         
-        $password = $basic_info['password'] ?? '';
+        if ($is_new_user) {
+            // Generate username from email prefix
+            $email_parts = explode('@', $email);
+            $base_username = sanitize_user($email_parts[0]);
+            $username = $base_username;
+            $counter = 1;
+            
+            // Ensure username is unique
+            while (username_exists($username)) {
+                $username = $base_username . $counter;
+                $counter++;
+            }
+            
+            $password = $basic_info['password'] ?? '';
+            $user_id = wp_create_user($username, $password, $email);
+            
+            if (is_wp_error($user_id)) {
+                wp_send_json_error(['message' => $user_id->get_error_message()]);
+            }
+            
+            $user = new WP_User($user_id);
+            $user->set_role('solar_vendor');
+        }
+
         $company_name = sanitize_text_field($basic_info['company_name'] ?? '');
         $phone = sanitize_text_field($basic_info['phone'] ?? '');
         $full_name = sanitize_text_field($basic_info['full_name'] ?? '');
@@ -85,22 +110,6 @@ class KSC_Public_API {
         $cities = $coverage['cities'] ?? [];
         $amount = floatval($registration_data['total_amount'] ?? 0);
         
-        // error_log("KSC_Public_API: Attempting to register user: $email with username: $username");
-        
-        if (email_exists($email)) {
-            wp_send_json_error(['message' => 'Email already registered.']);
-        }
-        
-        $user_id = wp_create_user($username, $password, $email);
-        
-        if (is_wp_error($user_id)) {
-            // error_log('KSC_Public_API: wp_create_user failed: ' . $user_id->get_error_message());
-            wp_send_json_error(['message' => $user_id->get_error_message()]);
-        }
-        
-        $user = new WP_User($user_id);
-        $user->set_role('solar_vendor');
-        
         // Update user meta
         update_user_meta($user_id, 'first_name', $full_name); // Store full name
         update_user_meta($user_id, 'company_name', $company_name);
@@ -108,55 +117,44 @@ class KSC_Public_API {
         update_user_meta($user_id, 'purchased_states', $states);
         update_user_meta($user_id, 'purchased_cities', $cities);
         
-        // Store payment details
+        // Check if this is the final callback where payment is complete
         if (!empty($payment_response)) {
-            global $wpdb;
-            $table = $wpdb->prefix . 'solar_vendor_payments';
-            $wpdb->insert($table, [
-                'vendor_id' => $user_id,
-                'razorpay_payment_id' => $payment_response['razorpay_payment_id'],
-                'razorpay_order_id' => $payment_response['razorpay_order_id'] ?? '',
-                'amount' => $amount,
-                'states_purchased' => json_encode($states),
-                'cities_purchased' => json_encode($cities),
-                'payment_status' => 'completed',
-                'payment_date' => current_time('mysql')
-            ]);
-            
-            update_user_meta($user_id, 'vendor_payment_status', 'completed');
+            // This case won't be hit anymore by the JS, but we leave it for legacy fallback
+            // We now use verify_ksc_payment webhook logic instead
         }
         
-        // Generate verification token
-        $token = wp_generate_password(32, false);
-        update_user_meta($user_id, 'email_verification_token', $token);
-        update_user_meta($user_id, 'email_verified', 'no');
-        update_user_meta($user_id, 'account_approved', 'pending');
-        
-        // Send verification email to Vendor
-        $verify_url = add_query_arg([
-            'action' => 'verify_vendor_email',
-            'token' => $token,
-            'user' => $user_id
-        ], home_url());
-        
-        $subject = 'Verify Your Email - Solar Dashboard';
-        $message = sprintf(
-            "Please verify your email address by clicking the link below:\n\n%s\n\nOnce verified, your account will be automatically approved.",
-            $verify_url
-        );
-        
-        wp_mail($email, $subject, $message);
-        
-        // Notify Admin
-        // 'admin' argument sends email ONLY to admin, not the user (since we sent custom email above)
-        wp_new_user_notification($user_id, null, 'admin');
-        
-        // error_log("KSC_Public_API: Registration successful for user $user_id");
+        if ($is_new_user) {
+            // Generate verification token
+            $token = wp_generate_password(32, false);
+            update_user_meta($user_id, 'email_verification_token', $token);
+            update_user_meta($user_id, 'email_verified', 'no');
+            update_user_meta($user_id, 'account_approved', 'pending');
+            update_user_meta($user_id, 'vendor_payment_status', 'pending');
+            
+            // Send verification email to Vendor
+            $verify_url = add_query_arg([
+                'action' => 'verify_vendor_email',
+                'token' => $token,
+                'user' => $user_id
+            ], home_url());
+            
+            $subject = 'Verify Your Email - Solar Dashboard';
+            $message = sprintf(
+                "Please verify your email address by clicking the link below:\n\n%s\n\nOnce verified, your account will be automatically approved.",
+                $verify_url
+            );
+            
+            wp_mail($email, $subject, $message);
+            
+            // Notify Admin
+            wp_new_user_notification($user_id, null, 'admin');
+        }
         
         wp_send_json_success([
-            'message' => 'Registration successful! Please check your email to verify your account.',
+            'message' => 'Account created/updated successfully! Proceeding to payment.',
             'user_id' => $user_id
         ]);
+        
     }
     
     /**
@@ -183,18 +181,18 @@ class KSC_Public_API {
         update_user_meta($user_id, 'email_verified', 'yes');
         delete_user_meta($user_id, 'email_verification_token');
         
+        // Log the user in automatically so they can seamlessly continue to payment
+        wp_clear_auth_cookie();
+        wp_set_current_user($user_id);
+        wp_set_auth_cookie($user_id);
+        
         // Check for auto-approval
         $this->check_auto_approval($user_id);
         
-        $is_approved = get_user_meta($user_id, 'account_approved', true) === 'yes';
-        
-        if ($is_approved) {
-            $message = 'Email verified successfully! Your account has been automatically approved. You can now <a href="' . wp_login_url() . '">login</a> and start bidding on projects.';
-        } else {
-            $message = 'Email verified successfully! Your account is pending payment verification. You will be automatically approved once payment is confirmed.';
-        }
-        
-        wp_die($message);
+        // Redirect back to registration page with a flag to resume at step 2
+        $redirect_url = home_url('/vendor-registration/?vreg_resume=2');
+        wp_redirect($redirect_url);
+        exit;
     }
     
     /**
@@ -312,18 +310,37 @@ class KSC_Public_API {
             $amount_in_paise = $amount * 100;
             $receipt_id = 'vendor_reg_' . time();
             
-            $result = $razorpay->create_order($amount_in_paise, 'INR', $receipt_id);
+            $order_data = [
+                'amount' => $amount_in_paise,
+                'currency' => 'INR',
+                'receipt' => $receipt_id,
+                'notes' => [
+                    'registration' => 'vendor_coverage'
+                ]
+            ];
+            $result = $razorpay->create_order($order_data);
             
-            if ($result['success'] && isset($result['data']['id'])) {
+            if (isset($result['success']) && !$result['success']) {
+                $error_msg = isset($result['message']) ? $result['message'] : 'Failed to create payment order';
+                wp_send_json_error(['message' => $error_msg]);
+            }
+            
+            $order_id = null;
+            if (isset($result['id'])) {
+                $order_id = $result['id'];
+            } else if (isset($result['data']['id'])) {
+                $order_id = $result['data']['id'];
+            }
+            
+            if ($order_id) {
                 wp_send_json_success([
                     'key' => $key_id,  // Razorpay public key for frontend
-                    'order_id' => $result['data']['id'],
+                    'order_id' => $order_id,
                     'amount' => $amount_in_paise,
                     'currency' => 'INR'
                 ]);
             } else {
-                $error_msg = isset($result['message']) ? $result['message'] : 'Failed to create payment order';
-                wp_send_json_error(['message' => $error_msg]);
+                wp_send_json_error(['message' => 'Failed to retrieve order ID from Razorpay']);
             }
         } catch (Exception $e) {
             // error_log('Razorpay order creation error: ' . $e->getMessage());
@@ -349,7 +366,7 @@ class KSC_Public_API {
     /**
      * Check if vendor meets criteria for auto-approval
      */
-    private function check_auto_approval($user_id) {
+    public function check_auto_approval($user_id) {
         $current_status = get_user_meta($user_id, 'account_approved', true);
         if ($current_status === 'yes') {
             return;
