@@ -14,6 +14,7 @@ if (!headers_sent()) {
 function render_solar_client_dashboard() {
     $current_user = wp_get_current_user();
     $is_admin = in_array('administrator', $current_user->roles);
+    $is_solar_client = in_array('solar_client', (array) $current_user->roles);
     
     if ($is_admin) {
         $client_id = isset($_GET['client_id']) ? intval($_GET['client_id']) : 0;
@@ -119,7 +120,8 @@ function switchSection(event, sectionName) {
     const titles = {
         'dashboard': 'Dashboard',
         'projects': 'Projects',
-        'timeline': 'Timeline'
+        'timeline': 'Timeline',
+        'cleaning': 'Cleaning Service'
     };
     const titleElement = document.getElementById('section-title');
     if (titleElement) {
@@ -816,6 +818,7 @@ function toggleProjectDetails(projectId) {
                 $cleaning_services = get_posts([
                     'post_type' => 'cleaning_service',
                     'posts_per_page' => -1,
+                    'post_status' => 'any',
                     'meta_query' => [
                         [
                             'key' => '_customer_user_id',
@@ -824,6 +827,52 @@ function toggleProjectDetails(projectId) {
                     ],
                 ]);
                 
+                // Get eligible projects for new booking (to determine if we can show/allow Book Now)
+                $eligible_projects_count = 0;
+                if ($client_id > 0) {
+                    $projs = get_posts([
+                        'post_type' => 'solar_project',
+                        'posts_per_page' => -1,
+                        'meta_query' => [['key' => '_client_user_id', 'value' => $client_id]]
+                    ]);
+                    
+                    foreach ($projs as $p) {
+                        $active_s = get_posts([
+                            'post_type' => 'cleaning_service',
+                            'posts_per_page' => 1,
+                            'meta_query' => [['key' => '_project_id', 'value' => $p->ID], ['key' => '_payment_status', 'value' => 'canceled', 'compare' => '!=']]
+                        ]);
+                        $eligible = true;
+                        if (!empty($active_s)) {
+                            $v_u = intval(get_post_meta($active_s[0]->ID, '_visits_used', true));
+                            $v_t = intval(get_post_meta($active_s[0]->ID, '_visits_total', true));
+                            if ($v_u < $v_t) $eligible = false;
+                        }
+                        if ($eligible) $eligible_projects_count++;
+                    }
+                }
+                ?>
+                
+                
+                <!-- Quick Action: Book Service -->
+                <div style="margin-bottom: 25px; display: flex; justify-content: space-between; align-items: center; background: white; padding: 15px 20px; border-radius: 12px; box-shadow: 0 4px 15px rgba(0,0,0,0.05);">
+                    <div>
+                        <h4 style="margin: 0; color: #1e293b;">Need more service?</h4>
+                        <p style="margin: 5px 0 0 0; font-size: 13px; color: #64748b;">Book a new cleaning plan for your solar installation.</p>
+                    </div>
+                    <?php 
+                    if ($is_solar_client && $eligible_projects_count === 0) : ?>
+                        <a href="javascript:void(0)" onclick="alert('⚠️ You already have active cleaning services for all your solar projects. To book a new one, please wait for your current visits to finish or contact support.')" class="btn-book-now" style="display: inline-flex; align-items: center; gap: 8px; padding: 10px 20px; background: #94a3b8; color: white; text-decoration: none; border-radius: 8px; font-weight: 600; font-size: 14px; cursor: not-allowed;">
+                            <span>🧹 Book Now</span>
+                        </a>
+                    <?php else : ?>
+                        <a href="<?php echo home_url('/book-solar-cleaning/'); ?>" class="btn-book-now" style="display: inline-flex; align-items: center; gap: 8px; padding: 10px 20px; background: linear-gradient(135deg, #10b981 0%, #059669 100%); color: white; text-decoration: none; border-radius: 8px; font-weight: 600; font-size: 14px; transition: transform 0.2s;">
+                            <span>🧹 Book Now</span>
+                        </a>
+                    <?php endif; ?>
+                </div>
+
+                <?php
                 if (!empty($cleaning_services)) :
                     foreach ($cleaning_services as $service) :
                         $service_id = $service->ID;
@@ -834,6 +883,8 @@ function toggleProjectDetails(projectId) {
                         $visits_remaining = $visits_total - $visits_used;
                         $payment_status = get_post_meta($service_id, '_payment_status', true);
                         $total_amount = get_post_meta($service_id, '_total_amount', true);
+                        $project_id = get_post_meta($service_id, '_project_id', true);
+                        $project_name = $project_id ? get_the_title($project_id) : '';
                         
                         $plan_labels = [
                             'one_time' => 'One-Time',
@@ -872,7 +923,14 @@ function toggleProjectDetails(projectId) {
                 <!-- Membership Card -->
                 <div class="card" style="margin-bottom: 20px; border-left: 4px solid #10b981;">
                     <div class="card-header" style="display: flex; justify-content: space-between; align-items: center;">
-                        <h3 style="margin: 0;">🧹 Solar Panel Cleaning</h3>
+                        <div>
+                            <h3 style="margin: 0;">🧹 Solar Panel Cleaning</h3>
+                            <?php if ($project_name) : ?>
+                                <p style="margin: 5px 0 0 0; font-size: 13px; color: #6366f1; font-weight: 500;">
+                                    📍 Linked to: <?php echo esc_html($project_name); ?>
+                                </p>
+                            <?php endif; ?>
+                        </div>
                         <span style="background: <?php echo $payment_status === 'paid' ? '#d1fae5' : '#fef3c7'; ?>; color: <?php echo $payment_status === 'paid' ? '#047857' : '#b45309'; ?>; padding: 6px 12px; border-radius: 20px; font-size: 12px; font-weight: 600;">
                             <?php echo $payment_status === 'paid' ? '✅ Active' : '⏳ Pending Payment'; ?>
                         </span>
@@ -984,6 +1042,10 @@ function toggleProjectDetails(projectId) {
         <a href="#" class="nav-btn" data-section="timeline" onclick="switchSection(event, 'timeline')">
             <span class="nav-icon">🔄</span>
             <span class="nav-label">Timeline</span>
+        </a>
+        <a href="#" class="nav-btn" data-section="cleaning" onclick="switchSection(event, 'cleaning')">
+            <span class="nav-icon">🧹</span>
+            <span class="nav-label">Cleaning</span>
         </a>
         <a href="<?php echo wp_logout_url(home_url()); ?>" class="nav-btn">
             <span class="nav-icon">🚪</span>

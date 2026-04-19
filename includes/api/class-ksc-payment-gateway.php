@@ -82,33 +82,33 @@ class KSC_Payment_Gateway {
         }
 
         // Create the CPT entry
+        if (!class_exists('KSC_CF7_Cleaning_Integration')) {
+            require_once plugin_dir_path(dirname(__DIR__)) . 'integrations/class-cf7-cleaning-integration.php';
+        }
         $cfm = new KSC_CF7_Cleaning_Integration();
-        // Since create_cleaning_booking is private in CF7 class, we need to temporarily make it accessible or pass the responsibility.
-        // Actually, the easiest way without modifying CF7 class privacy is to just let the CF7 class handle CPT creation,
-        // but since we want centralized routing, we will implement the meta save here or assume the CF7 class creates it first as 'draft'.
-        // For architectural safety, let's update the transient to hold the actual inserted POST ID instead of raw data.
         
-        $booking_id = $booking_data; // Assuming transient stores the actual Post ID now
-        if (!is_numeric($booking_id)) {
-             wp_send_json_error(['message' => 'Invalid booking data structure.']);
+        $booking_id = 0;
+        if (is_array($booking_data)) {
+            // Data is the raw form data array stored during order creation
+            $booking_id = $cfm->create_cleaning_booking($booking_data, 'paid');
+        } else if (is_numeric($booking_data)) {
+            // Data is already a booking ID (fallback)
+            $booking_id = intval($booking_data);
+        }
+
+        if (!$booking_id || is_wp_error($booking_id)) {
+             wp_send_json_error(['message' => 'Failed to create booking entry in database.']);
              exit;
         }
 
-        // Update booking status
+        // Update booking with payment details
         update_post_meta($booking_id, '_payment_status', 'paid');
         update_post_meta($booking_id, '_razorpay_order_id', $order_id);
         update_post_meta($booking_id, '_razorpay_payment_id', $payment_id);
         delete_transient($pending_key);
 
-        // Send Email Receipt
-        if (class_exists('KSC_Email_Templates')) {
-            $customer_email = get_post_meta($booking_id, '_customer_email', true);
-            if (!empty($customer_email)) {
-                $site_name = get_bloginfo('name');
-                $html_content = KSC_Email_Templates::get_cleaning_invoice_html($booking_id);
-                KSC_Email_Templates::send_styled_email($customer_email, "Payment Receipt - " . $site_name, $html_content);
-            }
-        }
+        // Send Notifications (Invoice + Bell)
+        $cfm->send_client_notifications($booking_id);
 
         wp_send_json_success([
             'message' => 'Payment verified & booking confirmed!',

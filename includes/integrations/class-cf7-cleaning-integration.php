@@ -82,7 +82,7 @@ class KSC_CF7_Cleaning_Integration {
     /**
      * Create cleaning booking CPT entry
      */
-    private function create_cleaning_booking($data, $payment_status = 'pending') {
+    public function create_cleaning_booking($data, $payment_status = 'pending') {
         $customer_name = sanitize_text_field($data['customer_name']);
         $customer_phone = sanitize_text_field($data['customer_phone']);
         $customer_address = sanitize_textarea_field($data['customer_address'] ?? '');
@@ -91,6 +91,7 @@ class KSC_CF7_Cleaning_Integration {
         $payment_option = sanitize_text_field($data['payment_option'] ?? 'pay_after');
         $preferred_date = sanitize_text_field($data['preferred_date'] ?? '');
         $preferred_week = sanitize_text_field($data['preferred_week'] ?? '');
+        $customer_email = sanitize_email($data['customer_email'] ?? '');
 
         // Calculate visits based on plan
         $visits_total = $this->get_visits_for_plan($plan_type);
@@ -133,10 +134,21 @@ class KSC_CF7_Cleaning_Integration {
             }
         }
 
+        // Check for linked project
+        $project_id = isset($data['project_id']) ? intval($data['project_id']) : 0;
+        $project_title = '';
+        if ($project_id > 0) {
+            $project_title = get_the_title($project_id);
+        }
+
         // Create post
+        $post_title = $project_title 
+            ? sprintf('Cleaning - %s (%s)', $project_title, date('Y-m-d H:i'))
+            : sprintf('Cleaning - %s (%s)', $customer_name, date('Y-m-d H:i'));
+
         $post_id = wp_insert_post([
             'post_type'   => 'cleaning_service',
-            'post_title'  => sprintf('Cleaning - %s (%s)', $customer_name, date('Y-m-d H:i')),
+            'post_title'  => $post_title,
             'post_status' => 'publish',
         ]);
 
@@ -145,8 +157,24 @@ class KSC_CF7_Cleaning_Integration {
         }
 
         // Save meta data
-        update_post_meta($post_id, '_customer_type', 'external');
+        $user_id = isset($data['user_id']) ? intval($data['user_id']) : 0;
+        if ($user_id > 0) {
+            update_post_meta($post_id, '_customer_user_id', $user_id);
+            update_post_meta($post_id, '_customer_type', 'client');
+            if (empty($customer_email)) {
+                $user = get_userdata($user_id);
+                if ($user) $customer_email = $user->user_email;
+            }
+        } else {
+            update_post_meta($post_id, '_customer_type', 'external');
+        }
+        
+        if ($project_id > 0) {
+            update_post_meta($post_id, '_project_id', $project_id);
+        }
+
         update_post_meta($post_id, '_customer_name', $customer_name);
+        update_post_meta($post_id, '_customer_email', $customer_email);
         update_post_meta($post_id, '_customer_phone', $customer_phone);
         update_post_meta($post_id, '_customer_address', $customer_address);
         update_post_meta($post_id, '_system_size_kw', $system_size_kw);
@@ -190,11 +218,11 @@ class KSC_CF7_Cleaning_Integration {
 
         // ✅ NEW: Add to Activity Stream / Notification Center
         if (class_exists('SP_Notifications_Manager')) {
-            $admins = get_users(['role' => 'administrator']);
+            $admins = get_users(['role__in' => ['administrator', 'manager']]);
             foreach ($admins as $admin) {
                 SP_Notifications_Manager::create_notification([
                     'user_id' => $admin->ID,
-                    'project_id' => null, // No project ID for cleaning service yet, or could use $post_id if column supports generic post ID
+                    'project_id' => null,
                     'message' => 'New Cleaning Booking: ' . $customer_name . ' (' . ucfirst($plan_type) . ')',
                     'type' => 'info',
                     'status' => 'unread',
@@ -202,7 +230,54 @@ class KSC_CF7_Cleaning_Integration {
             }
         }
 
+        // Send Client Notifications
+        $this->send_client_notifications($post_id);
+
         return $post_id;
+    }
+
+    /**
+     * Send email and bell notifications to the client
+     */
+    public function send_client_notifications($booking_id) {
+        $customer_email = get_post_meta($booking_id, '_customer_email', true);
+        $customer_name = get_post_meta($booking_id, '_customer_name', true);
+        $payment_status = get_post_meta($booking_id, '_payment_status', true);
+        $client_user_id = get_post_meta($booking_id, '_customer_user_id', true);
+        
+        $site_name = get_bloginfo('name');
+
+        // 1. Send Email
+        if (!empty($customer_email) && class_exists('KSC_Email_Templates')) {
+            if ($payment_status == 'paid') {
+                $subject = "Payment Receipt - " . $site_name;
+                $content = KSC_Email_Templates::get_cleaning_invoice_html($booking_id);
+            } else {
+                $subject = "Booking Confirmed - " . $site_name;
+                $content = "
+                    <h2 style='color: #1e293b;'>Booking Confirmed!</h2>
+                    <p>Hello {$customer_name},</p>
+                    <p>Your solar panel cleaning booking has been received. Our team will contact you shortly to confirm the schedule.</p>
+                    <p><strong>Payment Method:</strong> Pay After Service</p>
+                    <p>Thank you for choosing {$site_name}!</p>
+                ";
+            }
+            KSC_Email_Templates::send_styled_email($customer_email, $subject, $content);
+        }
+
+        // 2. Add Bell Notification (if logged in)
+        if ($client_user_id && class_exists('SP_Notifications_Manager')) {
+            $msg = ($payment_status == 'paid') 
+                ? "Payment Received & Cleaning Booking Confirmed!" 
+                : "Your Cleaning Booking has been received (Pending Payment).";
+                
+            SP_Notifications_Manager::create_notification([
+                'user_id' => $client_user_id,
+                'message' => $msg,
+                'type' => 'success',
+                'status' => 'unread',
+            ]);
+        }
     }
 
     /**
@@ -317,7 +392,7 @@ class KSC_CF7_Cleaning_Integration {
         }
 
         // Store pending booking data in transient
-        $pending_key = 'cleaning_pending_' . $order['id'];
+        $pending_key = 'cleaning_booking_' . $order['id'];
         set_transient($pending_key, $data, HOUR_IN_SECONDS);
 
         wp_send_json_success([
@@ -359,7 +434,7 @@ class KSC_CF7_Cleaning_Integration {
         }
 
         // Get pending booking data
-        $pending_key = 'cleaning_pending_' . $order_id;
+        $pending_key = 'cleaning_booking_' . $order_id;
         $data = get_transient($pending_key);
 
         if (!$data) {

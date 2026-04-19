@@ -19,9 +19,84 @@ function ksc_render_cleaning_booking_form() {
     // Enqueue Razorpay
     wp_enqueue_script('razorpay', 'https://checkout.razorpay.com/v1/checkout.js', [], null, true);
     
+    $current_user = wp_get_current_user();
+    $prefill_name = '';
+    $prefill_phone = '';
+    $prefill_email = '';
+    $prefill_address = '';
+    $logged_in_user_id = 0;
+    
+    if (is_user_logged_in()) {
+        $logged_in_user_id = get_current_user_id();
+        $is_solar_client = in_array('solar_client', (array) $current_user->roles);
+        $prefill_name = $current_user->display_name;
+        $prefill_email = $current_user->user_email;
+        
+        // 1. Get all projects for this client
+        $args = [
+            'post_type' => 'solar_project',
+            'posts_per_page' => -1,
+            'meta_query' => [
+                [
+                    'key' => '_client_user_id',
+                    'value' => $logged_in_user_id,
+                ]
+            ]
+        ];
+        $all_client_projects = get_posts($args);
+        $eligible_projects = [];
+
+        foreach ($all_client_projects as $project) {
+            // 2. Check for active cleaning services for this project
+            $active_services = get_posts([
+                'post_type' => 'cleaning_service',
+                'posts_per_page' => 1,
+                'meta_query' => [
+                    [
+                        'key' => '_project_id',
+                        'value' => $project->ID,
+                    ],
+                    [
+                        'key' => '_payment_status',
+                        'value' => 'canceled',
+                        'compare' => '!=',
+                    ]
+                ]
+            ]);
+
+            $is_eligible = true;
+            if (!empty($active_services)) {
+                $service_id = $active_services[0]->ID;
+                $v_used = intval(get_post_meta($service_id, '_visits_used', true));
+                $v_total = intval(get_post_meta($service_id, '_visits_total', true));
+                if ($v_used < $v_total) {
+                    $is_eligible = false; // Still has visits remaining
+                }
+            }
+
+            if ($is_eligible) {
+                $eligible_projects[] = [
+                    'id' => $project->ID,
+                    'title' => $project->post_title,
+                    'kw' => get_post_meta($project->ID, '_solar_system_size_kw', true) ?: 3
+                ];
+            }
+        }
+
+        // Prefill contact info from latest project (any status)
+        if (!empty($all_client_projects)) {
+            $latest_proj_id = $all_client_projects[0]->ID;
+            $prefill_phone = get_post_meta($latest_proj_id, '_client_phone_number', true);
+            $prefill_address = get_post_meta($latest_proj_id, '_client_address', true);
+        }
+    }
+
     ob_start();
     ?>
     <div class="ksc-booking-container">
+        <input type="hidden" id="ksc_logged_in_user_id" value="<?php echo $logged_in_user_id; ?>">
+        <input type="hidden" id="eligible_projects_count" value="<?php echo isset($eligible_projects) ? count($eligible_projects) : -1; ?>">
+        <input type="hidden" id="is_solar_client_val" value="<?php echo $is_solar_client ? '1' : '0'; ?>">
         <div class="ksc-booking-header">
             <h2>☀️ Book Solar Cleaning</h2>
             <p>Professional solar panel cleaning services to maximize your energy production.</p>
@@ -41,15 +116,24 @@ function ksc_render_cleaning_booking_form() {
                 <h3>Contact Details</h3>
                 <div class="form-group">
                     <label>Full Name *</label>
-                    <input type="text" name="customer_name" required placeholder="Enter your name">
+                    <input type="text" name="customer_name" required placeholder="Enter your name" value="<?php echo esc_attr($prefill_name); ?>">
+                </div>
+                <div class="form-group">
+                    <label>Email Address *</label>
+                    <input type="email" name="customer_email" required placeholder="Enter your email" value="<?php echo esc_attr($prefill_email); ?>">
                 </div>
                 <div class="form-group">
                     <label>Phone Number *</label>
-                    <input type="tel" name="customer_phone" required placeholder="10-digit mobile number">
+                    <input type="tel" name="customer_phone" required placeholder="10-digit mobile number" value="<?php echo esc_attr($prefill_phone); ?>">
                 </div>
                 <div class="form-group">
-                    <label>Address *</label>
-                    <textarea name="customer_address" required rows="3" placeholder="Full address for service"></textarea>
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 5px;">
+                        <label style="margin-bottom: 0;">Address *</label>
+                        <a href="javascript:void(0)" onclick="detectLocation()" style="font-size: 12px; color: #10b981; text-decoration: none; display: flex; align-items: center; gap: 4px;">
+                            <span id="gps-icon">📍</span> <span id="gps-text">Use My Location</span>
+                        </a>
+                    </div>
+                    <textarea name="customer_address" id="customer_address" required rows="3" placeholder="Full address for service"><?php echo esc_textarea($prefill_address); ?></textarea>
                 </div>
                 <button type="button" class="btn-next" onclick="nextStep(2)">Next: Plan Selection →</button>
             </div>
@@ -58,10 +142,33 @@ function ksc_render_cleaning_booking_form() {
             <div class="form-step" id="step-2">
                 <h3>System & Plan</h3>
                 
+                <?php if (!empty($eligible_projects) && $is_solar_client) : ?>
+                <div class="form-group">
+                    <label>Link to Solar Project *</label>
+                    <?php if (count($eligible_projects) === 1) : $p = $eligible_projects[0]; ?>
+                        <div style="background: #f8fafc; padding: 12px; border-radius: 8px; border: 1px solid #e2e8f0; color: #475569; font-weight: 500;">
+                            ✅ <?php echo esc_html($p['title']); ?>
+                            <input type="hidden" name="project_id" id="project_id" value="<?php echo $p['id']; ?>" data-kw="<?php echo $p['kw']; ?>">
+                        </div>
+                    <?php else : ?>
+                        <select name="project_id" id="project_id" class="form-control" onchange="updateSystemSizeFromProject()">
+                            <option value="">-- Select Your Project --</option>
+                            <?php foreach ($eligible_projects as $p) : ?>
+                                <option value="<?php echo $p['id']; ?>" data-kw="<?php echo $p['kw']; ?>"><?php echo esc_html($p['title']); ?></option>
+                            <?php endforeach; ?>
+                        </select>
+                    <?php endif; ?>
+                </div>
+                <?php elseif ($is_solar_client && empty($eligible_projects)) : ?>
+                    <div style="background: #fff8e1; color: #856404; padding: 15px; border-radius: 8px; margin-bottom: 20px; font-size: 14px; border-left: 4px solid #ffc107;">
+                        ⚠️ You have active cleaning subscriptions for all your projects. To renew, please contact support or wait for current visits to complete.
+                    </div>
+                <?php endif; ?>
+
                 <div class="form-group">
                     <label>System Size (kW) *</label>
                     <input type="number" name="system_size_kw" id="system_size_kw" required min="1" step="0.1" value="3">
-                    <small>Enter the capacity of your solar plant in kW</small>
+                    <small id="kw_manual_text">Enter the capacity of your solar plant in kW</small>
                 </div>
 
                 <div class="plan-selection">
@@ -180,6 +287,14 @@ function ksc_render_cleaning_booking_form() {
                 alert('Please fill in all contact details.');
                 return;
             }
+
+            // Blocking logic for clients with no eligible projects
+            const isClient = document.getElementById('is_solar_client_val').value === '1';
+            const eligibleCount = parseInt(document.getElementById('eligible_projects_count').value);
+            if (isClient && eligibleCount === 0) {
+                alert('⚠️ You have active cleaning subscriptions for all your projects. You cannot book a new service until your current visits are completed.');
+                return;
+            }
         }
         
         if (step === 3) {
@@ -211,6 +326,12 @@ function ksc_render_cleaning_booking_form() {
     function createPayAfterBooking() {
         const form = document.getElementById('ksc-cleaning-booking-form');
         const formData = new FormData(form);
+        const loggedInUserId = document.getElementById('ksc_logged_in_user_id').value;
+        
+        if (loggedInUserId > 0) {
+            formData.append('user_id', loggedInUserId);
+        }
+
         formData.append('action', 'create_pay_after_booking');
 
         const btn = document.querySelectorAll('.btn-next')[2]; // The confirm button
@@ -243,6 +364,12 @@ function ksc_render_cleaning_booking_form() {
     function initiatePayment() {
         const form = document.getElementById('ksc-cleaning-booking-form');
         const formData = new FormData(form);
+        const loggedInUserId = document.getElementById('ksc_logged_in_user_id').value;
+        
+        if (loggedInUserId > 0) {
+            formData.append('user_id', loggedInUserId);
+        }
+        
         formData.append('action', 'create_cleaning_razorpay_order');
 
         const btn = document.querySelector('.btn-next');
@@ -307,12 +434,62 @@ function ksc_render_cleaning_booking_form() {
         .then(res => res.json())
         .then(data => {
             if (data.success) {
-                showSuccessMessage(data.data.booking_id);
+                document.querySelector('.ksc-booking-container').innerHTML = `
+                    <div class="success-screen" style="text-align:center; padding: 40px 20px;">
+                        <div style="font-size:64px; margin-bottom: 20px;">✅</div>
+                        <h2>Booking Confirmed!</h2>
+                        <p>${data.data.message}</p>
+                        <a href="<?php echo home_url('/solar-dashboard'); ?>" class="btn-next" style="display:inline-block; text-decoration:none; margin-top:20px; padding: 10px 20px;">Go to Dashboard</a>
+                    </div>
+                `;
             } else {
-                alert('Payment verification failed: ' + data.data.message);
+                alert(data.data.message || 'Verification failed');
             }
-        });
+        })
+        .catch(err => console.error(err));
     }
+
+    // Project Linkage Logic
+    function updateSystemSizeFromProject() {
+        const projectSelect = document.getElementById('project_id');
+        const kwInput = document.getElementById('system_size_kw');
+        const kwText = document.getElementById('kw_manual_text');
+        
+        if (!projectSelect) return;
+
+        let selectedOption;
+        if (projectSelect.tagName === 'INPUT') {
+            // Hidden input for single project auto-select
+            selectedOption = projectSelect;
+        } else {
+            selectedOption = projectSelect.options[projectSelect.selectedIndex];
+        }
+
+        const kw = selectedOption.getAttribute('data-kw');
+        
+        if (kw && kw != "") {
+            kwInput.value = kw;
+            kwInput.setAttribute('readonly', true);
+            kwInput.style.backgroundColor = '#f1f5f9';
+            kwText.innerText = 'System size automatically filled from your solar project.';
+            kwText.style.color = '#10b981';
+        } else {
+            kwInput.removeAttribute('readonly');
+            kwInput.style.backgroundColor = '';
+            kwText.innerText = 'Enter the capacity of your solar plant in kW';
+            kwText.style.color = '';
+        }
+
+        calculatePrice();
+    }
+
+    // Auto-run for single project
+    document.addEventListener('DOMContentLoaded', function() {
+        const projectSelect = document.getElementById('project_id');
+        if (projectSelect) {
+            updateSystemSizeFromProject();
+        }
+    });
 
     function showSuccessMessage(bookingId) {
         document.querySelector('.ksc-booking-container').innerHTML = `
@@ -440,7 +617,58 @@ function ksc_render_cleaning_booking_form() {
         })
         .catch(err => console.error(err));
     }
-    </script>
-    <?php
+
+    // Location Detection Logic
+    function detectLocation() {
+        const gpsText = document.getElementById('gps-text');
+        const gpsIcon = document.getElementById('gps-icon');
+        const addressField = document.getElementById('customer_address');
+        
+        if (!navigator.geolocation) {
+            alert('Geolocation is not supported by your browser');
+            return;
+        }
+
+        gpsText.innerText = 'Detecting...';
+        gpsIcon.innerText = '⌛';
+
+        navigator.geolocation.getCurrentPosition(
+            async (position) => {
+                const lat = position.coords.latitude;
+                const lon = position.coords.longitude;
+
+                try {
+                    // Using OpenStreetMap Nominatim for Reverse Geocoding (Free)
+                    const response = await fetch(`https://nominatim.openstreetmap.org/reverse?format=jsonv2&lat=${lat}&lon=${lon}`);
+                    const data = await response.json();
+                    
+                    if (data && data.display_name) {
+                        addressField.value = data.display_name;
+                        gpsText.innerText = 'Location Found!';
+                        gpsIcon.innerText = '✅';
+                        setTimeout(() => {
+                            gpsText.innerText = 'Use My Location';
+                            gpsIcon.innerText = '📍';
+                        }, 3000);
+                    } else {
+                        throw new Error('Address not found');
+                    }
+                } catch (error) {
+                    console.error('Geocoding error:', error);
+                    gpsText.innerText = 'Error getting address';
+                    gpsIcon.innerText = '❌';
+                }
+            },
+            (error) => {
+                console.error('Geolocation error:', error);
+                gpsText.innerText = 'Access Denied';
+                gpsIcon.innerText = '🔒';
+                alert('Please enable location access in your browser settings.');
+            },
+            { enableHighAccuracy: true, timeout: 5000, maximumAge: 0 }
+        );
+    }
+</script>
+<?php
     return ob_get_clean();
 }
