@@ -2,7 +2,7 @@
 
 <div align="center">
 
-![Version](https://img.shields.io/badge/version-1.2.0-blue.svg)
+![Version](https://img.shields.io/badge/version-1.5.0-blue.svg)
 ![License](https://img.shields.io/badge/license-GPL--2.0+-green.svg)
 ![WordPress](https://img.shields.io/badge/WordPress-5.0+-orange.svg)
 ![PHP](https://img.shields.io/badge/PHP-7.4+-purple.svg)
@@ -70,6 +70,13 @@
 - Coverage expansion with Razorpay payment integration
 - Vendor approval workflow
 - Performance tracking
+
+### 🧹 Solar Cleaning Service
+- **Intelligent Booking** - Auto-select projects and pre-fill system size (kW)
+- **GPS Address Detection** - Use browser geolocation for quick address entry
+- **subscription Plans** - Monthly, 6-month, and Yearly cleaning plans
+- **Automated Invoices** - Razorpay integrated receipt generation
+- **Client Linkage** - Smart collision prevention for active services
 
 ### 💰 Financial Tracking
 
@@ -142,6 +149,14 @@ Vendors can register at `/vendor-registration/` page:
 2. Select coverage areas (states/cities)
 3. Complete payment via Razorpay
 4. Wait for admin approval
+
+### Solar Cleaning Service
+1. Navigate to **Book Solar Cleaning** page
+2. (For Clients) Select your solar project; kW will auto-fill
+3. (For Guests) Enter name, email, and plant capacity manually
+4. Use **📍 Use My Location** for automated address entry
+5. Select a plan and complete payment
+6. Track visit progress and invoices in your Client Dashboard
 
 ### Client Access
 
