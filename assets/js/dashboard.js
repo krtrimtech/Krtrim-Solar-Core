@@ -140,53 +140,7 @@ function submitComment(stepId, projectId) {
         });
 }
 
-// --- Unified Notification Loader ---
 
-function loadNotifications(restUrl) {
-    fetch(restUrl, {
-        method: 'GET',
-        credentials: 'same-origin',
-        headers: { 'X-WP-Nonce': REST_API_NONCE }
-    })
-        .then(response => {
-            if (!response.ok) throw new Error('Network response was not ok');
-            return response.json();
-        })
-        .then(data => {
-            const notifList = document.getElementById('notif-list');
-            const notifCount = document.getElementById('notif-count');
-            const notifications = data.notifications || data; // Handle both possible response structures
-
-            if (notifications && notifications.length > 0) {
-                let html = '';
-                notifications.forEach(n => {
-                    const isVendor = restUrl.includes('vendor');
-                    const borderColor = n.type === 'approved' ? '#28a745' : n.type === 'rejected' ? '#dc3545' : '#007bff';
-                    const bgColor = n.type === 'approved' ? '#f8fff9' : n.type === 'rejected' ? '#fff5f5' : '#f0f7ff';
-
-                    html += `<div class="notification-item" style="padding:12px;position:relative; border-radius:8px; border-left:4px solid ${borderColor}; background:${bgColor}; margin-bottom:10px;" data-notification-id="${n.id}">`;
-                    if (isVendor) {
-                        html += `<button class="btn-dismiss-notification" style="position:absolute; top:8px; right:8px; background:none; border:none; font-size:16px; cursor:pointer;">&times;</button>`;
-                    }
-                    html += `<div style="font-weight:600; color:#333;">${n.icon} ${n.title}</div>`;
-                    html += `<div style="font-size:12px; color:#666; margin-top:4px;">${n.message}</div>`;
-                    if (n.time_ago) {
-                        html += `<div style="font-size:10px; color:#999; margin-top:4px;">${n.time_ago}</div>`;
-                    }
-                    html += `</div>`;
-                });
-                notifList.innerHTML = html;
-                notifCount.textContent = notifications.length;
-            } else {
-                notifList.innerHTML = '<p style="text-align:center; color:#999; padding: 20px; margin: 0;">No new notifications</p>';
-                notifCount.textContent = '0';
-            }
-        })
-        .catch(error => {
-            // console.error('Notification Error:', error);
-            document.getElementById('notif-list').innerHTML = '<p style="color:#dc3545; text-align:center; padding: 20px; margin:0;">Error loading notifications</p>';
-        });
-}
 
 // --- Vendor-Specific Functions ---
 
@@ -209,9 +163,9 @@ document.addEventListener('DOMContentLoaded', function () {
     const vendorDashboard = document.getElementById('vendorDashboard');
 
     if (clientDashboard) {
-        const clientApiUrl = ksc_dashboard_vars.client_api_url;
-        loadNotifications(clientApiUrl);
-        setInterval(() => loadNotifications(clientApiUrl), 10000);
+        if (typeof KSC_NotificationComponent !== 'undefined' && ksc_dashboard_vars) {
+            KSC_NotificationComponent.init(ksc_dashboard_vars.client_api_url, ksc_dashboard_vars.rest_api_nonce);
+        }
 
         if (typeof payment_data !== 'undefined') {
             const ctx = document.getElementById('payment-summary-chart').getContext('2d');
@@ -233,9 +187,9 @@ document.addEventListener('DOMContentLoaded', function () {
     }
 
     if (vendorDashboard) {
-        const vendorApiUrl = ksc_dashboard_vars.vendor_api_url;
-        loadNotifications(vendorApiUrl);
-        setInterval(() => loadNotifications(vendorApiUrl), 10000);
+        if (typeof KSC_NotificationComponent !== 'undefined' && ksc_dashboard_vars) {
+            KSC_NotificationComponent.init(ksc_dashboard_vars.vendor_api_url, ksc_dashboard_vars.rest_api_nonce);
+        }
 
         function loadEarningsChart() {
             jQuery.ajax({
@@ -275,44 +229,7 @@ document.addEventListener('DOMContentLoaded', function () {
         loadEarningsChart();
     }
 
-    // Dismiss vendor notification
-    document.addEventListener('click', function (e) {
-        if (e.target && e.target.classList.contains('btn-dismiss-notification')) {
-            e.stopPropagation();
-            const notifDiv = e.target.closest('[data-notification-id]');
-            const notifId = notifDiv.dataset.notificationId;
 
-            if (!notifId) return;
-
-            fetch(`${ksc_dashboard_vars.vendor_notifications_url}${notifId}`, {
-                method: 'DELETE',
-                credentials: 'same-origin',
-                headers: { 'X-WP-Nonce': REST_API_NONCE }
-            })
-                .then(response => {
-                    if (!response.ok) throw new Error('Failed to delete');
-                    return response.json();
-                })
-                .then(() => {
-                    notifDiv.style.transition = 'opacity 0.3s';
-                    notifDiv.style.opacity = '0';
-                    setTimeout(() => {
-                        notifDiv.remove();
-                        const notifCount = document.getElementById('notif-count');
-                        const currentCount = parseInt(notifCount.textContent);
-                        if (currentCount > 0) {
-                            notifCount.textContent = currentCount - 1;
-                        }
-                    }, 300);
-                })
-                .catch(error => {
-                    alert('Error deleting notification');
-                    // console.error('Delete notification error:', error);
-                });
-        }
-    });
-
-    // Vendor step upload form
     const uploadForm = document.querySelector('.ajax-upload-form');
     if (uploadForm) {
         uploadForm.addEventListener('submit', function (e) {
@@ -624,12 +541,17 @@ jQuery(document).ready(function ($) {
             url: ksc_dashboard_vars.admin_ajax_url,
             type: 'POST',
             data: {
-                action: 'add_vendor_coverage',
+                action: 'verify_ksc_payment',
+                razorpay_payment_id: paymentResponse.razorpay_payment_id,
+                razorpay_order_id: paymentResponse.razorpay_order_id,
+                razorpay_signature: paymentResponse.razorpay_signature,
+                context: 'vendor_coverage',
+                extra_data: JSON.stringify({
+                    states: states,
+                    cities: cities,
+                    amount: amount,
+                }),
                 nonce: ksc_dashboard_vars.vendor_coverage_nonce,  // Fixed: use correct nonce
-                payment_response: JSON.stringify(paymentResponse),
-                states: states,
-                cities: cities,
-                amount: amount
             },
             success: function (response) {
                 if (response.success) {

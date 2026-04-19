@@ -7,9 +7,6 @@ if ( ! defined( 'ABSPATH' ) ) {
 class SP_Notifications_Manager {
 
     public function __construct() {
-        add_action('wp_ajax_get_user_notifications', array($this, 'ajax_get_user_notifications'));
-        add_action('wp_ajax_dismiss_notification', array($this, 'ajax_dismiss_notification'));
-
         // Hook into application actions
         add_action('sp_vendor_step_submitted', array($this, 'handle_vendor_step_submission'), 10, 2);
         add_action('sp_step_reviewed', array($this, 'handle_step_review'), 10, 3);
@@ -47,53 +44,6 @@ class SP_Notifications_Manager {
         ]);
         
         return $wpdb->insert_id; // ✅ Return notification ID for tracking
-    }
-
-    public function ajax_get_user_notifications() {
-        if (!is_user_logged_in()) {
-            wp_send_json_error(['message' => 'Not logged in.']);
-        }
-
-        global $wpdb;
-        $table = $wpdb->prefix . 'solar_notifications';
-        $user_id = get_current_user_id();
-
-        $notifications = $wpdb->get_results($wpdb->prepare(
-            "SELECT * FROM {$table} WHERE user_id = %d AND status = 'unread' ORDER BY created_at DESC LIMIT 20",
-            $user_id
-        ));
-
-        wp_send_json_success($notifications);
-    }
-
-    public function ajax_dismiss_notification() {
-        if (!is_user_logged_in()) {
-            wp_send_json_error(['message' => 'Not logged in.']);
-        }
-
-        $notification_id = isset($_POST['notification_id']) ? intval($_POST['notification_id']) : 0;
-        if (empty($notification_id)) {
-            wp_send_json_error(['message' => 'Invalid notification ID.']);
-        }
-
-        global $wpdb;
-        $table = $wpdb->prefix . 'solar_notifications';
-        $user_id = get_current_user_id();
-
-        // Ensure the user owns the notification they are dismissing
-        $result = $wpdb->update(
-            $table,
-            ['status' => 'dismissed'],
-            ['id' => $notification_id, 'user_id' => $user_id],
-            ['%s'],
-            ['%d', '%d']
-        );
-
-        if ($result) {
-            wp_send_json_success(['message' => 'Notification dismissed.']);
-        } else {
-            wp_send_json_error(['message' => 'Could not dismiss notification.']);
-        }
     }
 
     public function handle_vendor_step_submission($step_id, $project_id) {

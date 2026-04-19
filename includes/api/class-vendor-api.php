@@ -82,18 +82,31 @@ class KSC_Vendor_API extends KSC_API_Base {
             $project_title = get_the_title($project_id);
             $display_name = $this->get_vendor_display_name($vendor_id);
             
-            // Notify admin
+            // Prepare common notification data
+            $bid_message = sprintf('New bid received from %s on project "%s" - Amount: ₹%s', $display_name, $project_title, number_format($bid_amount, 2));
+            $project_edit_url = admin_url('post.php?post=' . $project_id . '&action=edit');
+            
+            $email_subject = '🔨 New Bid Received: ' . $project_title;
+            $email_body = '<p>A new bid has been submitted.</p>';
+            $email_body .= '<p><strong>Project:</strong> ' . esc_html($project_title) . '</p>';
+            $email_body .= '<p><strong>Vendor:</strong> ' . esc_html($display_name) . '</p>';
+            $email_body .= '<p><strong>Bid Amount:</strong> ₹' . number_format($bid_amount, 2) . '</p>';
+            $email_body .= '<p><a href="' . esc_url($project_edit_url) . '">View Project & Manage Bids →</a></p>';
+            $email_headers = ['Content-Type: text/html; charset=UTF-8'];
+            
+            // Notify admins (bell + email)
             $admin_users = get_users(['role' => 'administrator']);
             foreach ($admin_users as $admin) {
                 SP_Notifications_Manager::create_notification([
                     'user_id' => $admin->ID,
                     'project_id' => $project_id,
-                    'message' => sprintf('New bid received from %s on project "%s" - Amount: ₹%s', $display_name, $project_title, number_format($bid_amount, 2)),
+                    'message' => $bid_message,
                     'type' => 'bid_received',
                 ]);
+                wp_mail($admin->user_email, $email_subject, $email_body, $email_headers);
             }
             
-            // Notify area manager
+            // Notify area manager (bell + email)
             $project = get_post($project_id);
             if ($project) {
                 $author_id = $project->post_author;
@@ -105,7 +118,20 @@ class KSC_Vendor_API extends KSC_API_Base {
                         'message' => sprintf('New bid from %s on your project "%s" - Amount: ₹%s', $display_name, $project_title, number_format($bid_amount, 2)),
                         'type' => 'bid_received',
                     ]);
+                    wp_mail($author->user_email, $email_subject, $email_body, $email_headers);
                 }
+            }
+            
+            // Notify managers (bell + email)
+            $managers = get_users(['role' => 'manager']);
+            foreach ($managers as $mgr) {
+                SP_Notifications_Manager::create_notification([
+                    'user_id' => $mgr->ID,
+                    'project_id' => $project_id,
+                    'message' => $bid_message,
+                    'type' => 'bid_received',
+                ]);
+                wp_mail($mgr->user_email, $email_subject, $email_body, $email_headers);
             }
             
             do_action('sp_bid_submitted', $bid_id, $project_id, $vendor_id, $bid_amount);

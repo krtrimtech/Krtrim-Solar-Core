@@ -114,8 +114,8 @@ class KSC_Public_API {
         update_user_meta($user_id, 'first_name', $full_name); // Store full name
         update_user_meta($user_id, 'company_name', $company_name);
         update_user_meta($user_id, 'phone', $phone);
-        update_user_meta($user_id, 'purchased_states', $states);
-        update_user_meta($user_id, 'purchased_cities', $cities);
+        // update_user_meta($user_id, 'purchased_states', $states);
+        // update_user_meta($user_id, 'purchased_cities', $cities);
         
         // Check if this is the final callback where payment is complete
         if (!empty($payment_response)) {

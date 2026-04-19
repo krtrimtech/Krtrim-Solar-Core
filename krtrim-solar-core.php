@@ -312,15 +312,16 @@ final class Krtrim_Solar_Core {
 		wp_enqueue_style( 'ksc-public-styles', $this->dir_url . 'assets/css/dashboard.css', [], $this->version );
 		
         if ( is_page( 'solar-dashboard' ) ) {
-            wp_enqueue_script( 'ksc-public-scripts', $this->dir_url . 'assets/js/dashboard.js', [ 'jquery' ], $this->version, true );
+            wp_enqueue_script( 'notification-component-js', $this->dir_url . 'assets/js/components/notification-component.js', ['jquery'], $this->version, true );
+            wp_enqueue_script( 'ksc-public-scripts', $this->dir_url . 'assets/js/dashboard.js', [ 'jquery', 'notification-component-js' ], $this->version, true );
             wp_localize_script( 'ksc-public-scripts', 'ksc_dashboard_vars', [  
                 'rest_api_nonce' => wp_create_nonce( 'wp_rest' ),
-                'client_api_url' => rest_url( 'solar/v1/client-notifications' ),
-                'vendor_api_url' => rest_url( 'solar/v1/vendor-notifications' ),
+                'client_api_url' => rest_url( 'solar/v1/user-notifications' ),
+                'vendor_api_url' => rest_url( 'solar/v1/user-notifications' ),
                 'admin_ajax_url' => admin_url( 'admin-ajax.php' ),
                 'get_earnings_chart_data_nonce' => wp_create_nonce( 'get_earnings_chart_data_nonce' ),
                 'client_comments_url' => rest_url( 'solar/v1/client-comments' ),
-                'vendor_notifications_url' => rest_url( 'solar/v1/vendor-notifications/' ),
+                'vendor_notifications_url' => rest_url( 'solar/v1/user-notifications/' ),
                 'vendor_coverage_nonce' => wp_create_nonce( 'vendor_registration_nonce' ),  // For vendor coverage payment
             ]);
         }
@@ -386,7 +387,8 @@ final class Krtrim_Solar_Core {
             wp_enqueue_script('ksc-team-analysis-component', $this->dir_url . 'assets/js/components/team-analysis-component.js', ['jquery'], $this->version, true);
 			
 			// Enqueue the unified dashboard script for both roles
-			wp_enqueue_script( 'unified-dashboard-js', $this->dir_url . 'assets/js/unified-dashboard.js', [ 'jquery', 'chart-js', 'lead-component-js', 'cleaner-component-js', 'ksc-dashboard-utils', 'ksc-project-modal-component', 'ksc-team-analysis-component' ], '1.0.0', true );
+            wp_enqueue_script( 'notification-component-js', $this->dir_url . 'assets/js/components/notification-component.js', ['jquery'], $this->version, true );
+			wp_enqueue_script( 'unified-dashboard-js', $this->dir_url . 'assets/js/unified-dashboard.js', [ 'jquery', 'chart-js', 'lead-component-js', 'cleaner-component-js', 'ksc-dashboard-utils', 'ksc-project-modal-component', 'ksc-team-analysis-component', 'notification-component-js' ], '1.0.1', true );
 			
 			// Conditionally enqueue manager-specific scripts and styles
 			
@@ -395,6 +397,8 @@ final class Krtrim_Solar_Core {
 
 			wp_localize_script('unified-dashboard-js', 'sp_area_dashboard_vars', [
 				'ajax_url' => admin_url('admin-ajax.php'),
+				'rest_api_url' => rest_url('solar/v1/'),
+				'rest_api_nonce' => wp_create_nonce('wp_rest'),
 				'create_project_nonce' => wp_create_nonce('sp_create_project_nonce_field'),
 				'update_project_nonce' => wp_create_nonce('sp_update_project_nonce'),
 				'project_details_nonce' => wp_create_nonce('sp_project_details_nonce'),

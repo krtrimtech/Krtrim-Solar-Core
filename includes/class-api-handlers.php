@@ -57,75 +57,19 @@ class SP_API_Handlers {
      * Register all REST API routes
      */
     public function register_rest_routes() {
-        // Client notifications
-        register_rest_route('solar/v1', '/client-notifications', [
+
+        // Unified User notifications (for Managers and fallback)
+        register_rest_route('solar/v1', '/user-notifications', [
             'methods' => 'GET',
-            'callback' => [$this, 'client_get_notifications_rest'],
-            'permission_callback' => function () {
-                return is_user_logged_in() && (current_user_can('solar_client') || current_user_can('administrator'));
-            },
+            'callback' => [$this, 'get_unified_user_notifications_rest'],
+            'permission_callback' => 'is_user_logged_in',
         ]);
         
-        // Client comments
-        register_rest_route('solar/v1', '/client-comments', [
-            'methods' => 'POST',
-            'callback' => [$this, 'client_submit_comment_rest'],
-            'permission_callback' => function () {
-                return is_user_logged_in() && (current_user_can('solar_client') || current_user_can('administrator'));
-            },
-        ]);
-        
-        // Vendor notifications
-        register_rest_route('solar/v1', '/vendor-notifications', [
-            'methods' => 'GET',
-            'callback' => [$this, 'get_vendor_notifications_rest'],
-            'permission_callback' => function () {
-                return is_user_logged_in() && (current_user_can('solar_vendor') || current_user_can('vendor'));
-            },
-        ]);
-        
-        register_rest_route('solar/v1', '/vendor-notifications/(?P<id>\d+)', [
+        register_rest_route('solar/v1', '/user-notifications/(?P<id>\d+)', [
             'methods' => 'DELETE',
-            'callback' => [$this, 'delete_vendor_notification_rest'],
-            'permission_callback' => function () {
-                return is_user_logged_in() && (current_user_can('solar_vendor') || current_user_can('vendor'));
-            },
+            'callback' => [$this, 'delete_unified_user_notification_rest'],
+            'permission_callback' => 'is_user_logged_in',
         ]);
-    }
-    
-    /**
-     * REST: Get client notifications
-     */
-    public function client_get_notifications_rest(WP_REST_Request $request) {
-        $user = wp_get_current_user();
-        $client_id = $user->ID;
-        
-        global $wpdb;
-        $table = $wpdb->prefix . 'solar_notifications';
-        
-        $notifications = $wpdb->get_results($wpdb->prepare(
-            "SELECT * FROM {$table} WHERE user_id = %d AND status = 'unread' ORDER BY created_at DESC LIMIT 10",
-            $client_id
-        ));
-        
-        $formatted = [];
-        foreach ($notifications as $notif) {
-            $icon = 'ℹ️';
-            if (strpos($notif->type, 'approved') !== false) $icon = '✅';
-            if (strpos($notif->type, 'rejected') !== false) $icon = '❌';
-            if (strpos($notif->type, 'assigned') !== false) $icon = '👷';
-            
-            $formatted[] = [
-                'id' => $notif->id,
-                'type' => $notif->type,
-                'icon' => $icon,
-                'title' => ucfirst(str_replace('_', ' ', $notif->type)),
-                'message' => wp_kses_post($notif->message),
-                'time_ago' => human_time_diff(strtotime($notif->created_at), current_time('timestamp')) . ' ago',
-            ];
-        }
-        
-        return rest_ensure_response($formatted);
     }
     
     /**
@@ -160,10 +104,12 @@ class SP_API_Handlers {
         return rest_ensure_response(['message' => 'Comment submitted successfully']);
     }
     
+
+    
     /**
-     * REST: Get vendor notifications
+     * REST: Get Unified User Notifications
      */
-    public function get_vendor_notifications_rest(WP_REST_Request $request) {
+    public function get_unified_user_notifications_rest(WP_REST_Request $request) {
         $user_id = get_current_user_id();
         if (!$user_id) return new WP_Error('no_user', 'Not logged in', ['status' => 401]);
         
@@ -183,6 +129,8 @@ class SP_API_Handlers {
             if (strpos($notif->type, 'approved') !== false) $icon = '✅';
             if (strpos($notif->type, 'rejected') !== false) $icon = '❌';
             if (strpos($notif->type, 'bid') !== false) $icon = '💰';
+            if (strpos($notif->type, 'coverage_updated') !== false) $icon = '📍';
+            if (strpos($notif->type, 'assigned') !== false) $icon = '👷';
             
             $formatted[] = [
                 'id' => $notif->id,
@@ -198,18 +146,27 @@ class SP_API_Handlers {
     }
     
     /**
-     * REST: Delete vendor notification
+     * REST: Dismiss Unified User Notification
      */
-    public function delete_vendor_notification_rest(WP_REST_Request $request) {
+    public function delete_unified_user_notification_rest(WP_REST_Request $request) {
+        $notification_id = $request->get_param('id');
         $user_id = get_current_user_id();
-        if (!$user_id) return new WP_Error('unauthorized', 'Not logged in', ['status' => 401]);
         
-        $notif_id = intval($request->get_param('id'));
-        if (!$notif_id) return new WP_Error('no_id', 'Notification ID missing', ['status' => 400]);
+        global $wpdb;
+        $table = $wpdb->prefix . 'solar_notifications';
         
-        return rest_ensure_response(['message' => 'Notification dismissed (simulated).']);
+        $wpdb->update(
+            $table,
+            ['status' => 'dismissed'],
+            ['id' => $notification_id, 'user_id' => $user_id],
+            ['%s'],
+            ['%d', '%d']
+        );
+        
+        return rest_ensure_response(['message' => 'Notification dismissed']);
     }
-    
+
+
     /**
      * Save default process steps template
      */

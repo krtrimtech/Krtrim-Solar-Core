@@ -308,13 +308,21 @@ class SP_Admin_Widgets {
             <div class="sp-activity-feed">
                 <?php if (!empty($activities)) : ?>
                     <?php foreach ($activities as $activity) : ?>
+                        <?php if (!empty($activity['url'])) : ?>
+                        <a href="<?php echo esc_url($activity['url']); ?>" class="sp-activity-item sp-activity-link" style="text-decoration:none; color:inherit; display:flex; cursor:pointer;">
+                        <?php else : ?>
                         <div class="sp-activity-item">
+                        <?php endif; ?>
                             <span class="sp-activity-icon"><?php echo $activity['icon']; ?></span>
                             <div class="sp-activity-details">
                                 <span class="sp-activity-text"><?php echo esc_html($activity['text']); ?></span>
                                 <span class="sp-activity-time"><?php echo human_time_diff($activity['time'], current_time('timestamp')); ?> ago</span>
                             </div>
+                        <?php if (!empty($activity['url'])) : ?>
+                        </a>
+                        <?php else : ?>
                         </div>
+                        <?php endif; ?>
                     <?php endforeach; ?>
                 <?php else : ?>
                     <p class="sp-no-data">No recent activity.</p>
@@ -481,7 +489,8 @@ class SP_Admin_Widgets {
             $activities[] = [
                 'icon' => '🆕',
                 'text' => 'New project created: ' . $project->post_title,
-                'time' => strtotime($project->post_date)
+                'time' => strtotime($project->post_date),
+                'url' => admin_url('post.php?post=' . $project->ID . '&action=edit'),
             ];
         }
 
@@ -498,9 +507,33 @@ class SP_Admin_Widgets {
             $activities[] = [
                 'icon' => '✅',
                 'text' => 'Project completed: ' . $project->post_title,
-                'time' => strtotime($project->post_modified)
+                'time' => strtotime($project->post_modified),
+                'url' => admin_url('post.php?post=' . $project->ID . '&action=edit'),
             ];
         }
+
+        // ✅ RECENT COVERAGE PAYMENTS (last 7 days)
+        global $wpdb;
+        $payments_table = $wpdb->prefix . 'solar_vendor_payments';
+        $coverage_added = $wpdb->get_results(
+            "SELECT p.*, u.display_name 
+            FROM {$payments_table} p 
+            JOIN {$wpdb->users} u ON p.vendor_id = u.ID 
+            WHERE p.payment_status = 'completed' 
+            AND p.payment_date >= DATE_SUB(NOW(), INTERVAL 7 DAY) 
+            ORDER BY p.payment_date DESC 
+            LIMIT 5"
+        );
+
+        foreach ($coverage_added as $row) {
+            $activities[] = [
+                'icon' => '📍',
+                'text' => 'Coverage added by ' . $row->display_name . ' — States: ' . $row->states_purchased . '. Cities: ' . $row->cities_purchased . '. Payment: ₹' . number_format($row->amount, 0),
+                'time' => strtotime($row->payment_date),
+                'url' => admin_url('admin.php?page=vendor-approval'),
+            ];
+        }
+
 
         // ✅ RECENT BIDS (last 7 days)
         global $wpdb;
@@ -519,7 +552,8 @@ class SP_Admin_Widgets {
             $activities[] = [
                 'icon' => '🎯',
                 'text' => sprintf('Bid by %s on %s - ₹%s', $bid->display_name, $bid->post_title, number_format($bid->bid_amount, 0)),
-                'time' => strtotime($bid->created_at)
+                'time' => strtotime($bid->created_at),
+                'url' => admin_url('post.php?post=' . $bid->project_id . '&action=edit'),
             ];
         }
 
@@ -539,7 +573,8 @@ class SP_Admin_Widgets {
             $activities[] = [
                 'icon' => '📤',
                 'text' => sprintf('Step submitted: %s for %s', $step->step_name, $step->post_title),
-                'time' => strtotime($step->updated_at)
+                'time' => strtotime($step->updated_at),
+                'url' => admin_url('admin.php?page=project-reviews&project=' . $step->project_id),
             ];
         }
 
@@ -588,7 +623,8 @@ class SP_Admin_Widgets {
             $activities[] = [
                 'icon' => $icon,
                 'text' => $text,
-                'time' => strtotime($visit->post_modified)
+                'time' => strtotime($visit->post_modified),
+                'url' => admin_url('post.php?post=' . $visit->ID . '&action=edit'),
             ];
         }
 

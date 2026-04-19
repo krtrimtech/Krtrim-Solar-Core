@@ -56,6 +56,7 @@ class KSC_Payment_Gateway {
                     $this->process_cleaning_success($order_id, $payment_id, $extra_data);
                     break;
                 case 'vendor_registration':
+                case 'vendor_coverage':
                     $this->process_vendor_coverage_success($order_id, $payment_id, $extra_data);
                     break;
                 default:
@@ -142,8 +143,8 @@ class KSC_Payment_Gateway {
         $amount = floatval($extra_data['amount']);
 
         // Update Vendor Meta
-        $current_states = get_user_meta($vendor_id, 'operation_states', true) ?: [];
-        $current_cities = get_user_meta($vendor_id, 'operation_cities', true) ?: [];
+        $current_states = get_user_meta($vendor_id, 'purchased_states', true) ?: [];
+        $current_cities = get_user_meta($vendor_id, 'purchased_cities', true) ?: [];
 
         if (!is_array($current_states)) $current_states = [$current_states];
         if (!is_array($current_cities)) $current_cities = [$current_cities];
@@ -151,8 +152,8 @@ class KSC_Payment_Gateway {
         $new_states = array_unique(array_merge($current_states, $states));
         $new_cities = array_unique(array_merge($current_cities, $cities));
 
-        update_user_meta($vendor_id, 'operation_states', $new_states);
-        update_user_meta($vendor_id, 'operation_cities', $new_cities);
+        update_user_meta($vendor_id, 'purchased_states', $new_states);
+        update_user_meta($vendor_id, 'purchased_cities', $new_cities);
 
         // Log payment in custom table
         global $wpdb;
@@ -178,6 +179,13 @@ class KSC_Payment_Gateway {
         }
         $public_api = new KSC_Public_API();
         $public_api->check_auto_approval($vendor_id);
+
+        // Create bell notification for the vendor
+        SP_Notifications_Manager::create_notification([
+            'user_id' => $vendor_id,
+            'message' => 'Coverage area expanded successfully! Added States:' . (!empty($states) ? implode(', ', $states) : 'None') . '. Cities: ' . (!empty($cities) ? implode(', ', $cities) : 'None') . '. Payment: ₹' . number_format($amount, 0),
+            'type' => 'coverage_updated'
+        ]);
 
         // Notifications
         if (class_exists('KSC_Email_Templates')) {
