@@ -586,8 +586,10 @@
         }
     }
 
-    // Check if the page loaded with a pending payment status state
-    if (config.resume_step && config.resume_step === 2) {
+    // Check if the page loaded with a pending-payment state (verified but unpaid vendor)
+    // NOTE: wp_localize_script converts integers to strings, so we use parseInt()
+    // to avoid "2" === 2 being false (strict type mismatch).
+    if (parseInt(config.resume_step) === 2) {
         $(document).ready(function() {
             // Pre-fill the basic info so the summary doesn't look empty when they reach Step 3
             if (config.user_data) {
@@ -598,6 +600,12 @@
                     phone: config.user_data.phone || ''
                 };
             }
+
+            // Hide "Previous" buttons — Step 1 is done (account created + email verified).
+            // Letting the user go back would show a registration form they can't re-submit.
+            $('#vreg-step2-prev').hide();
+            $('#vreg-step3-prev').hide();
+
             showStep(2);
             showFeedback('Email verified successfully! Please select your coverage areas.', 'success');
         });

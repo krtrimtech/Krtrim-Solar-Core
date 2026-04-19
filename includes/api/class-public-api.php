@@ -189,10 +189,30 @@ class KSC_Public_API {
         // Check for auto-approval
         $this->check_auto_approval($user_id);
         
-        // Redirect back to registration page with a flag to resume at step 2
+        // Redirect back to registration page to resume at step 2
         $redirect_url = home_url('/vendor-registration/?vreg_resume=2');
-        wp_redirect($redirect_url);
-        exit;
+        
+        // Try wp_redirect first (works if no headers sent yet)
+        if (!headers_sent()) {
+            wp_redirect($redirect_url);
+            exit;
+        }
+        
+        // FALLBACK: If redirect failed (in-app browser, headers already sent, etc.)
+        // Show a friendly page with a manual link so the user is never stuck.
+        $login_url = wp_login_url($redirect_url);
+        wp_die(
+            '<div style="text-align:center; padding:40px; font-family:sans-serif;">'
+            . '<h2 style="color:#10b981;">✅ Email Verified Successfully!</h2>'
+            . '<p style="font-size:16px; color:#4b5563;">Your email has been verified. You can now continue your registration.</p>'
+            . '<p style="margin-top:20px;">'
+            . '<a href="' . esc_url($redirect_url) . '" style="display:inline-block; background:#667eea; color:#fff; padding:12px 28px; border-radius:8px; text-decoration:none; font-weight:600;">Continue Registration →</a>'
+            . '</p>'
+            . '<p style="margin-top:15px; font-size:14px; color:#9ca3af;">If you opened this link on a different device, '
+            . '<a href="' . esc_url($login_url) . '">log in here</a> to continue.</p>'
+            . '</div>',
+            'Email Verified — Solar Dashboard'
+        );
     }
     
     /**

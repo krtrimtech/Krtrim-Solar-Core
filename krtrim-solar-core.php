@@ -435,7 +435,7 @@ final class Krtrim_Solar_Core {
 				'vendor-registration-js',
 				$this->dir_url . 'assets/js/vendor-registration.js',
 				['jquery'],
-				'1.0.0',
+				'1.0.1',
 				true
 			);
 
@@ -450,9 +450,26 @@ final class Krtrim_Solar_Core {
 				$razorpay_key = isset($options['razorpay_test_key_id']) ? $options['razorpay_test_key_id'] : '';
 			}
 
-            // Handle step 2 resume data
+            // Handle step 2 resume — check URL param first, then fallback to DB status
             $resume_step = isset($_GET['vreg_resume']) ? intval($_GET['vreg_resume']) : 0;
             $user_data = null;
+
+            // SERVER-SIDE SMART CHECK: If a logged-in vendor has verified email but
+            // hasn't paid yet, auto-resume at step 2 regardless of URL parameter.
+            // This makes the flow device-independent (laptop, mobile, any browser).
+            if (is_user_logged_in()) {
+                $current_user = wp_get_current_user();
+                if (in_array('solar_vendor', $current_user->roles)) {
+                    $email_verified = get_user_meta($current_user->ID, 'email_verified', true);
+                    $payment_status = get_user_meta($current_user->ID, 'vendor_payment_status', true);
+
+                    if ($email_verified === 'yes' && $payment_status !== 'completed') {
+                        $resume_step = 2; // Override — DB is the source of truth
+                    }
+                }
+            }
+
+            // If resuming at step 2, pre-load user data for the JS form
             if ($resume_step === 2 && is_user_logged_in()) {
                 $current_user = wp_get_current_user();
                 $user_data = [
